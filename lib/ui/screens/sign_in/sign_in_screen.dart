@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/controllers/auth_controller.dart';
 import '../../../app/providers/auth_providers.dart';
@@ -95,7 +97,10 @@ class _SignInBody extends ConsumerWidget {
 
     final data = async.value;
     if (data is AuthDeviceFlowAwaitingUser) {
-      children.add(_DeviceCodePanel(userCode: data.challenge.userCode));
+      children.add(_DeviceCodePanel(
+        userCode: data.challenge.userCode,
+        verificationUri: data.challenge.verificationUri,
+      ));
       children.add(const SizedBox(height: 16));
     } else if (data is AuthSignedIn) {
       children.add(_SignedInPanel(login: data.session.identity.name));
@@ -159,9 +164,33 @@ class _SignInBody extends ConsumerWidget {
   }
 }
 
-class _DeviceCodePanel extends StatelessWidget {
-  const _DeviceCodePanel({required this.userCode});
+class _DeviceCodePanel extends StatefulWidget {
+  const _DeviceCodePanel({
+    required this.userCode,
+    required this.verificationUri,
+  });
   final String userCode;
+  final String verificationUri;
+
+  @override
+  State<_DeviceCodePanel> createState() => _DeviceCodePanelState();
+}
+
+class _DeviceCodePanelState extends State<_DeviceCodePanel> {
+  @override
+  void initState() {
+    super.initState();
+    // Auto-copy the code the moment the panel appears so the user can
+    // just tap "Copy & open GitHub" → paste → done. Re-mounting
+    // (e.g. after restarting the flow) re-copies the new code.
+    Clipboard.setData(ClipboardData(text: widget.userCode));
+  }
+
+  Future<void> _copyAndOpen() async {
+    await Clipboard.setData(ClipboardData(text: widget.userCode));
+    final uri = Uri.parse(widget.verificationUri);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -176,7 +205,7 @@ class _DeviceCodePanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            userCode,
+            widget.userCode,
             textAlign: TextAlign.center,
             style: appMono(
               context,
@@ -187,9 +216,26 @@ class _DeviceCodePanel extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Open github.com/login/device and enter this code.',
+            'Code copied to clipboard. Paste at github.com/login/device.',
             textAlign: TextAlign.center,
             style: TextStyle(color: t.textMuted, fontSize: 11, height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: _copyAndOpen,
+            icon: const Icon(Icons.open_in_new_rounded, size: 16),
+            label: const Text('Copy & open GitHub'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: t.accentPrimary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
+              textStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
