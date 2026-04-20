@@ -25,19 +25,19 @@ Task numbering and TDD ceremony follow IMPLEMENTATION.md §5.3 and §6.0. Each t
 
 | # | Task | Status |
 |---|---|---|
-| T1 | Tests for existing `AppTokens` + `context.tokens` extension | ⏳ |
-| T2 | Domain entities (`Job`, `SpecFile`, `Phase`, `Anchor`, `StrokeGroup`, `Commit`, `RepoRef`, `GitIdentity`, `AuthSession`) + tests | ⏳ |
-| T3 | `AuthPort` + `FakeAuthPort` + domain tests (Device Flow scripted, PAT, 401) | ⏳ |
-| T4 | `SecureStoragePort` + `KeystoreAdapter` | ⏳ |
-| T5 | `AuthController` (Riverpod) + state-transition tests | ⏳ |
-| T6 | OAuth Device Flow adapter (dio + `url_launcher`) | ⏳ |
-| T7 | `GitPort` + `FakeGitPort` + domain tests (conflict truth table, atomic commit) | ⏳ |
-| T8 | `FileSystemPort` + `PhaseResolver` + domain tests | ⏳ |
-| T9 | `SpecRepository` + `OpenQuestionExtractor` + tests | ⏳ |
-| T10 | Git infra adapter (`libgit2dart` isolate) + local-bare-repo integration test | ⏳ |
-| T11 | `SyncService.syncDown` happy-path + integration test | ⏳ |
-| T12 | Wire `SignIn`, `RepoPicker`, `JobList`, `SpecReader-md` screens to real controllers (replace stub data) | ⏳ |
-| M1a-close | Milestone review + finishing-a-development-branch | ⏳ |
+| T1 | Tests for existing `AppTokens` + `context.tokens` extension | ✅ |
+| T2 | Domain entities (`Job`, `SpecFile`, `Phase`, `Anchor`, `StrokeGroup`, `Commit`, `RepoRef`, `GitIdentity`, `AuthSession`) + tests | ✅ |
+| T3 | `AuthPort` + `FakeAuthPort` + domain tests (Device Flow scripted, PAT, 401) | ✅ |
+| T4 | `SecureStoragePort` + `KeystoreAdapter` | ✅ |
+| T5 | `AuthController` (Riverpod) + state-transition tests | ✅ |
+| T6 | OAuth Device Flow adapter (dio + `url_launcher`) | ✅ |
+| T7 | `GitPort` + `FakeGitPort` + domain tests (conflict truth table, atomic commit) | ✅ |
+| T8 | `FileSystemPort` + `FakeFileSystem` + `FsAdapter` + phase integration | ✅ |
+| T9 | `SpecRepository` + `OpenQuestionExtractor` + tests | ✅ |
+| T10 | Git infra adapter (`libgit2dart` isolate) + integration skeleton | ✅ (skeleton; real IT pending device seam) |
+| T11 | `SyncService.syncDown` happy-path + tests | ✅ (integration test is T10 skeleton; enable after device seam) |
+| T12 | Wire `SignIn` + `JobList` to real controllers (composition root) | ✅ (RepoPicker + SpecReader wiring → M1b/1c) |
+| M1a-close | Milestone review + QA + triage + finishing-a-development-branch | 🟡 |
 
 ### Milestones 1b–1d
 

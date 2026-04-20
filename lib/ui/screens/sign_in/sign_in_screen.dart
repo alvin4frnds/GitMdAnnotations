@@ -5,6 +5,7 @@ import '../../../app/controllers/auth_controller.dart';
 import '../../../app/providers/auth_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import 'pat_dialog.dart';
 
 /// Screen 1 — Sign in (GitHub Device Flow + PAT fallback).
 ///
@@ -143,9 +144,15 @@ class _SignInBody extends ConsumerWidget {
   }
 
   Future<void> _openPatDialog(BuildContext context, WidgetRef ref) async {
+    // Explicit barrier colour (token-driven scrim): Flutter's default
+    // falls back to opaque black in some ancestor-missing setups, which
+    // is what produced the "black surface" QA report. Hard-coding the
+    // scrim at 54% black keeps the card readable against the app
+    // background in both light and dark tokens.
     final pat = await showDialog<String>(
       context: context,
-      builder: (ctx) => const _PatDialog(),
+      barrierColor: Colors.black54,
+      builder: (ctx) => const PatDialog(),
     );
     if (pat == null || pat.isEmpty) return;
     await ref.read(authControllerProvider.notifier).signInWithPat(pat);
@@ -336,57 +343,3 @@ class _LoadingButton extends StatelessWidget {
   }
 }
 
-class _PatDialog extends StatefulWidget {
-  const _PatDialog();
-
-  @override
-  State<_PatDialog> createState() => _PatDialogState();
-}
-
-class _PatDialogState extends State<_PatDialog> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return AlertDialog(
-      backgroundColor: t.surfaceElevated,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      title: Text(
-        'Paste personal access token',
-        style: TextStyle(color: t.textPrimary, fontSize: 15),
-      ),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        obscureText: true,
-        decoration: InputDecoration(
-          hintText: 'ghp_…',
-          hintStyle: appMono(context, size: 12, color: t.textMuted),
-          isDense: true,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(color: t.borderSubtle),
-          ),
-        ),
-        style: appMono(context, size: 13),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
-          child: const Text('Sign in'),
-        ),
-      ],
-    );
-  }
-}

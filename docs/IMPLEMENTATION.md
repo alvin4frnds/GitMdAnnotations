@@ -1015,8 +1015,13 @@ Derived from the `sadd:subagent-driven-development` skill. Each milestone's task
 **Per milestone close-out.**
 
 1. After the last task, dispatch a **final code-reviewer subagent** to review the whole milestone against its exit criteria.
-2. If it passes, announce: *"I'm using the finishing-a-development-branch skill to complete this work."* and follow that skill (verify tests, present options, execute).
-3. Only then is the milestone done.
+2. Deploy the build to the tablet.
+3. Dispatch a **QA subagent** (fresh context, general-purpose) that uses ADB to screenshot every affected screen, walks through interactions, and reports findings ranked **Critical / High / Medium / Low**.
+4. Dispatch a **triage subagent** (separate fresh context) that reads the QA report and produces a fix plan for **Critical + High** only. Medium and Low are deferred.
+5. If any Critical or High findings exist, dispatch fix subagents, redeploy, and return to step 3 (round 2, 3, …) until a clean Critical/High pass.
+6. Append all remaining Medium + Low findings to `docs/Issues.md` (create if missing).
+7. Announce: *"I'm using the finishing-a-development-branch skill to complete this work."* and follow that skill (verify tests, present options, execute).
+8. Only then is the milestone done.
 
 **Never:**
 

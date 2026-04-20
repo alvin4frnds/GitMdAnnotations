@@ -4,11 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/providers/auth_providers.dart';
 import 'app/providers/spec_providers.dart';
 import 'app/providers/sync_providers.dart';
+import 'domain/entities/auth_session.dart';
+import 'domain/entities/git_identity.dart';
 import 'domain/entities/repo_ref.dart';
 import 'domain/fakes/fake_auth_port.dart';
 import 'domain/fakes/fake_file_system.dart';
 import 'domain/fakes/fake_git_port.dart';
 import 'domain/fakes/fake_secure_storage.dart';
+import 'domain/ports/auth_port.dart';
 import 'domain/ports/secure_storage_port.dart';
 import 'infra/auth/github_oauth_adapter.dart';
 import 'infra/fs/fs_adapter.dart';
@@ -90,14 +93,58 @@ List<Override> _realOverrides() {
 List<Override> _mockupOverrides() {
   final fs = FakeFileSystem();
   _seedMockupFs(fs);
+  final auth = _buildMockupAuth();
   return [
     secureStorageProvider.overrideWithValue(FakeSecureStorage()),
-    authPortProvider.overrideWithValue(FakeAuthPort()),
+    authPortProvider.overrideWithValue(auth),
     fileSystemProvider.overrideWithValue(fs),
     gitPortProvider.overrideWithValue(FakeGitPort()),
     currentWorkdirProvider.overrideWith((ref) => _mockupWorkdir),
     currentRepoProvider.overrideWith((ref) => _mockupRepo),
   ];
+}
+
+/// The fake identity used by the mockup-mode Sign In screen's auto-run
+/// walkthrough. Both the Device Flow success path and the "known good"
+/// PAT resolve to the same `(demo, demo@example.com)` pair.
+const _mockupIdentity =
+    GitIdentity(name: 'demo', email: 'demo@example.com');
+
+/// The PAT the walkthrough documents as a "known good" token for the
+/// Sign In screen's PAT fallback. Paired with an explicit invalid token
+/// below so the dialog exercises both the success and error paths.
+const _mockupDemoPat = 'ghp_mockup_demo_token';
+
+/// Builds a [FakeAuthPort] seeded for the mockup browser:
+///   * [FakeAuthPort.nextChallenge] — a realistic Device Flow challenge
+///     so `AuthController.startDeviceFlow` surfaces a visible `userCode`
+///     the reviewer can act on, instead of throwing `StateError`.
+///   * [FakeAuthPort.pollScript] — two `PollAuthorizationPending`s then
+///     a `PollSuccess`, so the awaiting-user → signed-in transition
+///     auto-completes in ~3s during the walkthrough.
+///   * [FakeAuthPort.patScript] — a known-good PAT that lands in
+///     `AuthSignedIn`, plus a scripted bad token that emits
+///     `AuthInvalidToken` so the dialog's error banner can be demoed.
+FakeAuthPort _buildMockupAuth() {
+  final session = const AuthSession(token: 'mock-token', identity: _mockupIdentity);
+  return FakeAuthPort()
+    ..nextChallenge = DeviceCodeChallenge(
+      deviceCode: 'mock-device-code',
+      userCode: 'WDJB-MJHT',
+      verificationUri: 'https://github.com/login/device',
+      pollInterval: const Duration(seconds: 1),
+      expiresAt: DateTime.now().add(const Duration(minutes: 15)),
+    )
+    ..pollScript.addAll([
+      const PollAuthorizationPending(),
+      const PollAuthorizationPending(),
+      PollSuccess(session),
+    ])
+    ..patScript.addAll({
+      _mockupDemoPat: PatResponse.success(session),
+      'ghp_mockup_bad_token':
+          const PatResponse.error(AuthInvalidToken()),
+    });
 }
 
 /// Pre-bakes the same three job folders the mockup JobListScreen used to
