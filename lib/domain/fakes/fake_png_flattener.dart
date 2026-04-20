@@ -9,7 +9,8 @@ import '../ports/png_flattener_port.dart';
 /// 8-byte PNG signature stand-in so downstream "is this a PNG?" checks
 /// pass while the real rasterizer (T10) is still a fake.
 class FakePngFlattener implements PngFlattener {
-  FakePngFlattener({Uint8List? output}) : _output = output;
+  FakePngFlattener({Uint8List? output})
+      : _output = output == null ? null : Uint8List.fromList(output);
 
   /// 8-byte PNG signature (`\x89PNG\r\n\x1a\n`) — the default bytes returned
   /// when no constructor override is supplied, so downstream "is this a

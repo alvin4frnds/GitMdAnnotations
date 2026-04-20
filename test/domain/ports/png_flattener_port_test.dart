@@ -62,6 +62,19 @@ void main() {
       );
       expect(bytes, Uint8List.fromList([1, 2, 3]));
     });
+
+    test(
+        'mutating the override buffer after construction '
+        'does not affect future flatten results', () async {
+      var bytes = Uint8List.fromList([1, 2, 3]);
+      final fake = FakePngFlattener(output: bytes);
+      bytes[0] = 99;
+      final flattened = await fake.flatten(
+        groups: [_sampleGroup()],
+        canvas: _sampleCanvas(),
+      );
+      expect(flattened, Uint8List.fromList([1, 2, 3]));
+    });
   });
 
   group('FakePngFlattener call log', () {
