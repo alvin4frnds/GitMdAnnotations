@@ -36,13 +36,20 @@ class _App extends StatelessWidget {
 
 /// Shows [SignInScreen] until auth settles into [AuthSignedIn], then the
 /// [JobListScreen]. A router-driven shell replaces this in M1b.
+///
+/// Wrapped in [SafeArea] so neither screen paints under the system status
+/// bar / nav bar / display cutout. Flutter renders edge-to-edge by default
+/// on Android 15+, and without this the status-bar clock collides with the
+/// top row of the job list.
 class _AuthGate extends ConsumerWidget {
   const _AuthGate();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final data = ref.watch(authControllerProvider).value;
-    if (data is AuthSignedIn) return const JobListScreen();
-    return const SignInScreen();
+    final screen = data is AuthSignedIn
+        ? const JobListScreen()
+        : const SignInScreen();
+    return SafeArea(child: screen);
   }
 }
