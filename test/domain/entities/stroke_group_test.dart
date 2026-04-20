@@ -98,6 +98,27 @@ void main() {
         );
       },
     );
+
+    test(
+      'two zero-stroke groups with same id, anchor, and timestamp '
+      'are equal and hash-equal',
+      () {
+        final a = StrokeGroup(
+          id: 'stroke-group-A',
+          anchor: anchor,
+          timestamp: ts,
+          strokes: const [],
+        );
+        final b = StrokeGroup(
+          id: 'stroke-group-A',
+          anchor: anchor,
+          timestamp: ts,
+          strokes: const [],
+        );
+        expect(a, equals(b));
+        expect(a.hashCode, equals(b.hashCode));
+      },
+    );
   });
 
   group('StrokeGroup huge stroke sets', () {
