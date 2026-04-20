@@ -1,0 +1,6 @@
+* text=auto
+
+# SVG goldens are compared byte-for-byte against serializer output that
+# emits `\n`. Lock them to LF so Windows autocrlf doesn't convert them
+# to CRLF on checkout and break the golden-match assertion.
+test/golden/*.svg text eol=lf

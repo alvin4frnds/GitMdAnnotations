@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" data-source-file="02-spec.md" data-source-sha="abc123">
+  <g id="stroke-group-A" data-anchor-line="10" data-timestamp="2026-04-20T09:14:22Z">
+    <path d="M 1,2 L 3,4" stroke="#DC2626" stroke-width="2.1" opacity="0.9"/>
+    <path d="M 5,6 L 7,8 L 9,10" stroke="#2563EB" stroke-width="3" opacity="0.9"/>
+  </g>
+  <g id="stroke-group-B" data-anchor-line="102" data-timestamp="2026-04-20T10:00:00Z">
+    <path d="M 50,60 L 70,80" stroke="#059669" stroke-width="1.5" opacity="0.9"/>
+  </g>
+</svg>
