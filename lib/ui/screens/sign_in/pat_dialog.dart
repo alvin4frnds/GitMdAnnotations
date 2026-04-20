@@ -47,9 +47,14 @@ class _PatDialogState extends State<PatDialog> {
           'Paste personal access token',
           style: TextStyle(color: t.textPrimary, fontSize: 15),
         ),
+        // Do NOT autofocus: on Android tablets (OnePlus Pad Go 2 in
+        // particular), autofocus + obscureText triggers the vendor's
+        // "OplusSecurityInputMethod" which paints opaque-black over the
+        // full Flutter surface, masking the dialog. Let the user tap to
+        // focus — the standard keyboard animates in and the dialog
+        // stays visible.
         content: TextField(
           controller: _controller,
-          autofocus: true,
           obscureText: true,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
