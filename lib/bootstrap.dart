@@ -15,11 +15,10 @@ import 'infra/id/system_id_generator.dart';
 import 'infra/pdf/pdfx_adapter.dart';
 import 'infra/storage/keystore_adapter.dart';
 
-/// BLOCKER: real OAuth client id is still `OVERRIDE_ME`. The real GitHub
-/// OAuth App isn't registered yet; this const lives here as a single
-/// anchor so the follow-up patch is a one-line change. Do NOT try to sign
-/// in until this is replaced.
-const String _prodClientId = 'OVERRIDE_ME';
+/// GitHub OAuth App client id for Device Flow. Public by design — ships
+/// in the app binary. Security comes from GitHub-side user approval, not
+/// from hiding this value.
+const String _prodClientId = 'Ov23licdsOmS75Rq82SE';
 
 /// Builds the composition root. Binds every port listed in §2.1's layer
 /// diagram to its production adapter. The returned scope wraps [child].
