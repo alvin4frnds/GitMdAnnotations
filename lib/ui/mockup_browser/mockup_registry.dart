@@ -1,0 +1,49 @@
+import 'package:flutter/widgets.dart';
+
+import '../screens/annotation_canvas/annotation_canvas_screen.dart';
+import '../screens/approval_confirmation/approval_confirmation_screen.dart';
+import '../screens/changelog_viewer/changelog_viewer_screen.dart';
+import '../screens/conflict_archived/conflict_archived_screen.dart';
+import '../screens/job_list/job_list_screen.dart';
+import '../screens/new_spec_author/new_spec_author_screen.dart';
+import '../screens/review_panel/review_panel_screen.dart';
+import '../screens/sign_in/sign_in_screen.dart';
+import '../screens/spec_reader_md/spec_reader_md_screen.dart';
+import '../screens/submit_confirmation/submit_confirmation_screen.dart';
+import '../screens/sync_status_bar/sync_down_screen.dart';
+import '../screens/sync_status_bar/sync_up_screen.dart';
+
+class MockupEntry {
+  final String label;
+  final WidgetBuilder builder;
+  const MockupEntry(this.label, this.builder);
+}
+
+/// Ordered list of the 12 PRD mockup screens for visual QA.
+const List<MockupEntry> mockupRegistry = [
+  MockupEntry('1. Sign in', _signIn),
+  MockupEntry('2. Sync Down', _syncDown),
+  MockupEntry('3. Job list', _jobList),
+  MockupEntry('4. Spec reader (markdown)', _specReaderMd),
+  MockupEntry('5. Annotation canvas', _annotationCanvas),
+  MockupEntry('6. Review panel', _reviewPanel),
+  MockupEntry('7. Submit confirmation', _submitConfirmation),
+  MockupEntry('8. Sync Up', _syncUp),
+  MockupEntry('9. Changelog viewer', _changelogViewer),
+  MockupEntry('10. Approval confirmation', _approvalConfirmation),
+  MockupEntry('11. Conflict archived', _conflictArchived),
+  MockupEntry('12. New spec (Phase 2)', _newSpecAuthor),
+];
+
+Widget _signIn(BuildContext c) => const SignInScreen();
+Widget _syncDown(BuildContext c) => const SyncDownScreen();
+Widget _jobList(BuildContext c) => const JobListScreen();
+Widget _specReaderMd(BuildContext c) => const SpecReaderMdScreen();
+Widget _annotationCanvas(BuildContext c) => const AnnotationCanvasScreen();
+Widget _reviewPanel(BuildContext c) => const ReviewPanelScreen();
+Widget _submitConfirmation(BuildContext c) => const SubmitConfirmationScreen();
+Widget _syncUp(BuildContext c) => const SyncUpScreen();
+Widget _changelogViewer(BuildContext c) => const ChangelogViewerScreen();
+Widget _approvalConfirmation(BuildContext c) => const ApprovalConfirmationScreen();
+Widget _conflictArchived(BuildContext c) => const ConflictArchivedScreen();
+Widget _newSpecAuthor(BuildContext c) => const NewSpecAuthorScreen();
