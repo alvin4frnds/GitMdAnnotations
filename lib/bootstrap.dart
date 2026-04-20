@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'app/providers/annotation_providers.dart';
 import 'app/providers/auth_providers.dart';
 import 'app/providers/spec_providers.dart';
 import 'app/providers/sync_providers.dart';
@@ -14,8 +15,10 @@ import 'domain/fakes/fake_secure_storage.dart';
 import 'domain/ports/auth_port.dart';
 import 'domain/ports/secure_storage_port.dart';
 import 'infra/auth/github_oauth_adapter.dart';
+import 'infra/clock/system_clock.dart';
 import 'infra/fs/fs_adapter.dart';
 import 'infra/git/git_adapter.dart';
+import 'infra/id/system_id_generator.dart';
 import 'infra/storage/keystore_adapter.dart';
 
 /// Composition-root mode flag. `real` binds production adapters (OAuth,
@@ -69,6 +72,8 @@ List<Override> _realOverrides() {
       GithubOAuthAdapter(clientId: _prodClientId, storage: storage),
     ),
     fileSystemProvider.overrideWithValue(fs),
+    clockProvider.overrideWithValue(SystemClock()),
+    idGeneratorProvider.overrideWithValue(SystemIdGenerator()),
     gitPortProvider.overrideWith((ref) {
       // Capture `ref` so the credentials loader stays lazy; resolving
       // storage at provider-define time would require a container which
@@ -99,6 +104,8 @@ List<Override> _mockupOverrides() {
     authPortProvider.overrideWithValue(auth),
     fileSystemProvider.overrideWithValue(fs),
     gitPortProvider.overrideWithValue(FakeGitPort()),
+    clockProvider.overrideWithValue(SystemClock()),
+    idGeneratorProvider.overrideWithValue(SystemIdGenerator()),
     currentWorkdirProvider.overrideWith((ref) => _mockupWorkdir),
     currentRepoProvider.overrideWith((ref) => _mockupRepo),
   ];
