@@ -119,9 +119,34 @@ class GithubOAuthAdapter implements AuthPort {
       await Future<void>.delayed(current.pollInterval);
       lastPollInterval = current.pollInterval;
 
-      final HttpResponse res;
+      final body = await _postTokenWithRetries(current);
+      if (body == null) {
+        // Transient network failure after all retries — stay in the poll
+        // loop so the next scheduled tick tries again. This specifically
+        // tolerates OEM DNS quirks (e.g. OPPO / OnePlus
+        // `dns_customized_timeout`) where the first call resolves but
+        // subsequent ones intermittently fail with EAI_AGAIN.
+        continue;
+      }
+      if (body['access_token'] is String) {
+        final token = body['access_token'] as String;
+        return _finaliseSession(token);
+      }
+      current = _handlePollError(body, current);
+    }
+  }
+
+  /// Posts to the token endpoint with short-backoff retries on transient
+  /// network failures. Returns the parsed JSON body on success, or `null`
+  /// if every attempt failed with a network error — the caller keeps
+  /// polling rather than aborting the whole flow.
+  Future<Map<String, dynamic>?> _postTokenWithRetries(
+    DeviceCodeChallenge current,
+  ) async {
+    const attempts = 3;
+    for (var i = 0; i < attempts; i++) {
       try {
-        res = await http.post(
+        final res = await http.post(
           _tokenUrl,
           headers: const {'Accept': 'application/json'},
           body: {
@@ -130,17 +155,16 @@ class GithubOAuthAdapter implements AuthPort {
             'grant_type': _grantType,
           },
         );
+        return res.body;
+      } on AuthNetworkFailure {
+        if (i == attempts - 1) return null;
+        await Future<void>.delayed(Duration(seconds: 1 << i));
       } catch (e) {
-        throw AuthNetworkFailure(e);
+        if (i == attempts - 1) throw AuthNetworkFailure(e);
+        await Future<void>.delayed(Duration(seconds: 1 << i));
       }
-
-      final body = res.body;
-      if (body['access_token'] is String) {
-        final token = body['access_token'] as String;
-        return _finaliseSession(token);
-      }
-      current = _handlePollError(body, current);
     }
+    return null;
   }
 
   DeviceCodeChallenge _handlePollError(
