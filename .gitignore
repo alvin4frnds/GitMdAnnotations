@@ -1,0 +1,34 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+*.iml
+
+# Flutter / Dart (future)
+/build/
+/.dart_tool/
+/.flutter-plugins
+/.flutter-plugins-dependencies
+/.pub-cache/
+/.pub/
+
+# Android (future)
+/android/.gradle/
+/android/local.properties
+/android/app/build/
+
+# Local backups and scratch
+backups/
+scratch/
+
+# Secrets and local config
+.env
+.env.local
+*.pem
+*.key

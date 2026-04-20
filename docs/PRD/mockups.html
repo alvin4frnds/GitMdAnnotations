@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GitMdAnnotations — Mockups (Tablet App)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #4F46E5;
+    --accent-soft: #EEF2FF;
+    --ink: #DC2626;
+    --ink-blue: #2563EB;
+    --ink-green: #059669;
+    --surface: #FAFAF9;
+    --text: #111827;
+    --text-muted: #6B7280;
+    --border: #E5E7EB;
+  }
+  * { -webkit-font-smoothing: antialiased; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: #0F0F10; color: var(--text); }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+  .handwritten { font-family: 'Caveat', cursive; }
+
+  /* Tablet frame: OnePlus Pad Go 2 landscape ~2400x1800 ≈ 4:3, but we use 16:10 for screen-fit */
+  .tablet-frame {
+    width: min(1280px, 96vw);
+    aspect-ratio: 16 / 10;
+    background: #000;
+    border-radius: 22px;
+    padding: 14px;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.5), 0 0 0 2px #1f1f22 inset;
+    position: relative;
+  }
+  .tablet-frame::before {
+    content: '';
+    position: absolute;
+    right: -6px; top: 50%;
+    transform: translateY(-50%);
+    width: 4px; height: 40px;
+    background: #222;
+    border-radius: 2px;
+  }
+  .tablet-frame::after {
+    content: '';
+    position: absolute;
+    right: -6px; top: 30%;
+    width: 4px; height: 70px;
+    background: #222;
+    border-radius: 2px;
+  }
+  .tablet-screen {
+    width: 100%; height: 100%;
+    background: var(--surface);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    display: flex; flex-direction: column;
+  }
+  .status-bar {
+    height: 24px;
+    background: #fff;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    font-size: 11px;
+    color: #374151;
+    font-weight: 600;
+  }
+  .app-chrome {
+    height: 52px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 18px;
+  }
+  .app-body { flex: 1; overflow: hidden; display: flex; }
+
+  /* Ink simulation */
+  .ink path {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Screen switcher */
+  .screen { display: none; width: 100%; height: 100%; }
+  .screen.active { display: flex; flex-direction: column; width: 100%; height: 100%; }
+
+  /* Reusable tag */
+  .phase-tag {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 600;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .phase-tag.gray { background: #F3F4F6; color: #6B7280; }
+  .phase-tag.green { background: #ECFDF5; color: #059669; }
+  .phase-tag.amber { background: #FFFBEB; color: #B45309; }
+
+  .btn { padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 13px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { filter: brightness(1.05); }
+  .btn-ghost { color: var(--text); background: transparent; border: 1px solid var(--border); }
+  .btn-danger { background: #DC2626; color: #fff; }
+
+  /* Markdown-ish rendered spec */
+  .rendered-md h1 { font-size: 22px; font-weight: 700; margin-bottom: 10px; }
+  .rendered-md h2 { font-size: 16px; font-weight: 600; margin: 16px 0 6px; color: #111; }
+  .rendered-md h3 { font-size: 13px; font-weight: 600; margin: 10px 0 4px; color: #374151; }
+  .rendered-md p { font-size: 13px; line-height: 1.55; margin: 4px 0; color: #1F2937; }
+  .rendered-md li { font-size: 13px; line-height: 1.55; color: #1F2937; }
+  .rendered-md pre { background: #F3F4F6; padding: 10px 12px; border-radius: 6px; font-size: 12px; margin: 8px 0; }
+  .rendered-md code { font-family: 'JetBrains Mono', monospace; }
+  .rendered-md ul { padding-left: 20px; list-style-type: disc; }
+  .rendered-md > * + * { margin-top: 6px; }
+
+  /* Pen annotation pulse */
+  @keyframes inkdraw {
+    from { stroke-dashoffset: 400; }
+    to { stroke-dashoffset: 0; }
+  }
+  .ink-animate path {
+    stroke-dasharray: 400;
+    stroke-dashoffset: 400;
+    animation: inkdraw 1.4s ease-out forwards;
+  }
+
+  /* Jump-to dropdown styling */
+  .jump-nav {
+    background: #1a1a1d;
+    color: #e5e7eb;
+    border: 1px solid #3f3f46;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .nav-btn {
+    background: #1a1a1d; color: #d4d4d8;
+    border: 1px solid #3f3f46;
+    padding: 8px 14px; border-radius: 8px;
+    font-size: 13px; font-weight: 500;
+  }
+  .nav-btn:hover { background: #2a2a2d; }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Pen palette */
+  .pen-dot {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+  }
+
+  /* ============ DARK MODE ============ */
+  body.dark { background: #09090B; }
+
+  body.dark .tablet-frame {
+    background: #000;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.75), 0 0 0 2px #2a2a2d inset;
+  }
+  body.dark .tablet-screen { background: #0a0a0b; color: #E5E7EB; }
+  body.dark .status-bar {
+    background: #111113;
+    border-bottom-color: #1f1f22;
+    color: #A1A1AA;
+  }
+  body.dark .app-chrome {
+    background: #111113;
+    border-bottom-color: #27272A;
+  }
+
+  /* Surface / panel overrides */
+  body.dark .bg-white           { background: #18181B !important; }
+  body.dark .bg-gray-50         { background: #0f0f10 !important; }
+  body.dark .bg-gray-100        { background: #27272A !important; }
+  body.dark .bg-indigo-50       { background: rgba(99, 102, 241, 0.15) !important; }
+  body.dark .bg-indigo-50\/40   { background: rgba(99, 102, 241, 0.08) !important; }
+  body.dark .bg-amber-50        { background: rgba(245, 158, 11, 0.12) !important; }
+  body.dark .bg-emerald-100     { background: rgba(5, 150, 105, 0.22) !important; }
+  body.dark .bg-red-50          { background: rgba(220, 38, 38, 0.18) !important; }
+  body.dark .bg-amber-100       { background: rgba(245, 158, 11, 0.22) !important; }
+  body.dark .bg-emerald-600     { background: #10B981 !important; }
+  body.dark .bg-gradient-to-br.from-indigo-50.to-white {
+    background: linear-gradient(to bottom right, #1a1a1d, #0a0a0b) !important;
+  }
+  body.dark .from-indigo-50 { --tw-gradient-from: #1a1a1d !important; }
+  body.dark .to-white       { --tw-gradient-to: #0a0a0b !important; }
+
+  /* Borders */
+  body.dark .border-gray-100,
+  body.dark .border-gray-200,
+  body.dark .border-y,
+  body.dark .border-b,
+  body.dark .border-t { border-color: #27272A !important; }
+  body.dark .border-amber-200 { border-color: rgba(245, 158, 11, 0.3) !important; }
+  body.dark .border-indigo-500 { border-color: #6366F1 !important; }
+  body.dark .divide-gray-100 > * + *,
+  body.dark .divide-y > * + * { border-color: #27272A !important; }
+
+  /* Text */
+  body.dark .text-gray-900 { color: #F3F4F6 !important; }
+  body.dark .text-gray-800 { color: #E5E7EB !important; }
+  body.dark .text-gray-700 { color: #D4D4D8 !important; }
+  body.dark .text-gray-600 { color: #A1A1AA !important; }
+  body.dark .text-gray-500 { color: #71717A !important; }
+  body.dark .text-gray-400 { color: #52525B !important; }
+  body.dark .text-indigo-700 { color: #A5B4FC !important; }
+  body.dark .text-indigo-600 { color: #818CF8 !important; }
+  body.dark .text-amber-700,
+  body.dark .text-amber-800,
+  body.dark .text-amber-900 { color: #FCD34D !important; }
+  body.dark .text-emerald-700 { color: #6EE7B7 !important; }
+  body.dark .text-red-700 { color: #F87171 !important; }
+  body.dark .text-green-700 { color: #6EE7B7 !important; }
+
+  /* Rendered markdown */
+  body.dark .rendered-md h1,
+  body.dark .rendered-md h2,
+  body.dark .rendered-md h3 { color: #F3F4F6 !important; }
+  body.dark .rendered-md p,
+  body.dark .rendered-md li { color: #D4D4D8 !important; }
+  body.dark .rendered-md pre { background: #1f1f22 !important; color: #E5E7EB !important; }
+  body.dark .rendered-md code { color: #F3F4F6 !important; }
+
+  /* Phase tags */
+  body.dark .phase-tag { background: rgba(99, 102, 241, 0.2) !important; color: #A5B4FC !important; }
+  body.dark .phase-tag.gray { background: #27272A !important; color: #A1A1AA !important; }
+  body.dark .phase-tag.green { background: rgba(5, 150, 105, 0.25) !important; color: #6EE7B7 !important; }
+  body.dark .phase-tag.amber { background: rgba(245, 158, 11, 0.22) !important; color: #FCD34D !important; }
+
+  /* Buttons */
+  body.dark .btn-ghost {
+    color: #E5E7EB !important;
+    border-color: #3F3F46 !important;
+    background: transparent;
+  }
+  body.dark .btn-ghost:hover { background: #27272A !important; }
+  body.dark .btn-primary { background: #6366F1; color: #fff; }
+
+  /* Modals / overlays */
+  body.dark .bg-black\/30 { background: rgba(0,0,0,0.7) !important; }
+  body.dark .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.85), 0 0 0 1px #27272A !important; }
+
+  /* Inputs / textareas */
+  body.dark textarea,
+  body.dark input,
+  body.dark select { color: #E5E7EB; }
+  body.dark textarea::placeholder,
+  body.dark input::placeholder { color: #52525B; }
+
+  /* Pen ink — brighten red a touch on dark for contrast */
+  body.dark .ink path[stroke="#DC2626"] { stroke: #F87171 !important; }
+  body.dark .handwritten { color: #FCA5A5 !important; }
+
+  /* Inline-styled highlighter (yellow) in the spec */
+  body.dark span[style*="background:#FEF9C3"] {
+    background: rgba(250, 204, 21, 0.25) !important;
+    color: #FDE68A !important;
+  }
+  /* Inline strike-through ink color */
+  body.dark span[style*="text-decoration-color:#DC2626"] {
+    text-decoration-color: #F87171 !important;
+  }
+  /* Phase-2 "required" red */
+  body.dark [style*="color:#DC2626"] { color: #F87171 !important; }
+
+  /* Sign-in screen accent */
+  body.dark .bg-indigo-100 { background: rgba(99, 102, 241, 0.25) !important; }
+  body.dark .border-indigo-100 { border-color: rgba(99, 102, 241, 0.35) !important; }
+
+  /* Tablet side-buttons (bezel details) */
+  body.dark .tablet-frame::before,
+  body.dark .tablet-frame::after { background: #3f3f46; }
+
+  /* Theme toggle */
+  .theme-toggle {
+    background: #1a1a1d; color: #e5e7eb;
+    border: 1px solid #3f3f46;
+    padding: 8px 12px; border-radius: 8px;
+    font-size: 13px;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-weight: 500;
+  }
+  .theme-toggle:hover { background: #2a2a2d; }
+  .theme-toggle .sun { display: none; }
+  .theme-toggle .moon { display: inline-block; }
+  body.dark .theme-toggle .sun { display: inline-block; }
+  body.dark .theme-toggle .moon { display: none; }
+</style>
+</head>
+<body class="min-h-screen py-6">
+
+<!-- Top navigation -->
+<div class="max-w-[1320px] mx-auto px-4 mb-4">
+  <div class="flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <h1 class="text-white text-xl font-semibold">GitMdAnnotations — Tablet Mockups</h1>
+      <p class="text-zinc-400 text-sm">User journey walkthrough · OnePlus Pad Go 2 (landscape) · Draft v2</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <button class="theme-toggle" id="themeBtn" title="Toggle theme">
+        <svg class="moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <span id="themeLabel">Dark</span>
+      </button>
+      <button class="nav-btn" id="prevBtn">← Prev</button>
+      <select class="jump-nav" id="jumpNav"></select>
+      <button class="nav-btn" id="nextBtn">Next →</button>
+    </div>
+  </div>
+  <div class="mt-3 text-zinc-500 text-xs" id="screenCaption"></div>
+</div>
+
+<!-- Tablet stage -->
+<div class="flex justify-center">
+  <div class="tablet-frame">
+    <div class="tablet-screen">
+
+      <!-- =========== SCREEN 1: Sign-in ============ -->
+      <div class="screen active" data-title="1 · Sign in with GitHub" data-caption="First launch. OAuth web flow; device-code flow as fallback. Refresh token → Android Keystore.">
+        <div class="status-bar">
+          <span>GitMdAnnotations</span>
+          <span>9:41 · 87%</span>
+        </div>
+        <div class="flex-1 flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white">
+          <div class="w-[380px] text-center">
+            <div class="mx-auto mb-5 w-14 h-14 rounded-2xl flex items-center justify-center" style="background:var(--accent)">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48 0-.24-.01-.87-.01-1.7-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33s1.7.11 2.5.33c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.67.92.67 1.85 0 1.34-.01 2.42-.01 2.75 0 .27.18.58.69.48A10 10 0 0022 12C22 6.48 17.52 2 12 2z"/></svg>
+            </div>
+            <h1 class="text-2xl font-semibold text-gray-900 mb-1">GitMdAnnotations</h1>
+            <p class="text-gray-500 text-sm mb-8">Pen-driven spec review, synced to git.</p>
+            <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2 text-sm">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48 0-.24-.01-.87-.01-1.7-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33s1.7.11 2.5.33c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.67.92.67 1.85 0 1.34-.01 2.42-.01 2.75 0 .27.18.58.69.48A10 10 0 0022 12C22 6.48 17.52 2 12 2z"/></svg>
+              Sign in with GitHub
+            </button>
+            <p class="text-[11px] text-gray-400 mt-4">We never read or write outside <span class="font-mono">claude-jobs</span> on repos you pick.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========== SCREEN 2: Sync Down ============ -->
+      <div class="screen" data-title="2 · Sync Down (before leaving home)" data-caption="Explicit button. Fetches claude-jobs; creates it from main if missing; merges main into claude-jobs so the branch carries latest source-file context for desktop Claude.">
+        <div class="status-bar">
+          <span>GitMdAnnotations · acme-inc/payments-api</span>
+          <span>9:42 · 86%</span>
+        </div>
+        <div class="app-chrome">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-sm">payments-api</span>
+            <span class="phase-tag gray font-mono">claude-jobs</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="btn btn-primary flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+              Syncing down…
+            </button>
+            <button class="btn btn-ghost">↑ Sync Up</button>
+          </div>
+        </div>
+        <div class="app-body bg-surface">
+          <div class="flex-1 flex flex-col items-center justify-center gap-4">
+            <div class="w-20 h-20 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin"></div>
+            <div class="text-center">
+              <div class="text-gray-900 font-semibold">Sync Down in progress</div>
+              <div class="text-gray-500 text-sm mt-1">Fetching <span class="font-mono">origin/claude-jobs</span> · Merging <span class="font-mono">main</span> into <span class="font-mono">claude-jobs</span></div>
+            </div>
+            <div class="w-[460px] bg-white border border-gray-200 rounded-lg p-4 text-xs font-mono space-y-1">
+              <div class="text-green-700">✓ Fetched origin (17.2 MB)</div>
+              <div class="text-green-700">✓ claude-jobs exists — fast-forwarded to e7ab31f</div>
+              <div class="text-gray-700">→ Merging main (a8cd091) into claude-jobs…</div>
+              <div class="text-gray-400">⋯ Caching 3 open jobs locally</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========== SCREEN 3: Job list ============ -->
+      <div class="screen" data-title="3 · Job list — pending specs" data-caption="jobs/pending/ on claude-jobs. Each folder = one spec. Phase tag is derived from which numbered files exist.">
+        <div class="status-bar">
+          <span>GitMdAnnotations · acme-inc/payments-api</span>
+          <span>9:43 · 86%</span>
+        </div>
+        <div class="app-chrome">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-sm">payments-api</span>
+            <span class="phase-tag gray font-mono">claude-jobs</span>
+            <span class="text-xs text-gray-400 ml-2">Last synced: 2 min ago</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="btn btn-ghost">↓ Sync Down</button>
+            <button class="btn btn-ghost">↑ Sync Up <span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px]">0</span></button>
+          </div>
+        </div>
+        <div class="app-body">
+          <!-- Left rail: filters -->
+          <div class="w-52 border-r border-gray-200 bg-white p-3 text-sm">
+            <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Phase</div>
+            <div class="space-y-1">
+              <div class="flex justify-between text-gray-700 rounded px-2 py-1.5 bg-indigo-50"><span>All open</span><span class="text-gray-500">3</span></div>
+              <div class="flex justify-between text-gray-600 rounded px-2 py-1.5"><span>Awaiting review</span><span class="text-gray-500">2</span></div>
+              <div class="flex justify-between text-gray-600 rounded px-2 py-1.5"><span>Awaiting revision</span><span class="text-gray-500">1</span></div>
+              <div class="flex justify-between text-gray-600 rounded px-2 py-1.5"><span>Ready to approve</span><span class="text-gray-500">0</span></div>
+            </div>
+            <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-5 mb-2">New</div>
+            <button class="w-full btn btn-ghost text-left flex items-center gap-2">
+              <span class="text-indigo-600 font-bold">+</span> New Spec <span class="phase-tag amber ml-auto">Phase 2</span>
+            </button>
+          </div>
+          <!-- Job list -->
+          <div class="flex-1 overflow-auto">
+            <div class="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+              <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide">jobs/pending/</div>
+              <div class="text-xs text-gray-500">3 open jobs</div>
+            </div>
+            <div class="divide-y divide-gray-100">
+
+              <!-- job 1 (highlighted — just arrived) -->
+              <div class="px-5 py-4 bg-indigo-50/40 border-l-4 border-indigo-500 cursor-pointer">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <span class="font-mono text-[13px] text-gray-900 font-medium">spec-auth-flow-totp</span>
+                    <span class="phase-tag">Awaiting review</span>
+                    <span class="phase-tag gray">.md</span>
+                  </div>
+                  <div class="text-xs text-gray-400">just arrived · 02-spec.md</div>
+                </div>
+                <p class="text-sm text-gray-600 mt-2 leading-relaxed">Add TOTP-based authentication to /v2/auth endpoints. Replace session-cookie fallback with JWT; migrate existing sessions. Claude has 4 open questions and flags 2 edge cases…</p>
+              </div>
+
+              <!-- job 2 -->
+              <div class="px-5 py-4 cursor-pointer hover:bg-gray-50">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <span class="font-mono text-[13px] text-gray-900 font-medium">spec-invoice-pdf-redesign</span>
+                    <span class="phase-tag">Awaiting review</span>
+                    <span class="phase-tag gray">.pdf</span>
+                  </div>
+                  <div class="text-xs text-gray-400">2 hours ago · source.pdf</div>
+                </div>
+                <p class="text-sm text-gray-600 mt-2 leading-relaxed">Design brief PDF from Sarah — 12 pages. Needs annotation pass before we plan the backend changes…</p>
+              </div>
+
+              <!-- job 3 -->
+              <div class="px-5 py-4 cursor-pointer hover:bg-gray-50">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <span class="font-mono text-[13px] text-gray-900 font-medium">spec-webhook-retry-policy</span>
+                    <span class="phase-tag amber">Awaiting revision</span>
+                    <span class="phase-tag gray">.md</span>
+                  </div>
+                  <div class="text-xs text-gray-400">yesterday · 04-spec-v2.md pending</div>
+                </div>
+                <p class="text-sm text-gray-600 mt-2 leading-relaxed">Desktop is revising based on your review. Come back after Sync Down…</p>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========== SCREEN 4: Spec review — reading ============ -->
+      <div class="screen" data-title="4 · Spec review — reading mode" data-caption="02-spec.md rendered cleanly. Heading nav rail on left, review panel collapsed right. Pen tools in the top bar — not active until selected.">
+        <div class="status-bar">
+          <span>spec-auth-flow-totp · 02-spec.md</span>
+          <span>9:48 · 86%</span>
+        </div>
+        <div class="app-chrome">
+          <div class="flex items-center gap-2">
+            <button class="text-gray-400 text-sm">← jobs</button>
+            <span class="font-mono text-sm text-gray-900 font-medium">spec-auth-flow-totp</span>
+            <span class="phase-tag">Awaiting review</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <!-- pen tools -->
+            <div class="flex items-center gap-1 border border-gray-200 rounded-lg px-2 py-1">
+              <div class="w-7 h-7 flex items-center justify-center rounded bg-gray-100 text-gray-700" title="Read (no ink)">👆</div>
+              <div class="w-7 h-7 flex items-center justify-center rounded text-gray-500" title="Pen">✎</div>
+              <div class="w-7 h-7 flex items-center justify-center rounded text-gray-500" title="Highlighter">█</div>
+              <div class="w-7 h-7 flex items-center justify-center rounded text-gray-500" title="Eraser">⌫</div>
+            </div>
+            <button class="btn btn-ghost">Review panel →</button>
+            <button class="btn btn-primary">Submit Review</button>
+          </div>
+        </div>
+        <div class="app-body">
+          <!-- Heading nav rail -->
+          <div class="w-48 border-r border-gray-200 bg-white p-3 text-xs">
+            <div class="font-semibold text-gray-400 uppercase mb-2">On this page</div>
+            <ul class="space-y-1.5 text-gray-600">
+              <li class="text-indigo-700 font-medium">Goals</li>
+              <li>Non-goals</li>
+              <li>Open questions</li>
+              <li>File-level change plan</li>
+              <li>Assumptions</li>
+              <li class="text-gray-400">Changelog</li>
+            </ul>
+          </div>
+          <!-- Spec body -->
+          <div class="flex-1 overflow-auto px-12 py-8 rendered-md bg-white" style="max-width:none">
+            <h1>Auth flow — TOTP rollout</h1>
+            <p class="text-gray-500 text-xs">Generated by Claude Code on 2026-04-19 · <span class="font-mono">02-spec.md @ e7ab31f</span></p>
+
+            <h2>Goals</h2>
+            <ul>
+              <li>Replace session cookies on <code>/v2/auth</code> with JWT + TOTP second factor.</li>
+              <li>Migrate 14k active sessions without forcing re-login.</li>
+              <li>Preserve magic-link flow as fallback for users without TOTP set up.</li>
+            </ul>
+
+            <h2>Non-goals</h2>
+            <ul>
+              <li>Changing v1 auth. Kept in place behind a feature flag until next quarter.</li>
+              <li>Adding WebAuthn. Tracked separately.</li>
+            </ul>
+
+            <h2>Open questions</h2>
+            <ol style="padding-left:22px">
+              <li><b>Q1:</b> Should auth flow support magic links as primary, or only as fallback after TOTP?</li>
+              <li><b>Q2:</b> Do we expire the session-cookie grace period at 7 or 14 days?</li>
+              <li><b>Q3:</b> Session store — assume Redis, or read from config?</li>
+              <li><b>Q4:</b> Do we rate-limit TOTP attempts per account or per IP?</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========== SCREEN 5: Annotating ============ -->
+      <div class="screen" data-title="5 · Pen annotation in action" data-caption="Pressure-sensitive ink overlays the rendered spec. Each stroke group anchors to the nearest markdown line number → &quot;stroke group A, line 47&quot; metadata.">
+        <div class="status-bar">
+          <span>spec-auth-flow-totp · 02-spec.md · ANNOTATING</span>
+          <span>9:51 · 85%</span>
+        </div>
+        <div class="app-chrome">
+          <div class="flex items-center gap-2">
+            <button class="text-gray-400 text-sm">← jobs</button>
+            <span class="font-mono text-sm text-gray-900 font-medium">spec-auth-flow-totp</span>
+            <span class="phase-tag">Awaiting review</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-1 border-2 border-indigo-400 rounded-lg px-2 py-1 bg-indigo-50">
+              <div class="w-7 h-7 flex items-center justify-center rounded text-gray-400">👆</div>
+              <div class="w-7 h-7 flex items-center justify-center rounded bg-indigo-600 text-white">✎</div>
+              <div class="w-7 h-7 flex items-center justify-center rounded text-gray-500">█</div>
+              <div class="w-7 h-7 flex items-center justify-center rounded text-gray-500">⌫</div>
+              <div class="w-px h-6 bg-gray-300 mx-1"></div>
+              <div class="pen-dot" style="background:#DC2626; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #DC2626" title="red"></div>
+              <div class="pen-dot" style="background:#2563EB" title="blue"></div>
+              <div class="pen-dot" style="background:#059669" title="green"></div>
+              <div class="pen-dot" style="background:#F59E0B" title="orange"></div>
+              <div class="pen-dot" style="background:#000000" title="black"></div>
+            </div>
+            <button class="btn btn-ghost">Review panel →</button>
+            <button class="btn btn-primary">Submit Review</button>
+          </div>
+        </div>
+        <div class="app-body relative">
+          <div class="w-48 border-r border-gray-200 bg-white p-3 text-xs">
+            <div class="font-semibold text-gray-400 uppercase mb-2">On this page</div>
+            <ul class="space-y-1.5 text-gray-600">
+              <li>Goals</li>
+              <li>Non-goals</li>
+              <li class="text-indigo-700 font-medium">Open questions</li>
+              <li>File-level change plan</li>
+              <li>Assumptions</li>
+              <li class="text-gray-400">Changelog</li>
+            </ul>
+            <div class="mt-4 pt-4 border-t border-gray-100">
+              <div class="font-semibold text-gray-400 uppercase mb-2">Ink layers</div>
+              <ul class="space-y-1 text-gray-700">
+                <li>🔴 group A · line 47</li>
+                <li>🔴 group B · line 52</li>
+                <li>🔵 group C · line 61</li>
+              </ul>
+            </div>
+          </div>
+          <div class="flex-1 overflow-auto px-12 py-8 rendered-md bg-white relative" style="max-width:none">
+            <h1>Auth flow — TOTP rollout</h1>
+            <h2 id="oq">Open questions</h2>
+            <ol style="padding-left:22px; line-height: 1.9">
+              <li><b>Q1:</b> <span style="position:relative"><span style="text-decoration:line-through; text-decoration-color:#DC2626; text-decoration-thickness:2px">Should auth flow support magic links as primary,</span></span> or only as fallback after TOTP?</li>
+              <li><b>Q2:</b> Do we expire the session-cookie grace period at <span style="background:#FEF9C3; padding:2px 4px">7 or 14</span> days?</li>
+              <li><b>Q3:</b> Session store — assume Redis, or read from config?</li>
+              <li><b>Q4:</b> Do we rate-limit TOTP attempts per account or per IP?</li>
+            </ol>
+
+            <h2 style="margin-top:40px">Assumptions</h2>
+            <ul>
+              <li>Default session store will remain Redis.</li>
+              <li>TOTP apps supported: Google Authenticator, 1Password, Authy.</li>
+              <li>Migration is transparent; no user-visible downtime.</li>
+            </ul>
+
+            <!-- SVG ink layer positioned over the content -->
+            <svg class="ink ink-animate" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none">
+              <!-- Circle around Q1 -->
+              <g id="group-A">
+                <path d="M 60 130 Q 40 150 58 200 Q 320 210 430 195 Q 470 170 430 135 Q 240 120 60 130 Z" stroke="#DC2626" stroke-width="2.2" opacity="0.85"/>
+              </g>
+              <!-- Arrow between Q1 and Q3 with note -->
+              <g id="group-B">
+                <path d="M 440 168 Q 550 200 580 235" stroke="#DC2626" stroke-width="2" opacity="0.85"/>
+                <path d="M 575 225 L 582 238 L 572 238 Z" stroke="#DC2626" fill="#DC2626" stroke-width="1" opacity="0.85"/>
+              </g>
+              <!-- Circle around "7 or 14" and writing next to it -->
+              <g id="group-C">
+                <path d="M 355 220 Q 330 210 330 230 Q 345 248 400 242 Q 420 232 400 218 Q 380 214 355 220" stroke="#DC2626" stroke-width="2" opacity="0.85"/>
+              </g>
+            </svg>
+
+            <!-- Handwritten margin note -->
+            <div class="handwritten absolute" style="top:190px; right:80px; color:#DC2626; font-size:22px; transform:rotate(-3deg); line-height:1.1">
+              TOTP first.<br>fallback only.
+            </div>
+            <div class="handwritten absolute" style="top:270px; right:100px; color:#DC2626; font-size:20px; transform:rotate(-2deg); line-height:1.1">
+              14 — match refresh token
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========== SCREEN 6: Typed review panel open ============ -->
+      <div class="screen" data-title="6 · Typed review panel" data-caption="Right-side panel auto-extracts the &quot;Open questions&quot; section from the spec as individual text inputs. Spatial references pair typed answers with the pen strokes.">
+        <div class="status-bar">
+          <span>spec-auth-flow-totp · review draft</span>
+          <span>9:58 · 84%</span>
+        </div>
+        <div class="app-chrome">
+          <div class="flex items-center gap-2">
+            <span class="font-mono text-sm text-gray-900 font-medium">spec-auth-flow-totp</span>
+            <span class="phase-tag">Drafting review</span>
+            <span class="text-xs text-gray-400">auto-saved 3s ago</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <button class="btn btn-ghost">← Hide panel</button>
+            <button class="btn btn-primary">Submit Review</button>
+          </div>
+        </div>
+        <div class="app-body">
+          <!-- Left: spec with ink overlay preview -->
+          <div class="flex-1 overflow-auto px-10 py-6 rendered-md bg-white border-r border-gray-200 relative">
+            <h2>Open questions</h2>
+            <ol style="padding-left:22px; line-height: 1.9">
+              <li><b>Q1:</b> <span style="text-decoration:line-through; text-decoration-color:#DC2626; text-decoration-thickness:2px">Should auth flow support magic links as primary,</span> or only as fallback after TOTP?</li>
+              <li><b>Q2:</b> Do we expire the session-cookie grace period at <span style="background:#FEF9C3">7 or 14</span> days?</li>
+              <li><b>Q3:</b> Session store — assume Redis, or read from config?</li>
+              <li><b>Q4:</b> Do we rate-limit TOTP attempts per account or per IP?</li>
+            </ol>
+            <div class="mt-2 text-xs text-gray-500">3 stroke groups · 2 margin notes</div>
+          </div>
+          <!-- Right: review panel -->
+          <div class="w-[420px] bg-gray-50 overflow-auto p-5">
+            <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">03-review.md (draft)</div>
+            <div class="font-mono text-xs text-gray-400 mb-4">Reviewed: 2026-04-20 09:58 local</div>
+
+            <div class="space-y-4">
+              <div class="bg-white border border-gray-200 rounded-lg p-3">
+                <div class="text-xs font-semibold text-gray-700">Q1: Magic links — primary or fallback?</div>
+                <textarea class="mt-2 w-full text-sm text-gray-800 resize-none bg-transparent outline-none" rows="2">TOTP first; magic links only as fallback after TOTP is set up. See stroke group A (line 47).</textarea>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-lg p-3">
+                <div class="text-xs font-semibold text-gray-700">Q2: Session-cookie grace period 7 or 14?</div>
+                <textarea class="mt-2 w-full text-sm text-gray-800 resize-none bg-transparent outline-none" rows="2">14 — match the refresh-token lifetime. See stroke group C.</textarea>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-lg p-3">
+                <div class="text-xs font-semibold text-gray-700">Q3: Session store — Redis vs config?</div>
+                <textarea class="mt-2 w-full text-sm text-gray-400 resize-none bg-transparent outline-none" rows="2" placeholder="Type or dictate…"></textarea>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-lg p-3">
+                <div class="text-xs font-semibold text-gray-700">Q4: Rate-limit per account or IP?</div>
+                <textarea class="mt-2 w-full text-sm text-gray-400 resize-none bg-transparent outline-none" rows="2" placeholder="Type or dictate…"></textarea>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-lg p-3">
+                <div class="text-xs font-semibold text-gray-700">Free-form notes</div>
+                <textarea class="mt-2 w-full text-sm text-gray-800 resize-none bg-transparent outline-none" rows="3">The Assumptions section mentions Redis — but stroke group B flags that we need to make this config-driven. Cross-reference Q3 above.</textarea>
+              </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-gray-200">
+              <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Spatial references</div>
+              <ul class="text-xs text-gray-600 space-y-1 font-mono">
+                <li>🔴 group A → line 47</li>
+                <li>🔴 group B → line 52</li>
+                <li>🔵 group C → line 61</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========== SCREEN 7: Submit Review confirm ============ -->
+      <div class="screen" data-title="7 · Submit Review (local commit)" data-caption="Writes 03-review.md + SVG + PNG + changelog entry. Commits LOCALLY to claude-jobs. No push yet — sync is explicit.">
+        <div class="status-bar">
+          <span>spec-auth-flow-totp</span>
+          <span>10:02 · 83%</span>
+        </div>
+        <div class="app-chrome bg-white">
+          <div class="flex items-center gap-2">
+            <span class="font-mono text-sm text-gray-900 font-medium">spec-auth-flow-totp</span>
+            <span class="phase-tag">Drafting review</span>
+          </div>
+          <div></div>
+        </div>
+        <div class="app-body bg-gray-900/20 flex items-center justify-center relative">
+          <div class="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
+          <div class="relative bg-white w-[520px] rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+            <div class="px-6 pt-6 pb-4">
+              <div class="text-base font-semibold text-gray-900">Submit review?</div>
+              <div class="text-sm text-gray-500 mt-1">This commits the review locally to <span class="font-mono">claude-jobs</span>. Push happens when you tap Sync Up.</div>
+            </div>
+            <div class="px-6 py-3 bg-gray-50 border-y border-gray-200">
+              <div class="text-xs font-semibold text-gray-500 uppercase mb-2">Files to be committed</div>
+              <ul class="text-xs font-mono text-gray-700 space-y-1">
+                <li class="flex justify-between"><span>+ 03-review.md</span><span class="text-gray-400">1.8 KB</span></li>
+                <li class="flex justify-between"><span>+ 03-annotations.svg</span><span class="text-gray-400">3 stroke groups · 612 B</span></li>
+                <li class="flex justify-between"><span>+ 03-annotations.png</span><span class="text-gray-400">164 KB</span></li>
+                <li class="flex justify-between"><span>~ 02-spec.md</span><span class="text-gray-400">changelog +1 line</span></li>
+              </ul>
+            </div>
+            <div class="px-6 py-3 bg-gray-50 border-b border-gray-200 text-xs font-mono text-gray-600">
+              <div class="text-gray-500 mb-1">Changelog entry:</div>
+              <div>- 2026-04-20 10:02 tablet: User clarified — TOTP primary, magic links fallback; grace period = 14 days.</div>
+            </div>
+            <div class="px-6 py-3 border-b border-gray-200">
+              <div class="text-xs font-semibold text-gray-500 uppercase mb-1">Commit message</div>
+              <div class="font-mono text-xs text-gray-700">review: spec-auth-flow-totp</div>
+            </div>
+            <div class="px-6 py-4 flex items-center justify-between">
+              <div class="flex items-center gap-2 text-xs text-amber-700">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                Offline — will push on next Sync Up
+              </div>
+              <div class="flex items-center gap-2">
+                <button class="btn btn-ghost">Cancel</button>
+                <button class="btn btn-primary">Submit & commit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========== SCREEN 8: Sync Up ============ -->
+      <div class="screen" data-title="8 · Sync Up (arriving at office)" data-caption="Pushes the queued claude-jobs commits to remote. On conflict: remote wins; local archived to on-device backup.">
+        <div class="status-bar">
+          <span>GitMdAnnotations · acme-inc/payments-api</span>
+          <span>10:42 · 78%</span>
+        </div>
+        <div class="app-chrome">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-sm">payments-api</span>
+            <span class="phase-tag gray font-mono">claude-jobs</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="btn btn-ghost">↓ Sync Down</button>
+            <button class="btn btn-primary flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+              Syncing up…
+            </button>
+          </div>
+        </div>
+        <div class="app-body bg-surface">
+          <div class="flex-1 flex flex-col items-center justify-center gap-4">
+            <div class="w-20 h-20 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin"></div>
+            <div class="text-center">
+              <div class="text-gray-900 font-semibold">Sync Up in progress</div>
+              <div class="text-gray-500 text-sm mt-1">Pushing 1 local commit to <span class="font-mono">origin/claude-jobs</span></div>
+            </div>
+            <div class="w-[500px] bg-white border border-gray-200 rounded-lg p-4 text-xs font-mono space-y-1">
+              <div class="text-green-700">✓ Staged 4 files (169 KB)</div>
+              <div class="text-green-700">✓ Commit <span>f31ac44</span> — review: spec-auth-flow-totp</div>
+              <div class="text-gray-700">→ Pushing origin/claude-jobs… (43%)</div>
+              <div class="text-gray-400">⋯ Verifying remote state</div>
+            </div>
+            <div class="text-xs text-gray-500 mt-2">Desktop watcher will pick up the push and start Phase 4 (revision).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========== SCREEN 9: Revision ready ============ -->
+      <div class="screen" data-title="9 · Revision ready — 04-spec-v2.md" data-caption="After Sync Down at lunch: desktop has revised the spec. The changelog at the bottom shows every event in plain English — no diff view needed.">
+        <div class="status-bar">
+          <span>spec-auth-flow-totp · 04-spec-v2.md</span>
+          <span>12:31 · 72%</span>
+        </div>
+        <div class="app-chrome">
+          <div class="flex items-center gap-2">
+            <button class="text-gray-400 text-sm">← jobs</button>
+            <span class="font-mono text-sm text-gray-900 font-medium">spec-auth-flow-totp</span>
+            <span class="phase-tag green">Ready to approve</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <button class="btn btn-ghost">Review again</button>
+            <button class="btn btn-primary" style="background:#059669">✓ Approve</button>
+          </div>
+        </div>
+        <div class="app-body">
+          <div class="w-48 border-r border-gray-200 bg-white p-3 text-xs">
+            <div class="font-semibold text-gray-400 uppercase mb-2">Versions</div>
+            <ul class="space-y-1">
+              <li class="text-gray-500 font-mono">02-spec.md</li>
+              <li class="text-gray-500 font-mono">03-review.md</li>
+              <li class="text-indigo-700 font-mono font-semibold">04-spec-v2.md</li>
+            </ul>
+            <div class="font-semibold text-gray-400 uppercase mt-5 mb-2">On this page</div>
+            <ul class="space-y-1.5 text-gray-600">
+              <li>Goals</li>
+              <li>Non-goals</li>
+              <li>Open questions (2 new)</li>
+              <li>File-level change plan</li>
+              <li class="text-indigo-700 font-medium">Changelog</li>
+            </ul>
+          </div>
+          <div class="flex-1 overflow-auto px-12 py-8 rendered-md bg-white">
+            <h1>Auth flow — TOTP rollout <span class="text-sm font-normal text-gray-400">v2</span></h1>
+
+            <h2>Open questions <span class="text-xs text-amber-700 font-normal">2 new</span></h2>
+            <ol style="padding-left:22px; line-height: 1.8">
+              <li class="text-gray-400 line-through">Q1 — resolved (TOTP primary, magic-link fallback)</li>
+              <li class="text-gray-400 line-through">Q2 — resolved (grace period = 14d)</li>
+              <li><b>Q3 (new):</b> Making session store config-driven implies a migration for existing Redis-based deployments. Do we provide a one-shot migration script or expect teams to re-deploy?</li>
+              <li><b>Q4 (new):</b> If TOTP fallback is magic-link, we need to define what happens if the user's email is also compromised. Lockout window?</li>
+            </ol>
+
+            <h2 style="margin-top:32px">Changelog</h2>
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-2 text-sm">
+              <div class="flex gap-3">
+                <span class="font-mono text-xs text-gray-500 mt-0.5 shrink-0">2026-04-19 14:32</span>
+                <span class="phase-tag gray shrink-0">desktop</span>
+                <span class="text-gray-700">Initial spec generated from requirements. 4 open questions, 2 edge cases flagged.</span>
+              </div>
+              <div class="flex gap-3">
+                <span class="font-mono text-xs text-gray-500 mt-0.5 shrink-0">2026-04-20 10:02</span>
+                <span class="phase-tag shrink-0">tablet</span>
+                <span class="text-gray-700">User clarified — TOTP primary, magic links fallback; grace period = 14 days.</span>
+              </div>
+              <div class="flex gap-3 bg-indigo-50 -mx-2 px-2 py-1.5 rounded">
+                <span class="font-mono text-xs text-gray-500 mt-0.5 shrink-0">2026-04-20 12:18</span>
+                <span class="phase-tag shrink-0">desktop</span>
+                <span class="text-gray-700">Folded in user answers. Session store now config-driven (flagged follow-up). Added lockout-window question for magic-link fallback.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========== SCREEN 10: Approve + conflict dialog ============ -->
+      <div class="screen" data-title="10 · Approve confirmation" data-caption="Creates 05-approved marker + changelog entry. Locally commits. Sync Up later lets desktop open the PR into main and delete jobs/pending/spec-… from claude-jobs.">
+        <div class="status-bar">
+          <span>spec-auth-flow-totp</span>
+          <span>12:33 · 71%</span>
+        </div>
+        <div class="app-chrome bg-white">
+          <div class="flex items-center gap-2">
+            <span class="font-mono text-sm text-gray-900 font-medium">spec-auth-flow-totp</span>
+            <span class="phase-tag green">Ready to approve</span>
+          </div>
+          <div></div>
+        </div>
+        <div class="app-body bg-gray-900/20 flex items-center justify-center relative">
+          <div class="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
+          <div class="relative bg-white w-[540px] rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+            <div class="px-6 pt-6 pb-4 flex items-start gap-4">
+              <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 text-xl">✓</div>
+              <div>
+                <div class="text-base font-semibold text-gray-900">Approve 04-spec-v2 for implementation?</div>
+                <div class="text-sm text-gray-500 mt-1">The desktop will treat this spec as the source of truth. It will implement the change, open a PR, and clean up <span class="font-mono">jobs/pending/spec-auth-flow-totp/</span>.</div>
+              </div>
+            </div>
+            <div class="px-6 py-3 bg-gray-50 border-y border-gray-200 text-xs">
+              <div class="font-semibold text-gray-500 uppercase mb-2">Files to be committed</div>
+              <ul class="font-mono text-gray-700 space-y-1">
+                <li class="flex justify-between"><span>+ 05-approved</span><span class="text-gray-400">empty marker</span></li>
+                <li class="flex justify-between"><span>~ 04-spec-v2.md</span><span class="text-gray-400">changelog +1 line</span></li>
+              </ul>
+            </div>
+            <div class="px-6 py-3 bg-amber-50 border-b border-amber-200 flex items-start gap-2 text-xs text-amber-900">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 mt-0.5"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+              <div><strong>This is irreversible in-app.</strong> You can still <span class="font-mono">git revert</span> externally.</div>
+            </div>
+            <div class="px-6 py-4 flex items-center justify-end gap-2">
+              <button class="btn btn-ghost">Keep reviewing</button>
+              <button class="btn" style="background:#059669; color:#fff">Approve & commit</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========== SCREEN 11: Conflict (remote wins) ============ -->
+      <div class="screen" data-title="11 · Conflict — remote wins, local archived" data-caption="If tablet + another device both pushed to claude-jobs, remote always wins. Local uncommitted / un-pushed edits get archived under GitMdAnnotations/backups/ so nothing is lost.">
+        <div class="status-bar">
+          <span>GitMdAnnotations · acme-inc/payments-api</span>
+          <span>10:43 · 78%</span>
+        </div>
+        <div class="app-chrome bg-white">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-sm">payments-api</span>
+            <span class="phase-tag gray font-mono">claude-jobs</span>
+          </div>
+        </div>
+        <div class="app-body bg-gray-900/20 flex items-center justify-center relative">
+          <div class="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
+          <div class="relative bg-white w-[580px] rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+            <div class="px-6 pt-6 pb-4 flex items-start gap-4">
+              <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+              </div>
+              <div>
+                <div class="text-base font-semibold text-gray-900">Remote had newer commits</div>
+                <div class="text-sm text-gray-500 mt-1">Your local <span class="font-mono">claude-jobs</span> diverged from the remote. Per policy, <strong>remote takes priority</strong> and your local changes are archived.</div>
+              </div>
+            </div>
+            <div class="px-6 py-3 bg-gray-50 border-y border-gray-200 text-xs space-y-2">
+              <div>
+                <div class="font-semibold text-gray-500 uppercase mb-1">Local changes archived to</div>
+                <div class="font-mono text-gray-700 text-[11px]">~/GitMdAnnotations/backups/payments-api/claude-jobs-2026-04-20T10-43-01/</div>
+              </div>
+              <div>
+                <div class="font-semibold text-gray-500 uppercase mb-1">Backed-up commits (1)</div>
+                <div class="font-mono text-gray-700 text-[11px]">f31ac44 · review: spec-auth-flow-totp</div>
+              </div>
+              <div>
+                <div class="font-semibold text-gray-500 uppercase mb-1">Remote has</div>
+                <div class="font-mono text-gray-700 text-[11px]">a1e9cc2 · review: spec-auth-flow-totp (from laptop · 10:41)</div>
+              </div>
+            </div>
+            <div class="px-6 py-3 border-b border-gray-200 text-xs text-gray-600">
+              <strong>Next step:</strong> Your laptop's review already covers the same job. Open the backup to compare, or discard if the remote version is fine.
+            </div>
+            <div class="px-6 py-4 flex items-center justify-end gap-2">
+              <button class="btn btn-ghost">Open backup folder</button>
+              <button class="btn btn-ghost">Discard backup</button>
+              <button class="btn btn-primary">Continue with remote</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========== SCREEN 12: Phase 2 — New Spec authoring ============ -->
+      <div class="screen" data-title="12 · New Spec (Phase 2 authoring)" data-caption="Phase 2 unlocks direct authoring on the tablet. Templates come from .gitmdannotations/templates/ on main, or bundled defaults. Linter blocks commit until required sections exist.">
+        <div class="status-bar">
+          <span>payments-api · New Spec</span>
+          <span>20:14 · 58%</span>
+        </div>
+        <div class="app-chrome">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-sm">New Spec</span>
+            <span class="phase-tag amber">Phase 2</span>
+            <span class="text-xs text-gray-400">auto-saved 5s ago</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <button class="btn btn-ghost">Save draft</button>
+            <button class="btn btn-primary" disabled style="opacity:.5">Commit to claude-jobs</button>
+          </div>
+        </div>
+        <div class="app-body">
+          <div class="w-56 border-r border-gray-200 bg-white p-3 text-sm">
+            <div class="text-xs font-semibold text-gray-400 uppercase mb-2">Template</div>
+            <div class="space-y-1">
+              <div class="rounded px-2 py-1.5 bg-indigo-50 text-indigo-700 font-medium">API change <span class="text-xs text-gray-400 block">pre-filled</span></div>
+              <div class="rounded px-2 py-1.5 text-gray-700 hover:bg-gray-50">New feature</div>
+              <div class="rounded px-2 py-1.5 text-gray-700 hover:bg-gray-50">Refactor</div>
+              <div class="rounded px-2 py-1.5 text-gray-700 hover:bg-gray-50">Bug fix</div>
+              <div class="mt-2 text-xs text-gray-400 px-2">Repo templates override bundled defaults.</div>
+            </div>
+            <div class="mt-5 pt-5 border-t border-gray-100">
+              <div class="text-xs font-semibold text-gray-400 uppercase mb-2">Required sections</div>
+              <ul class="space-y-1.5 text-xs">
+                <li class="flex items-center gap-2 text-emerald-700">✓ Goals</li>
+                <li class="flex items-center gap-2 text-emerald-700">✓ Non-goals</li>
+                <li class="flex items-center gap-2 text-amber-700">⚠ Open questions</li>
+                <li class="flex items-center gap-2 text-red-700">✗ File-level change plan</li>
+              </ul>
+              <div class="mt-3 text-[11px] text-red-700 bg-red-50 p-2 rounded">Commit blocked until all required sections are filled.</div>
+            </div>
+          </div>
+          <div class="flex-1 overflow-auto bg-white px-10 py-6 rendered-md">
+            <div class="text-xs text-gray-400 font-mono mb-2">jobs/pending/spec-rate-limit-v3/02-spec.md · author=tablet</div>
+            <h1>Rate-limit v3 — per-API-key with burst allowance</h1>
+            <h2>Goals</h2>
+            <ul>
+              <li>Replace per-IP rate limiting on <code>/v2/*</code> with per-API-key limits.</li>
+              <li>Allow 2x burst in a 10s window before throttling.</li>
+            </ul>
+            <h2>Non-goals</h2>
+            <ul>
+              <li>Changing auth flow.</li>
+              <li>v1 rate limiter (deprecated endpoint).</li>
+            </ul>
+            <h2>Open questions</h2>
+            <ul>
+              <li>Where should burst-counter state live? Redis or in-process?</li>
+            </ul>
+            <h2 style="color:#DC2626; opacity:0.5">File-level change plan</h2>
+            <p style="color:#DC2626; opacity:0.6; font-style:italic">(required — please fill in)</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Bottom screen list -->
+<div class="max-w-[1320px] mx-auto px-4 mt-6">
+  <div class="text-zinc-400 text-xs uppercase tracking-wider font-semibold mb-2">All screens</div>
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 text-sm" id="screenGrid"></div>
+  <p class="text-zinc-500 text-xs mt-6">
+    Mockups only — click any screen tile or use ← → to navigate. Pen strokes are static SVG. Latency, pressure, and palm-rejection behavior are implemented in the build, not demonstrable here.
+  </p>
+</div>
+
+<script>
+  const screens = Array.from(document.querySelectorAll('.screen'));
+  const jumpNav = document.getElementById('jumpNav');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const caption = document.getElementById('screenCaption');
+  const grid = document.getElementById('screenGrid');
+
+  let current = 0;
+
+  screens.forEach((s, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = s.dataset.title;
+    jumpNav.appendChild(opt);
+
+    const tile = document.createElement('button');
+    tile.className = 'text-left p-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300';
+    tile.innerHTML = `<div class="text-xs text-zinc-500 mb-0.5">${i+1} of ${screens.length}</div><div class="text-sm">${s.dataset.title.replace(/^\d+\s·\s/, '')}</div>`;
+    tile.onclick = () => show(i);
+    grid.appendChild(tile);
+  });
+
+  function show(i) {
+    current = Math.max(0, Math.min(screens.length - 1, i));
+    screens.forEach((s, idx) => s.classList.toggle('active', idx === current));
+    jumpNav.value = current;
+    prevBtn.disabled = current === 0;
+    nextBtn.disabled = current === screens.length - 1;
+    caption.textContent = screens[current].dataset.caption;
+    // Re-trigger ink animation when entering an annotating screen
+    const ink = screens[current].querySelector('.ink-animate');
+    if (ink) {
+      ink.style.animation = 'none';
+      ink.offsetHeight; // reflow
+      ink.style.animation = '';
+    }
+  }
+
+  jumpNav.onchange = () => show(+jumpNav.value);
+  prevBtn.onclick = () => show(current - 1);
+  nextBtn.onclick = () => show(current + 1);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft') show(current - 1);
+    if (e.key === 'ArrowRight') show(current + 1);
+    if (e.key === 'd' || e.key === 'D') toggleTheme();
+  });
+
+  // Theme toggle (persisted + OS default)
+  const themeBtn = document.getElementById('themeBtn');
+  const themeLabel = document.getElementById('themeLabel');
+  function applyTheme(t) {
+    document.body.classList.toggle('dark', t === 'dark');
+    themeLabel.textContent = t === 'dark' ? 'Light' : 'Dark';
+  }
+  function toggleTheme() {
+    const next = document.body.classList.contains('dark') ? 'light' : 'dark';
+    localStorage.setItem('theme', next);
+    applyTheme(next);
+  }
+  themeBtn.onclick = toggleTheme;
+  const stored = localStorage.getItem('theme');
+  const osDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(stored || (osDark ? 'dark' : 'light'));
+
+  show(0);
+</script>
+
+</body>
+</html>

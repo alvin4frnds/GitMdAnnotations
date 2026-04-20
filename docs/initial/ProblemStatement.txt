@@ -1,0 +1,28 @@
+Problem Statement, Proposed Solution & User Journey
+Problem Statement
+Vibe coding with AI assistants fails in a predictable way: when given a vague "build X" instruction, the AI silently makes dozens of assumptions, skips edge cases, and produces code that only reveals its misalignment after implementation. The developer then discovers the gaps during review — when rework is expensive — rather than during specification, when correction is cheap.
+The same AI, however, excels when asked to write a spec: it naturally surfaces open questions, concerns, and edge cases. The bottleneck isn't capability; it's workflow. Today's AI coding tools collapse specification and implementation into a single step, robbing the developer of the highest-leverage moment — the review of assumptions before code is written.
+Compounding this, the developer's best thinking time is often away from the desk (commutes, couch time, bed). Capturing detailed technical thoughts on a phone is painful, and existing mobile AI interfaces are built for real-time chat — not for the asynchronous, review-heavy workflow that spec-driven development needs. Meanwhile, the existing Claude mobile app and Remote Control feature assume you're present and typing live; they don't support the offline-capture-then-batch-execute pattern that matches how ideas actually arrive.
+The result: developers either rush into vibe coding and pay the rework cost, or do rigorous spec work but only when chained to a desktop, losing hours of potential thinking time.
+Proposed Solution
+A mobile-first spec composer and review cockpit that separates the five phases of AI-assisted development and lets each one happen on the device best suited to it — with the desktop doing the heavy lifting unattended.
+The app is a thin client by design. It does three things well: authenticate to GitHub, let the user capture requirements and pen-annotated reviews, and commit structured "job files" to a dedicated path in the user's repo. The desktop — running Claude Code in headless mode on the user's existing Max subscription — watches that path and executes whichever phase the job is in. No Anthropic API key, no API costs, no proxy hacks, no ToS gray zones; just the official Claude Code CLI doing what it's already sanctioned to do.
+The workflow enforces five phases with hard gates between them:
+
+Requirements (mobile capture)
+Spec generation (desktop, no code touched)
+Spec review (tablet with pen annotations)
+Spec revision (desktop, loops until approved)
+Implementation (desktop, PR opened)
+
+Claude refuses to cross phase boundaries without explicit approval markers, which kills the "helpfully skipping ahead" failure mode that defines vibe coding. A "quick mode" bypasses phases 2–4 for trivial changes so the ceremony doesn't bleed into work that doesn't need it.
+The output is a git-committed audit trail of every requirement, spec version, annotation, and decision — automatically, as a byproduct of using the tool.
+User Journey
+Monday evening, on the couch. Praveen is thinking about a new feature for his side project. He opens the app, taps "New Job," and dumps rough requirements into a text field — maybe dictates some of it. He picks the repo, tags the target area ("auth flow"), and commits. The app pushes a jobs/<id>/01-requirements.md file to the repo and he puts the phone down.
+Overnight. His desktop watcher sees the new job, pulls the branch, and runs Claude Code in spec-generation mode. Claude reads the requirements, explores the codebase, and writes 02-spec.md — goals, non-goals, open questions, edge cases, a proposed file-level change plan, and a list of assumptions it's making. Commits it back. Desktop goes idle.
+Tuesday morning commute. Praveen gets a notification: "Spec ready for review." He opens the tablet, sees the spec rendered cleanly, and goes through it with the pen. Strikes through an assumption that's wrong. Circles an open question and writes his answer in the margin. Draws an arrow between two sections with a note: "these should share state." Taps "Submit Review." The app saves his typed answers as 03-review.md and the annotated image as 03-annotations.png, commits both.
+Tuesday, during a meeting. Desktop picks up the review, runs Claude in revision mode — Claude reads the original spec, his typed answers, and the annotated image. Produces 04-spec-v2.md with his answers integrated, flags two new questions that his answers raised, and pushes.
+Tuesday lunch. Praveen pulls the revised spec, reviews it, finds it clean, and taps "Approve." The app drops an 05-approved marker in the job folder.
+Tuesday afternoon. Desktop sees the approval, switches Claude into implementation mode with the approved spec as the single source of truth. Claude edits the code, runs tests, opens a PR referencing the full job folder. Praveen gets a notification with the PR link.
+Tuesday evening. He reviews a PR that does exactly what he asked for, because every decision was made explicitly, in writing, with his approval. The job folder stays in the repo as a permanent record of why the change was made — not just what it did.
+The contrast with today: the same feature would have taken one vague prompt, three rounds of "actually I meant…," and a PR that subtly missed the point. Here, the thinking happened in the right places at the right times, on the right devices.
