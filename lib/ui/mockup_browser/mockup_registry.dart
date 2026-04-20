@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+import '../../domain/entities/job_ref.dart';
+import '../../domain/entities/repo_ref.dart';
 import '../screens/annotation_canvas/annotation_canvas_screen.dart';
 import '../screens/approval_confirmation/approval_confirmation_screen.dart';
 import '../screens/changelog_viewer/changelog_viewer_screen.dart';
@@ -39,7 +41,16 @@ Widget _signIn(BuildContext c) => const SignInScreen();
 Widget _syncDown(BuildContext c) => const SyncDownScreen();
 Widget _jobList(BuildContext c) => const JobListScreen();
 Widget _specReaderMd(BuildContext c) => const SpecReaderMdScreen();
-Widget _annotationCanvas(BuildContext c) => const AnnotationCanvasScreen();
+// Mockup JobRef — mirrors bootstrap.dart's `_mockupRepo` and the fake
+// filesystem's pre-baked `spec-auth-flow-totp` job folder so the mockup
+// canvas shows the same breadcrumb the hardcoded chrome always had.
+final _mockupAnnotationJob = JobRef(
+  repo: const RepoRef(owner: 'demo', name: 'payments-api'),
+  jobId: 'spec-auth-flow-totp',
+);
+
+Widget _annotationCanvas(BuildContext c) =>
+    AnnotationCanvasScreen(jobRef: _mockupAnnotationJob);
 Widget _reviewPanel(BuildContext c) => const ReviewPanelScreen();
 Widget _submitConfirmation(BuildContext c) => const SubmitConfirmationScreen();
 Widget _syncUp(BuildContext c) => const SyncUpScreen();
