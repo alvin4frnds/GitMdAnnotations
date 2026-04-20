@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'app/controllers/auth_controller.dart';
+import 'app/providers/auth_providers.dart';
 import 'bootstrap.dart';
-import 'ui/mockup_browser/mockup_browser_app.dart';
+import 'ui/screens/job_list/job_list_screen.dart';
+import 'ui/screens/sign_in/sign_in_screen.dart';
+import 'ui/theme/app_theme.dart';
+import 'ui/theme/tokens.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -10,25 +16,33 @@ Future<void> main() async {
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ]);
-  // Default is `mockup` so `flutter run` keeps working as the visual-QA
-  // harness. Opt into real adapters with `--dart-define=APP_MODE=real`.
-  const modeString =
-      String.fromEnvironment('APP_MODE', defaultValue: 'mockup');
-  final mode = modeString == 'real' ? AppMode.real : AppMode.mockup;
-  runApp(buildAppScope(mode: mode, child: const _AppRoot()));
+  runApp(buildAppScope(child: const _App()));
 }
 
-/// Root widget shared by both modes. M1a intentionally reuses the mockup
-/// browser as the nav tree so the team can still flip through the 12
-/// screens; SignIn + JobList are now driven by real controllers regardless
-/// of mode, so `real` mode yields real OAuth + libgit2 against whatever
-/// workdir / repo the picker (M1c) sets. A router-driven shell replaces
-/// this in M1b.
-class _AppRoot extends StatelessWidget {
-  const _AppRoot();
+class _App extends StatelessWidget {
+  const _App();
 
   @override
   Widget build(BuildContext context) {
-    return const MockupBrowserApp();
+    return MaterialApp(
+      title: 'GitMdScribe',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.build(AppTokens.light),
+      darkTheme: AppTheme.build(AppTokens.dark),
+      home: const _AuthGate(),
+    );
+  }
+}
+
+/// Shows [SignInScreen] until auth settles into [AuthSignedIn], then the
+/// [JobListScreen]. A router-driven shell replaces this in M1b.
+class _AuthGate extends ConsumerWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final data = ref.watch(authControllerProvider).value;
+    if (data is AuthSignedIn) return const JobListScreen();
+    return const SignInScreen();
   }
 }
