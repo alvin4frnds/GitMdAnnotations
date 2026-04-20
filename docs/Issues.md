@@ -94,3 +94,12 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 - **Screen/area:** `lib/infra/auth/github_oauth_adapter.dart`.
 - **Detail:** When a user has "Keep my email address private" enabled, `GET /user` returns `email: null`. We currently record `email: ''`, so commits carry an empty email.
 - **Proposed fix:** Fallback to `GET /user/emails` when `/user` returns null email; pick the primary verified address.
+
+## From M1b T8 review (2026-04-20)
+
+### Issue: PdfxAdapter native-path coverage deferred to on-device run
+- **Severity:** Medium
+- **Source:** M1b T8 review (2026-04-20)
+- **Screen/area:** `lib/infra/pdf/pdfx_adapter.dart`, `integration_test/infra/pdf/pdfx_adapter_test.dart`, `test/infra/pdf/pdfx_adapter_test.dart`.
+- **Detail:** `pdfx` is a platform-channel plugin; under `flutter test` on the host VM every real `open`/`renderPage` call raises `MissingPluginException(No implementation found for method open.document.file on channel io.scer.pdf_renderer)` because no Flutter engine is attached. The T8 review follow-up added four host-side tests that exercise only the pre-native branches (bad-path → `PdfOpenError` wrap, unknown-handle `close` idempotency). The remaining contract points — `pageCount` + `pdf-doc-<...>` id shape on a successful open, PNG-signature bytes from `renderPage`, `RangeError` on `pageNumber` out of bounds, finally-close of the pdfx page object, after-close `renderPage` behaviour — still live in `integration_test/infra/pdf/pdfx_adapter_test.dart` as `skip:`ped skeletons.
+- **Proposed fix:** On M1b close-out, run `fvm flutter test integration_test/infra/pdf/pdfx_adapter_test.dart -d <OPD2504-id>`: unskip the three tests, wire the rootBundle asset through a tempfile so `openFile` can consume a real path, and pin the PNG-signature + range-error + id-shape assertions enumerated in the T8 fix-subagent brief.
