@@ -2,7 +2,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gitmdannotations_tablet/domain/entities/anchor.dart';
 import 'package:gitmdannotations_tablet/domain/entities/ink_tool.dart';
 import 'package:gitmdannotations_tablet/domain/entities/pointer_sample.dart';
+import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_id_generator.dart';
+import 'package:gitmdannotations_tablet/domain/services/annotation_session.dart';
 
 import '_annotation_session_fixtures.dart';
 
@@ -73,6 +75,48 @@ void main() {
       s.endStroke(stylusSample(0, 0));
       expect(s.snapshot(), isEmpty);
       expect(s.hasActiveStroke, isFalse);
+    });
+
+    test(
+        'extendStroke with touch sample during active stylus stroke is '
+        'rejected (the touch coordinates do not land in the committed stroke)',
+        () {
+      final s = newSession();
+      s.beginStroke(stylusSample(0, 0), anchor: markdownAnchor);
+      s.extendStroke(stylusSample(10, 10));
+      // Palm lands on the canvas mid-stroke. Must be ignored.
+      s.extendStroke(kindSample(PointerKind.touch));
+      s.extendStroke(stylusSample(20, 20));
+      s.endStroke(stylusSample(30, 30));
+      final pts = s.snapshot().single.strokes.single.points;
+      expect(pts.map((p) => p.x).toList(), [0, 10, 20, 30]);
+      expect(pts.map((p) => p.y).toList(), [0, 10, 20, 30]);
+      // The default kindSample coords are (0, 0); if the guard regressed
+      // the point list would not have length 4 with these exact x's — but
+      // pin the palm coords explicitly too by using a non-origin touch:
+      // (the assertion above is already sufficient since a (0,0) touch
+      // would have been appended at index 2, shifting (20,20) to index 3
+      // and adding a 5th point).
+      expect(pts, hasLength(4));
+    });
+
+    test(
+        'endStroke with touch sample while stylus stroke is active is a '
+        'no-op on the end-sample (the stylus extend point is preserved '
+        'and the touch coords do not appear)', () {
+      final s = newSession();
+      s.beginStroke(stylusSample(0, 0), anchor: markdownAnchor);
+      s.extendStroke(stylusSample(10, 10));
+      // A palm-up event arrives while the stylus is still down. The
+      // stroke must commit *without* the touch sample's coords.
+      s.endStroke(kindSample(PointerKind.touch));
+      // The stroke commits on any endStroke call (active != null), but
+      // the non-stylus sample is dropped rather than appended.
+      expect(s.hasActiveStroke, isFalse);
+      final pts = s.snapshot().single.strokes.single.points;
+      expect(pts.map((p) => p.x).toList(), [0, 10]);
+      expect(pts.map((p) => p.y).toList(), [0, 10]);
+      expect(pts, hasLength(2));
     });
   });
 
@@ -243,6 +287,37 @@ void main() {
       s.endStroke(stylusSample(3, 3, pressure: 0.5));
       final pts = s.snapshot().single.strokes.single.points;
       expect(pts.map((p) => p.pressure).toList(), [0.1, 0.5, 0.9, 0.5]);
+    });
+  });
+
+  // Constructor validation ---------------------------------------------
+  group('AnnotationSession constructor — undoDepth validation', () {
+    test('throws ArgumentError when undoDepth == 0 '
+        '(0 has no recoverable state)', () {
+      expect(
+        () => AnnotationSession(
+          initialAnchor: markdownAnchor,
+          tool: InkTool.pen,
+          clock: FakeClock(baseInstant),
+          idGenerator: FakeIdGenerator(),
+          undoDepth: 0,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('throws ArgumentError when undoDepth < 0 (negative is nonsense)',
+        () {
+      expect(
+        () => AnnotationSession(
+          initialAnchor: markdownAnchor,
+          tool: InkTool.pen,
+          clock: FakeClock(baseInstant),
+          idGenerator: FakeIdGenerator(),
+          undoDepth: -1,
+        ),
+        throwsArgumentError,
+      );
     });
   });
 }
