@@ -39,6 +39,10 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   path_provider: ^2.1.5
   libgit2dart: ^1.2.2
+  # PDF rasterization — IMPLEMENTATION.md §4.4 / D-12 fixes the renderer
+  # as `pdfx` (MIT). Consumed only from `lib/infra/pdf/pdfx_adapter.dart`;
+  # domain code talks to `PdfRasterPort`.
+  pdfx: ^2.9.2
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +72,14 @@ flutter:
   # assets:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
+  assets:
+    # 587-byte minimal 1-page PDF used by
+    # `integration_test/pdf_raster_test.dart`. Shipped as an app asset so
+    # `rootBundle.load` can hand the bytes to pdfx via `openData` on the
+    # real device — the device filesystem has no access to the host's
+    # `integration_test/fixtures/` directory during a
+    # `flutter test integration_test/...` run.
+    - integration_test/fixtures/hello.pdf
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

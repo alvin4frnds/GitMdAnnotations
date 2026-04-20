@@ -2,7 +2,6 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gitmdannotations_tablet/domain/entities/canvas_size.dart';
-import 'package:gitmdannotations_tablet/domain/entities/pdf_document_handle.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_pdf_raster_port.dart';
 import 'package:gitmdannotations_tablet/domain/ports/pdf_raster_port.dart';
 
