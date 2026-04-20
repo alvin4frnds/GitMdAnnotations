@@ -98,7 +98,7 @@ Per IMPLEMENTATION.md §6.2. Fresh subagent per task; sequential execution withi
 
 | # | Task | Status |
 |---|---|---|
-| T1 | `Stroke` / `StrokePoint` / `StrokeGroup` entity tests deepened (boundary cases for pressure, empty strokes, huge stroke sets) | ⏳ |
+| T1 | `Stroke` / `StrokePoint` / `StrokeGroup` entity tests deepened (boundary cases for pressure, empty strokes, huge stroke sets) | ✅ |
 | T2 | `SvgSerializer` domain service + golden tests (scripted stroke sequences → exact SVG strings) | ⏳ |
 | T3 | `AnnotationSession` state machine (begin/extend/end stroke, undo/redo ≥ 50, palm rejection against `PointerDeviceKind`) + tests | ⏳ |
 | T4 | `PngFlattener` port + fake + domain tests | ⏳ |
@@ -118,3 +118,4 @@ See IMPLEMENTATION.md §6.3–6.4. Task boards expand here when each milestone s
 ## Change log
 
 - 2026-04-20 — UI spike deployed; 12 screens rendering on OPD2504. PROGRESS.md initialized. Milestone 1a started.
+- 2026-04-20 — M1b T1 complete (commits `971ea15` + `6924538`). Added 16 boundary tests across `test/domain/entities/stroke_boundary_test.dart` + `stroke_group_test.dart` (pressure bounds, NaN rejection on x/y/pressure, empty/huge stroke sets, 10k-point + 500-group equality/hash). `StrokePoint` gained NaN/bounds validation (`const` dropped; no `lib/**` call-site impact). 185 → 201 domain tests, pristine analyzer. Reviewer Minor findings (NaN pressure error-message symmetry; weaker -0.0001 boundary probe) deferred — not blocking.
