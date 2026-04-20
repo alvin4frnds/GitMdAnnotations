@@ -34,15 +34,26 @@ class PdfPageCache {
   final LinkedHashMap<_CacheKey, Uint8List> _entries =
       LinkedHashMap<_CacheKey, Uint8List>();
 
+  /// Ids we've already forwarded to `_port.close`. Guards against
+  /// double-close cascades — the provider layer fires `ref.onDispose`
+  /// blindly and a real `pdfx` document cannot be closed twice without
+  /// crashing.
+  final Set<String> _closedHandleIds = <String>{};
+
   /// Current number of cached pages.
   int get size => _entries.length;
 
   /// Maximum number of cached pages the cache will hold before evicting.
   int get capacity => _capacity;
 
-  /// Passes through to the underlying port. No cache state is touched on
-  /// open — entries are only minted by [renderPage].
-  Future<PdfDocumentHandle> open(String filePath) => _port.open(filePath);
+  /// Passes through to the underlying port. Clears the "already closed"
+  /// mark for this id so a subsequent [close] on the freshly-opened
+  /// handle forwards to the port — re-opening is not idempotency.
+  Future<PdfDocumentHandle> open(String filePath) async {
+    final handle = await _port.open(filePath);
+    _closedHandleIds.remove(handle.id);
+    return handle;
+  }
 
   /// Renders page [pageNumber] at [targetSize], serving from cache on hit
   /// and otherwise delegating to the port + memoizing the result.
@@ -70,8 +81,13 @@ class PdfPageCache {
   }
 
   /// Closes the handle on the underlying port and evicts every cache
-  /// entry keyed on [handle]'s id.
+  /// entry keyed on [handle]'s id. Idempotent: a second call with the
+  /// same handle is a silent no-op — the provider layer can fire
+  /// `ref.onDispose` without tracking whether close already ran.
   Future<void> close(PdfDocumentHandle handle) async {
+    if (!_closedHandleIds.add(handle.id)) {
+      return;
+    }
     _entries.removeWhere((key, _) => key.handleId == handle.id);
     await _port.close(handle);
   }
