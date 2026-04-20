@@ -1,4 +1,4 @@
-# GitMdAnnotations — Tablet App PRD
+# GitMdScribe — Tablet App PRD
 
 **Status:** Draft v2 (incorporates Praveen's clarifications 2026-04-20)
 **Owner:** Praveen
@@ -193,7 +193,7 @@ Solo developer with a Claude Max subscription and a personal or small-team GitHu
 - **FR-1.30** **Sync Up** button: `git push origin claude-jobs`. On push rejection (remote has newer commits), trigger the same conflict flow.
 - **FR-1.31** Both buttons show progress and result toast; the app badge shows unpushed-commit count.
 - **FR-1.32** **Conflict policy = remote wins.** On conflict during Sync Down or Sync Up:
-  1. Save the local `claude-jobs` HEAD to an on-device backup folder (`~/GitMdAnnotations/backups/<repo>/<branch>-<timestamp>/`) as a full copy of the job folders.
+  1. Save the local `claude-jobs` HEAD to an on-device backup folder (`~/GitMdScribe/backups/<repo>/<branch>-<timestamp>/`) as a full copy of the job folders.
   2. Reset local `claude-jobs` to `origin/claude-jobs`.
   3. Merge `origin/main` on top (as normal Sync Down).
   4. Notify user: "Local changes archived — remote took precedence. Backup at …"

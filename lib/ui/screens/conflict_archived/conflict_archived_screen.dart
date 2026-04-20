@@ -41,7 +41,7 @@ class ConflictArchivedScreen extends StatelessWidget {
               _InfoRow(
                 label: 'Backup path',
                 value:
-                    '~/GitMdAnnotations/backups/payments-api/claude-jobs-2026-04-20T10-43-01/',
+                    '~/GitMdScribe/backups/payments-api/claude-jobs-2026-04-20T10-43-01/',
                 first: true,
               ),
               _InfoRow(

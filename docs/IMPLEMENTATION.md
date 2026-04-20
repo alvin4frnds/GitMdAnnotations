@@ -1,4 +1,4 @@
-# GitMdAnnotations — Tablet App Implementation Doc
+# GitMdScribe — Tablet App Implementation Doc
 
 > Phase 1 (Milestones 1a–1d). Companion to [TabletApp-PRD.md](PRD/TabletApp-PRD.md).
 > Authoring bias: architecture-first, subagent-driven, TDD.
@@ -712,7 +712,7 @@ class SyncFailed extends SyncProgress { final SyncError error; ... }
 4. Both sync operations are idempotent with no intermediate commits.
 5. Sync is always manual (FR-1.33). No background sync. No push notifications in Phase 1.
 
-**Backup path.** PRD §5.7 writes `~/GitMdAnnotations/backups/<repo>/<branch>-<timestamp>/`. On Android scoped storage (>= API 29), this resolves to the app's documents directory: `getApplicationDocumentsDirectory() + "/backups/<repo>/<branch>-<timestamp>/"`. A Settings screen "Export backups" action surfaces them via the Storage Access Framework.
+**Backup path.** PRD §5.7 writes `~/GitMdScribe/backups/<repo>/<branch>-<timestamp>/`. On Android scoped storage (>= API 29), this resolves to the app's documents directory: `getApplicationDocumentsDirectory() + "/backups/<repo>/<branch>-<timestamp>/"`. A Settings screen "Export backups" action surfaces them via the Storage Access Framework.
 
 **Offline behavior** (FR-1.34, §5.8).
 
@@ -1163,7 +1163,7 @@ All three PRD §14 "still open" items resolved on 2026-04-20:
 
 1. **State management = Riverpod 2.** Justified in §2.2. If the project ever onboards a second engineer with strong Bloc preference, the port/adapter boundaries are stable regardless — state management is local to `lib/app/`.
 2. **Anchor stability.** SVG stores `(sourceSha, lineNumber)`. Desktop re-anchors after spec revisions against the `sourceSha` snapshot rather than walking forward-diffs. This matches the PRD's phrasing in §8.4 but makes the algorithm explicit.
-3. **Backup path on Android scoped storage.** PRD writes `~/GitMdAnnotations/backups/…` which is inaccessible post-API-29. Use `getApplicationDocumentsDirectory() + "/backups/…"` and expose via Storage Access Framework in Settings.
+3. **Backup path on Android scoped storage.** PRD writes `~/GitMdScribe/backups/…` which is inaccessible post-API-29. Use `getApplicationDocumentsDirectory() + "/backups/…"` and expose via Storage Access Framework in Settings.
 4. **Atomic review commit.** `CommitPlanner` assembles the full `FileWrite` list before calling `GitPort.commit`, ensuring one commit per Submit Review / Approve. Avoids a two-commit "review, then changelog" drift.
 5. **libgit2 isolate IPC cost.** File writes crossing the isolate boundary serialize their bytes. Fine for MB-scale review payloads; re-measure in 1a if sync latency slips.
 6. **No schema version field (MVP).** Deferred. Graceful-degradation contract documented in §3.8.

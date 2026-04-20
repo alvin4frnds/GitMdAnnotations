@@ -64,7 +64,7 @@ class _SignInBody extends ConsumerWidget {
       _BrandMark(),
       const SizedBox(height: 20),
       Text(
-        'GitMdAnnotations',
+        'GitMdScribe',
         textAlign: TextAlign.center,
         style: TextStyle(
           color: t.textPrimary,

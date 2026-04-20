@@ -1,4 +1,4 @@
-# GitMdAnnotations
+# GitMdScribe
 
 > Pen-driven spec review, synced to git.
 
