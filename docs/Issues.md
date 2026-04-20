@@ -127,6 +127,38 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 - **Detail:** `pdfx` is a platform-channel plugin; under `flutter test` on the host VM every real `open`/`renderPage` call raises `MissingPluginException(No implementation found for method open.document.file on channel io.scer.pdf_renderer)` because no Flutter engine is attached. The T8 review follow-up added four host-side tests that exercise only the pre-native branches (bad-path → `PdfOpenError` wrap, unknown-handle `close` idempotency). The remaining contract points — `pageCount` + `pdf-doc-<...>` id shape on a successful open, PNG-signature bytes from `renderPage`, `RangeError` on `pageNumber` out of bounds, finally-close of the pdfx page object, after-close `renderPage` behaviour — still live in `integration_test/infra/pdf/pdfx_adapter_test.dart` as `skip:`ped skeletons.
 - **Proposed fix:** On M1b close-out, run `fvm flutter test integration_test/infra/pdf/pdfx_adapter_test.dart -d <OPD2504-id>`: unskip the three tests, wire the rootBundle asset through a tempfile so `openFile` can consume a real path, and pin the PNG-signature + range-error + id-shape assertions enumerated in the T8 fix-subagent brief.
 
+## From M1b close-out QA round 1 (2026-04-20)
+
+Reference: `docs/_m1b_qa_round1.md` + 25 screenshots in `docs/_m1b_qa_round1/`. 0 Critical / 0 High / 1 Medium / 3 Low. Clean pass — close-out loop did not iterate.
+
+### Issue: PDF mockup pages render "Failed to render page N" instead of transparent placeholders
+- **Severity:** Medium
+- **Source:** M1b close-out QA round 1 (2026-04-20)
+- **Screen/area:** `lib/ui/widgets/pdf_page_view/pdf_page_tile.dart:48,70-80`; `lib/domain/fakes/fake_pdf_raster_port.dart:108-109`; mockup seeding in `lib/bootstrap.dart` (`_mockupOverrides` `FakePdfRasterPort.register` call).
+- **Detail:** `FakePdfRasterPort` returns the 8-byte PNG magic signature for unregistered pages. Those 8 bytes are not a decodable PNG (no IHDR/IDAT/IEND), so `Image.memory`'s `errorBuilder` fires and `_ErrorBox` renders a red-tinted "Failed to render page N" card. Dominant visual on screen 4b in both light and dark modes — a mockup visitor reasonably reads it as broken rather than "placeholder". No crash; no regression vs. M1a (screen is new to M1b).
+- **Proposed fix:** Either (a) seed `pagePngs:` in bootstrap with a tiny valid 1×1 transparent PNG for each of the 3 mockup pages, or (b) silence the error box in `PdfPageTile` when the bytes are the signature-only sentinel (cheapest: check `bytes.length == 8` before rendering `_ErrorBox`). Option (a) is more faithful; option (b) avoids touching bootstrap.
+
+### Issue: PDF Pages rail is display-only (no jump-scroll on tap)
+- **Severity:** Low
+- **Source:** M1b close-out QA round 1 (2026-04-20)
+- **Screen/area:** `lib/ui/screens/spec_reader_pdf/spec_reader_pdf_rail.dart`.
+- **Detail:** Tapping "Page 2" / "Page 3" in the rail does nothing. Rail comment acknowledges this is intentional for M1b, but the visual affordance reads as clickable.
+- **Proposed fix:** Wire `ScrollController.animateTo(pageOffset)` on tap. Reuse the controller already held by `PdfPageView`'s visible-page tracker; expose via callback.
+
+### Issue: PDF aspect ratio 1.4142 produces tiles taller than viewport on 2800×1980
+- **Severity:** Low
+- **Source:** M1b close-out QA round 1 (2026-04-20)
+- **Screen/area:** `lib/ui/widgets/pdf_page_view/pdf_page_view.dart` — `pageAspectRatio` default.
+- **Detail:** A4-portrait tiles are ~1860w × ~2630h logical — taller than the ~1860px visible height after rails. Only the top of page 1 appears. Combined with the pan/zoom-blocked T9 Issues.md entry, page content effectively can't be explored in mockup.
+- **Proposed fix:** Shrink the default aspect when no per-page dims are known (e.g. 1.0 square), or add a page indicator chip to the chrome.
+
+### Issue: Annotation canvas "Ink layers" rail hardcoded to Groups A/B/C
+- **Severity:** Low
+- **Source:** M1b close-out QA round 1 (2026-04-20)
+- **Screen/area:** `lib/ui/screens/annotation_canvas/left_rail.dart`.
+- **Detail:** Rail shows `Group A — line 47 / B — line 23 / C — line 89` regardless of the controller's actual `state.groups`. Commented as display-only chrome but visually reads as state.
+- **Proposed fix:** `ref.watch(annotationControllerProvider(jobRef)).groups` into the rail; map each committed group to `Group <letter> — line <anchor.lineNumber>` (or page/bbox for PDF anchors). Empty-state = rail message rather than A/B/C chrome.
+
 ## From M1b T11 (2026-04-20)
 
 ### Issue: Real-stylus pen-latency gap requires camera observation
