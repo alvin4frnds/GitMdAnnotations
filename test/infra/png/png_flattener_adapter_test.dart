@@ -64,7 +64,7 @@ void main() {
 
   group('PngFlattenerAdapter (port assignability)', () {
     test('is assignable to PngFlattener', () {
-      const PngFlattener flat = PngFlattenerAdapter();
+      final PngFlattener flat = PngFlattenerAdapter();
       expect(flat, isA<PngFlattener>());
     });
   });
@@ -72,7 +72,7 @@ void main() {
   group('PngFlattenerAdapter.flatten — PNG signature', () {
     test('empty canvas returns bytes starting with the 8-byte PNG signature',
         () async {
-      const flattener = PngFlattenerAdapter();
+      final flattener = PngFlattenerAdapter();
       final bytes = await flattener.flatten(
         groups: const [],
         canvas: _size(100, 100),
@@ -83,7 +83,7 @@ void main() {
 
     test('non-empty canvas (with a stroke) also starts with PNG magic',
         () async {
-      const flattener = PngFlattenerAdapter();
+      final flattener = PngFlattenerAdapter();
       final bytes = await flattener.flatten(
         groups: [
           _group([
@@ -99,7 +99,7 @@ void main() {
   group('PngFlattenerAdapter.flatten — visible content', () {
     test('a stroke produces strictly more bytes than the empty canvas',
         () async {
-      const flattener = PngFlattenerAdapter();
+      final flattener = PngFlattenerAdapter();
       final emptyBytes = await flattener.flatten(
         groups: const [],
         canvas: _size(100, 100),
@@ -118,7 +118,7 @@ void main() {
     test(
         'two different stroke contents produce different PNG bytes '
         '(render is content-sensitive)', () async {
-      const flattener = PngFlattenerAdapter();
+      final flattener = PngFlattenerAdapter();
       final a = await flattener.flatten(
         groups: [
           _group([
@@ -143,7 +143,7 @@ void main() {
     test(
         'same groups + same canvas → byte-identical bytes across two calls',
         () async {
-      const flattener = PngFlattenerAdapter();
+      final flattener = PngFlattenerAdapter();
       final groups = [
         _group([
           _stroke(const [Offset(10, 10), Offset(50, 50), Offset(90, 30)]),
@@ -164,7 +164,7 @@ void main() {
   group('PngFlattenerAdapter.flatten — stroke edge cases', () {
     test('empty stroke in a group produces the same bytes as if it were absent',
         () async {
-      const flattener = PngFlattenerAdapter();
+      final flattener = PngFlattenerAdapter();
       final realStroke = _stroke(const [Offset(20, 20), Offset(80, 80)]);
       final bytesWithEmpty = await flattener.flatten(
         groups: [
@@ -183,7 +183,7 @@ void main() {
 
     test('single-point stroke produces bytes distinct from zero-point stroke',
         () async {
-      const flattener = PngFlattenerAdapter();
+      final flattener = PngFlattenerAdapter();
       final withDot = await flattener.flatten(
         groups: [
           _group([
@@ -206,7 +206,7 @@ void main() {
   group('PngFlattenerAdapter.flatten — image dimensions honor canvas size',
       () {
     test('canvas (100x60) produces an image sized 100x60', () async {
-      const flattener = PngFlattenerAdapter();
+      final flattener = PngFlattenerAdapter();
       final bytes = await flattener.flatten(
         groups: const [],
         canvas: _size(100, 60),
@@ -221,7 +221,7 @@ void main() {
     });
 
     test('canvas (123x45) produces an image sized 123x45', () async {
-      const flattener = PngFlattenerAdapter();
+      final flattener = PngFlattenerAdapter();
       final bytes = await flattener.flatten(
         groups: const [],
         canvas: _size(123, 45),
@@ -233,6 +233,36 @@ void main() {
       expect(img.height, 45);
       img.dispose();
       codec.dispose();
+    });
+  });
+
+  group('PngFlattenerAdapter.flatten — error path (seam-injected)', () {
+    test('throws PngFlattenRenderError when toImage seam throws', () async {
+      final flattener = PngFlattenerAdapter(
+        toImage: (ui.Picture picture, int w, int h) async =>
+            throw Exception('simulated Picture.toImage failure'),
+      );
+      await expectLater(
+        flattener.flatten(
+          groups: const [],
+          canvas: _size(100, 100),
+        ),
+        throwsA(isA<PngFlattenRenderError>()),
+      );
+    });
+
+    test('throws PngFlattenEncodeError when toPngBytes seam returns null',
+        () async {
+      final flattener = PngFlattenerAdapter(
+        toPngBytes: (ui.Image _) async => null,
+      );
+      await expectLater(
+        flattener.flatten(
+          groups: const [],
+          canvas: _size(100, 100),
+        ),
+        throwsA(isA<PngFlattenEncodeError>()),
+      );
     });
   });
 }
