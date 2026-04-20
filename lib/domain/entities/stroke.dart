@@ -1,11 +1,30 @@
 /// A single sampled point along a pen stroke: logical canvas coordinates
 /// plus normalized pressure in `[0, 1]` captured from the stylus.
+///
+/// `x` and `y` may be negative and may be `double.infinity` /
+/// `double.negativeInfinity`; coordinate clamping for rendering is handled
+/// at the render layer, not at this value object. `x`, `y`, and `pressure`
+/// are rejected as `NaN` because equality and hashing break on `NaN`.
 class StrokePoint {
-  const StrokePoint({
+  StrokePoint({
     required this.x,
     required this.y,
     required this.pressure,
-  });
+  }) {
+    if (x.isNaN) {
+      throw ArgumentError.value(x, 'x', 'must not be NaN');
+    }
+    if (y.isNaN) {
+      throw ArgumentError.value(y, 'y', 'must not be NaN');
+    }
+    if (pressure.isNaN || pressure < 0.0 || pressure > 1.0) {
+      throw ArgumentError.value(
+        pressure,
+        'pressure',
+        'must be a normalized value in [0, 1]',
+      );
+    }
+  }
 
   final double x;
   final double y;
