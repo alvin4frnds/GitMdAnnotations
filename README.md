@@ -64,4 +64,4 @@ Start with the PRD — everything else is derived from it:
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE).
+[PolyForm Noncommercial License 1.0.0](LICENSE) — free for personal, research, educational, hobby, and other noncommercial use. Commercial use requires a separate license.
