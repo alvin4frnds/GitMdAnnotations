@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/providers/annotation_providers.dart';
 import 'app/providers/auth_providers.dart';
+import 'app/providers/pdf_providers.dart';
 import 'app/providers/spec_providers.dart';
 import 'app/providers/sync_providers.dart';
 import 'domain/entities/auth_session.dart';
@@ -11,6 +12,7 @@ import 'domain/entities/repo_ref.dart';
 import 'domain/fakes/fake_auth_port.dart';
 import 'domain/fakes/fake_file_system.dart';
 import 'domain/fakes/fake_git_port.dart';
+import 'domain/fakes/fake_pdf_raster_port.dart';
 import 'domain/fakes/fake_secure_storage.dart';
 import 'domain/ports/auth_port.dart';
 import 'domain/ports/secure_storage_port.dart';
@@ -19,6 +21,7 @@ import 'infra/clock/system_clock.dart';
 import 'infra/fs/fs_adapter.dart';
 import 'infra/git/git_adapter.dart';
 import 'infra/id/system_id_generator.dart';
+import 'infra/pdf/pdfx_adapter.dart';
 import 'infra/storage/keystore_adapter.dart';
 
 /// Composition-root mode flag. `real` binds production adapters (OAuth,
@@ -74,6 +77,7 @@ List<Override> _realOverrides() {
     fileSystemProvider.overrideWithValue(fs),
     clockProvider.overrideWithValue(SystemClock()),
     idGeneratorProvider.overrideWithValue(SystemIdGenerator()),
+    pdfRasterPortProvider.overrideWithValue(PdfxAdapter()),
     gitPortProvider.overrideWith((ref) {
       // Capture `ref` so the credentials loader stays lazy; resolving
       // storage at provider-define time would require a container which
@@ -106,9 +110,23 @@ List<Override> _mockupOverrides() {
     gitPortProvider.overrideWithValue(FakeGitPort()),
     clockProvider.overrideWithValue(SystemClock()),
     idGeneratorProvider.overrideWithValue(SystemIdGenerator()),
+    pdfRasterPortProvider.overrideWithValue(_buildMockupPdfPort()),
     currentWorkdirProvider.overrideWith((ref) => _mockupWorkdir),
     currentRepoProvider.overrideWith((ref) => _mockupRepo),
   ];
+}
+
+/// Seeds the mockup-mode PDF port with the one PDF the mockup
+/// walkthrough surfaces — the invoice redesign's `spec.pdf`. The fake
+/// doesn't need real bytes: pages render as an 8-byte PNG signature
+/// which `Image.memory` displays as an empty image. That's acceptable
+/// for a visual walkthrough (the pen annotation chrome is the point);
+/// a real PNG would just add weight.
+FakePdfRasterPort _buildMockupPdfPort() {
+  const mockPdfPath =
+      '$_mockupWorkdir/jobs/pending/spec-invoice-pdf-redesign/spec.pdf';
+  return FakePdfRasterPort()
+    ..register(path: mockPdfPath, pageCount: 3);
 }
 
 /// The fake identity used by the mockup-mode Sign In screen's auto-run
