@@ -3,7 +3,7 @@ import '../entities/commit.dart';
 import '../entities/git_identity.dart';
 import '../entities/repo_ref.dart';
 import '../ports/git_port.dart';
-import 'changelog_parser.dart';
+import '../services/changelog_parser.dart';
 
 /// In-memory, scripted implementation of [GitPort] for domain tests.
 /// Does zero real I/O. Tests seed state via [initial], script edge cases

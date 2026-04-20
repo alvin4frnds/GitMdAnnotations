@@ -1,11 +1,12 @@
 import '../entities/changelog_entry.dart';
 
-/// Strict parser for the `## Changelog` section used by `FakeGitPort`.
+/// Strict parser for the `## Changelog` section at the bottom of a spec /
+/// review markdown file (or sidecar `CHANGELOG.md` for PDFs).
 ///
-/// Kept alongside the fake (not in `lib/domain/services/`) because the
-/// shipping git adapter (T10) will get its own parser backed by real
-/// file I/O; this copy exists purely to let domain tests exercise the
-/// on-disk contract without touching the filesystem.
+/// Originally colocated with [FakeGitPort]; promoted to `services/` in T9 so
+/// that [SpecRepository] can share the single parser implementation. The
+/// shipping git adapter (T10) will call straight into this function — no
+/// forked copy.
 ///
 /// Contract: missing section -> empty list; malformed entries ->
 /// [FormatException]. Timestamps are local time per PRD §8.3 / D-14
