@@ -106,7 +106,7 @@ Per IMPLEMENTATION.md §6.2. Fresh subagent per task; sequential execution withi
 | T6 | `InkOverlay` widget: `Listener` + `CustomPainter` stylus pipeline; pressure-sensitive painting | ✅ |
 | T7 | Wire real `AnnotationCanvas` screen to `AnnotationController` (replace hardcoded strokes with session state) | ✅ |
 | T8 | `PdfRasterPort` + `pdfx` adapter (lazy-load pages, LRU cache) + minimal integration test on device | ✅ |
-| T9 | `PdfPageView` widget + wire into `SpecReader` flow; PDF + overlay composition matches markdown pipeline | ⏳ |
+| T9 | `PdfPageView` widget + wire into `SpecReader` flow; PDF + overlay composition matches markdown pipeline | ✅ |
 | T10 | `PngFlattener` infra adapter (real Skia-free capture via offscreen surface) + integration test | ⏳ |
 | T11 | Pen-latency measurement against NFR-1 (<25 ms p95) on OPD2504 | ⏳ |
 | M1b-close | QA round + triage + Medium/Low to Issues.md | ⏳ |

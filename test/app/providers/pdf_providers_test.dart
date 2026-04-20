@@ -83,7 +83,7 @@ void main() {
       // Keep the provider alive long enough to resolve.
       final sub = container.listen(
         pdfDocumentNotifierProvider('/docs/one.pdf'),
-        (_, __) {},
+        (_, c) {},
       );
       await container
           .read(pdfDocumentNotifierProvider('/docs/one.pdf').future);

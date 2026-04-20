@@ -95,6 +95,29 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 - **Detail:** When a user has "Keep my email address private" enabled, `GET /user` returns `email: null`. We currently record `email: ''`, so commits carry an empty email.
 - **Proposed fix:** Fallback to `GET /user/emails` when `/user` returns null email; pick the primary verified address.
 
+## From M1b T9 (2026-04-20)
+
+### Issue: PDF page aspect ratio hardcoded (A4 portrait, 1.4142)
+- **Severity:** Medium
+- **Source:** M1b T9 (2026-04-20)
+- **Screen/area:** `lib/ui/widgets/pdf_page_view/pdf_page_view.dart`, `lib/domain/ports/pdf_raster_port.dart`.
+- **Detail:** `PdfPageView` sizes every page tile as `width * 1.4142` (A4 portrait). Pages that are letter, tabloid, landscape, or mixed-orientation render with whitespace or clipping. The `PdfRasterPort` has no `pageDimensions(pageNumber)` getter yet — adding one is a T8 follow-up.
+- **Proposed fix:** Extend `PdfRasterPort` with `Future<PdfPageDimensions> pageDimensions(handle, pageNumber)`; add a family provider `pdfPageDimensionsProvider` so `PdfPageView` can size each tile correctly. Wire through `PdfxAdapter` (exposes `page.width`/`page.height` via `pdfx.PdfPage`) and `FakePdfRasterPort` (register per-page dims).
+
+### Issue: Pan/zoom disabled while InkOverlay covers the PDF
+- **Severity:** Medium
+- **Source:** M1b T9 (2026-04-20)
+- **Screen/area:** `lib/ui/screens/spec_reader_pdf/spec_reader_pdf_pane.dart`.
+- **Detail:** `InkOverlay` uses `HitTestBehavior.opaque` so touch pan/zoom (that would otherwise drive the underlying `InteractiveViewer`) is swallowed. T9 accepts this tradeoff (stylus-only) because the session drops non-stylus pointer events anyway. Result: users can't pinch-zoom or scroll the PDF while the pen-annotation overlay is mounted.
+- **Proposed fix:** Add a pen/pan toggle in the top chrome (mockup already sketches a read/pen tool switch). When "pan" is active, switch the overlay to `HitTestBehavior.translucent` and forward non-stylus events to the `InteractiveViewer`; when "pen" is active, keep the current opaque behaviour.
+
+### Issue: PDF anchor derivation is a sentinel placeholder
+- **Severity:** Medium
+- **Source:** M1b T9 (2026-04-20)
+- **Screen/area:** `lib/ui/screens/spec_reader_pdf/spec_reader_pdf_screen.dart` — `_placeholderAnchor()`.
+- **Detail:** Every stroke gets `PdfAnchor(page: <visiblePage>, bbox: (0,0,0,0), sourceSha: '')`. Real bbox derivation from `(page, localOffset)` requires knowing the current scroll offset + the page-tile's position + the PDF-page coordinate transform. Deferred to a dedicated anchor-derivation task per IMPLEMENTATION.md §4.4 `anchor_for(page, bbox)`.
+- **Proposed fix:** Extract `PdfAnchorResolver` from the screen into `lib/domain/services/`; it should accept `(page, localOffsetInPage, pageDims, sourceSha)` and emit a `PdfAnchor` with the stroke's bbox in PDF-page coordinates. The screen derives `localOffsetInPage` from the `GestureDetector` in `PdfPageTile` and pipes it into the controller.
+
 ## From M1b T8 review (2026-04-20)
 
 ### Issue: PdfxAdapter native-path coverage deferred to on-device run
