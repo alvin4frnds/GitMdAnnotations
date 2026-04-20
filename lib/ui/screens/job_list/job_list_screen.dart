@@ -1,22 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/job_list_controller.dart';
+import '../../../app/providers/spec_providers.dart';
+import '../../../domain/entities/job.dart';
+import '../../../domain/entities/phase.dart';
+import '../../../domain/entities/repo_ref.dart';
+import '../../../domain/entities/source_kind.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 
-/// Screen 3 — Job list / pending specs (UI spike, stubbed).
-class JobListScreen extends StatelessWidget {
+/// Screen 3 — Job list / pending specs. T12 replaces the inline stub data
+/// with [jobListControllerProvider]; phase/sourceKind colour mapping lives
+/// in [_PhaseTag] / [_FileKindChip] below.
+///
+/// Follow-up: the `just arrived` treatment (indigo left-rail accent + "just
+/// arrived" caption) is dropped in M1a because `Job` doesn't expose an
+/// arrival timestamp yet. Restore once sync telemetry ships.
+class JobListScreen extends ConsumerWidget {
   const JobListScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
+    final async = ref.watch(jobListControllerProvider);
+    final repo = ref.watch(currentRepoProvider);
     return ColoredBox(
       color: t.surfaceBackground,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: const [
-          _LeftRail(),
-          Expanded(child: _MainArea()),
+        children: [
+          _LeftRail(async: async),
+          Expanded(
+            child: _MainArea(async: async, repo: repo),
+          ),
         ],
       ),
     );
@@ -28,11 +45,13 @@ class JobListScreen extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _LeftRail extends StatelessWidget {
-  const _LeftRail();
+  const _LeftRail({required this.async});
+  final AsyncValue<JobListState> async;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final counts = _phaseCounts(async);
     return Container(
       width: 208,
       decoration: BoxDecoration(
@@ -45,13 +64,13 @@ class _LeftRail extends StatelessWidget {
         children: [
           const _SectionHeader(label: 'Phase'),
           const SizedBox(height: 8),
-          const _FilterRow(label: 'All', count: '3', selected: true),
+          _FilterRow(label: 'All', count: '${counts.all}', selected: true),
           const SizedBox(height: 2),
-          const _FilterRow(label: 'Awaiting review', count: '2'),
+          _FilterRow(label: 'Awaiting review', count: '${counts.review}'),
           const SizedBox(height: 2),
-          const _FilterRow(label: 'Awaiting revision', count: '1'),
+          _FilterRow(label: 'Awaiting revision', count: '${counts.revised}'),
           const SizedBox(height: 2),
-          const _FilterRow(label: 'Approved', count: '0'),
+          _FilterRow(label: 'Approved', count: '${counts.approved}'),
           const SizedBox(height: 16),
           Divider(height: 1, color: t.borderSubtle),
           const SizedBox(height: 16),
@@ -60,6 +79,51 @@ class _LeftRail extends StatelessWidget {
       ),
     );
   }
+
+  _PhaseCounts _phaseCounts(AsyncValue<JobListState> async) {
+    final state = async.value;
+    if (state is! JobListLoaded) return const _PhaseCounts.zero();
+    var review = 0;
+    var revised = 0;
+    var approved = 0;
+    for (final j in state.jobs) {
+      switch (j.phase) {
+        case Phase.review:
+          review++;
+        case Phase.revised:
+          revised++;
+        case Phase.approved:
+          approved++;
+        case Phase.spec:
+          // Pre-review phase — not surfaced as a bucket in the rail.
+          break;
+      }
+    }
+    return _PhaseCounts(
+      all: state.jobs.length,
+      review: review,
+      revised: revised,
+      approved: approved,
+    );
+  }
+}
+
+class _PhaseCounts {
+  const _PhaseCounts({
+    required this.all,
+    required this.review,
+    required this.revised,
+    required this.approved,
+  });
+  const _PhaseCounts.zero()
+      : all = 0,
+        review = 0,
+        revised = 0,
+        approved = 0;
+  final int all;
+  final int review;
+  final int revised;
+  final int approved;
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -171,26 +235,33 @@ class _NewSpecButton extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _MainArea extends StatelessWidget {
-  const _MainArea();
+  const _MainArea({required this.async, required this.repo});
+  final AsyncValue<JobListState> async;
+  final RepoRef? repo;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: const [
-        _TopChrome(),
-        Expanded(child: _JobList()),
+      children: [
+        _TopChrome(async: async, repo: repo),
+        Expanded(child: _JobListBody(async: async)),
       ],
     );
   }
 }
 
 class _TopChrome extends StatelessWidget {
-  const _TopChrome();
+  const _TopChrome({required this.async, required this.repo});
+  final AsyncValue<JobListState> async;
+  final RepoRef? repo;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final state = async.value;
+    final hasRepo = state is JobListLoaded;
+    final jobCount = state is JobListLoaded ? state.jobs.length : 0;
     return Container(
       height: 48,
       decoration: BoxDecoration(
@@ -201,7 +272,7 @@ class _TopChrome extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            'payments-api',
+            repo?.name ?? '—',
             style: appMono(context, size: 12, weight: FontWeight.w600),
           ),
           Padding(
@@ -217,17 +288,20 @@ class _TopChrome extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           Text(
-            '3 jobs',
+            '$jobCount jobs',
             style: TextStyle(color: t.textMuted, fontSize: 12),
           ),
           const Spacer(),
           _GhostButton(
             icon: Icons.arrow_downward_rounded,
             label: 'Sync Down',
-            onPressed: () {},
+            onPressed: hasRepo ? () {} : null,
           ),
           const SizedBox(width: 8),
-          _SyncUpButton(onPressed: () {}, badgeCount: '1'),
+          _SyncUpButton(
+            onPressed: hasRepo ? () {} : null,
+            badgeCount: hasRepo ? '0' : '—',
+          ),
         ],
       ),
     );
@@ -237,7 +311,7 @@ class _TopChrome extends StatelessWidget {
 class _GhostButton extends StatelessWidget {
   final IconData icon;
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   const _GhostButton({required this.icon, required this.label, required this.onPressed});
 
   @override
@@ -271,7 +345,7 @@ class _GhostButton extends StatelessWidget {
 }
 
 class _SyncUpButton extends StatelessWidget {
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final String badgeCount;
   const _SyncUpButton({required this.onPressed, required this.badgeCount});
 
@@ -321,72 +395,118 @@ class _SyncUpButton extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Job list
+// Body — switches on the AsyncValue<JobListState>
 // ---------------------------------------------------------------------------
 
-/// Internal stub data model — no logic, just shape for the layout.
-class _JobStub {
-  final String id;
-  final _Phase phase;
-  final _FileKind fileKind;
-  final String preview;
-  final String timestamp;
-  final bool justArrived;
+class _JobListBody extends StatelessWidget {
+  const _JobListBody({required this.async});
+  final AsyncValue<JobListState> async;
 
-  const _JobStub({
-    required this.id,
-    required this.phase,
-    required this.fileKind,
-    required this.preview,
-    required this.timestamp,
-    this.justArrived = false,
-  });
+  @override
+  Widget build(BuildContext context) {
+    if (async.isLoading && !async.hasValue) {
+      return const _LoadingState();
+    }
+    if (async.hasError && !async.hasValue) {
+      return _ErrorState(message: async.error.toString());
+    }
+    final state = async.value;
+    if (state is JobListEmpty) return const _EmptyState();
+    if (state is JobListLoaded) {
+      if (state.jobs.isEmpty) return const _EmptyState(reason: 'No jobs');
+      return _JobRows(jobs: state.jobs);
+    }
+    // Fallback (should not happen — AsyncNotifier always lands in a sealed
+    // JobListState). Show a spinner rather than an empty frame.
+    return const _LoadingState();
+  }
 }
 
-enum _Phase { awaitingReview, awaitingRevision }
+class _LoadingState extends StatelessWidget {
+  const _LoadingState();
 
-enum _FileKind { md, pdf }
+  @override
+  Widget build(BuildContext context) {
+    return const Center(child: CircularProgressIndicator());
+  }
+}
 
-const List<_JobStub> _stubJobs = [
-  _JobStub(
-    id: 'spec-auth-flow-totp',
-    phase: _Phase.awaitingReview,
-    fileKind: _FileKind.md,
-    preview:
-        'TOTP rollout plan. Open questions on magic-link fallback and refresh-token lifetime.',
-    timestamp: '2 min ago',
-    justArrived: true,
-  ),
-  _JobStub(
-    id: 'spec-invoice-pdf-redesign',
-    phase: _Phase.awaitingReview,
-    fileKind: _FileKind.pdf,
-    preview:
-        'Layout A vs B for the new PDF invoice template. Sample attached.',
-    timestamp: '14 min ago',
-  ),
-  _JobStub(
-    id: 'spec-webhook-retry-policy',
-    phase: _Phase.awaitingRevision,
-    fileKind: _FileKind.md,
-    preview:
-        'Revision v2 ready after review. Dead-letter behavior clarified.',
-    timestamp: '1 h ago',
-  ),
-];
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message});
+  final String message;
 
-class _JobList extends StatelessWidget {
-  const _JobList();
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: t.statusDanger.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: t.statusDanger.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline_rounded, size: 16, color: t.statusDanger),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    color: t.statusDanger,
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({this.reason = 'No repo selected'});
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.inbox_outlined, size: 32, color: t.textMuted),
+          const SizedBox(height: 10),
+          Text(
+            reason,
+            style: TextStyle(color: t.textMuted, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JobRows extends StatelessWidget {
+  const _JobRows({required this.jobs});
+  final List<Job> jobs;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final rows = <Widget>[];
-    for (var i = 0; i < _stubJobs.length; i++) {
+    for (var i = 0; i < jobs.length; i++) {
       if (i > 0) {
         rows.add(Divider(height: 1, thickness: 1, color: t.borderSubtle));
       }
-      rows.add(_JobRow(job: _stubJobs[i]));
+      rows.add(_JobRow(job: jobs[i]));
     }
     return SingleChildScrollView(
       child: Column(
@@ -398,26 +518,22 @@ class _JobList extends StatelessWidget {
 }
 
 class _JobRow extends StatelessWidget {
-  final _JobStub job;
+  final Job job;
   const _JobRow({required this.job});
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final highlighted = job.justArrived;
-
-    final bg = highlighted ? t.accentSoftBg : t.surfaceBackground;
-
     return Material(
-      color: bg,
+      color: t.surfaceBackground,
       child: InkWell(
         onTap: () {},
-        hoverColor: highlighted ? t.accentSoftBg : t.surfaceSunken,
+        hoverColor: t.surfaceSunken,
         child: Container(
-          decoration: BoxDecoration(
-            border: highlighted
-                ? Border(left: BorderSide(color: t.accentPrimary, width: 4))
-                : const Border(left: BorderSide(color: Colors.transparent, width: 4)),
+          decoration: const BoxDecoration(
+            border: Border(
+              left: BorderSide(color: Colors.transparent, width: 4),
+            ),
           ),
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           child: Row(
@@ -431,11 +547,11 @@ class _JobRow extends StatelessWidget {
                       children: [
                         _PhaseTag(phase: job.phase),
                         const SizedBox(width: 8),
-                        _FileKindChip(kind: job.fileKind),
+                        _FileKindChip(kind: job.sourceKind),
                         const SizedBox(width: 10),
                         Flexible(
                           child: Text(
-                            job.id,
+                            job.ref.jobId,
                             style: appMono(
                               context,
                               size: 13,
@@ -444,48 +560,15 @@ class _JobRow extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (highlighted) ...[
-                          const SizedBox(width: 10),
-                          Text(
-                            'just arrived',
-                            style: TextStyle(
-                              color: t.accentPrimary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
                       ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      job.preview,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: t.textMuted,
-                        fontSize: 13,
-                        height: 1.45,
-                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
               Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      job.timestamp,
-                      style: appMono(context, size: 11, color: t.textMuted),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.chevron_right_rounded,
-                        size: 18, color: t.textMuted),
-                  ],
-                ),
+                child: Icon(Icons.chevron_right_rounded,
+                    size: 18, color: t.textMuted),
               ),
             ],
           ),
@@ -496,30 +579,37 @@ class _JobRow extends StatelessWidget {
 }
 
 class _PhaseTag extends StatelessWidget {
-  final _Phase phase;
+  final Phase phase;
   const _PhaseTag({required this.phase});
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-
-    // Phase tag colors — derived from tokens:
-    //   Awaiting review  → indigo (accentPrimary over accentSoftBg)
-    //   Awaiting revision → amber (statusWarning soft bg + strong text)
+    // Phase colour mapping — ties back to §4.3's phase truth table.
+    //   review   → indigo   (awaiting review)
+    //   revised  → amber    (awaiting revision)
+    //   approved → green    (approved, read-only)
+    //   spec     → muted    (pre-review; rarely shown here but covered)
     late final Color bg;
     late final Color fg;
     late final String label;
     switch (phase) {
-      case _Phase.awaitingReview:
+      case Phase.review:
         bg = t.accentSoftBg;
         fg = t.accentPrimary;
         label = 'Awaiting review';
-        break;
-      case _Phase.awaitingRevision:
+      case Phase.revised:
         bg = t.statusWarning.withValues(alpha: 0.15);
         fg = t.statusWarning;
         label = 'Awaiting revision';
-        break;
+      case Phase.approved:
+        bg = t.statusSuccess.withValues(alpha: 0.15);
+        fg = t.statusSuccess;
+        label = 'Approved';
+      case Phase.spec:
+        bg = t.surfaceSunken;
+        fg = t.textMuted;
+        label = 'Spec';
     }
 
     return Container(
@@ -541,13 +631,13 @@ class _PhaseTag extends StatelessWidget {
 }
 
 class _FileKindChip extends StatelessWidget {
-  final _FileKind kind;
+  final SourceKind kind;
   const _FileKindChip({required this.kind});
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final label = kind == _FileKind.md ? '.md' : '.pdf';
+    final label = kind == SourceKind.markdown ? '.md' : '.pdf';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(

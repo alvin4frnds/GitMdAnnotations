@@ -1,14 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/auth_controller.dart';
+import '../../../app/providers/auth_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 
-class SignInScreen extends StatelessWidget {
+/// Screen 1 — Sign in (GitHub Device Flow + PAT fallback).
+///
+/// Wired in T12 to [authControllerProvider]. Behaviour per the sealed
+/// [AuthState] plus Riverpod's [AsyncValue]:
+///   data(AuthSignedOut)                 → default card, GitHub button live
+///   data(AuthDeviceFlowAwaitingUser)    → shows challenge.userCode
+///   data(AuthSignedIn)                  → brief "Signed in as @…" message
+///   loading                             → spinner replaces GitHub button
+///   error                               → inline error banner + button
+class SignInScreen extends ConsumerWidget {
   const SignInScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
+    final async = ref.watch(authControllerProvider);
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -29,61 +42,219 @@ class SignInScreen extends StatelessWidget {
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _BrandMark(),
-                  const SizedBox(height: 20),
-                  Text(
-                    'GitMdAnnotations',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: t.textPrimary,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Sign in with your GitHub account to start reviewing specs.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: t.textMuted,
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  _GitHubButton(onPressed: () {}),
-                  const SizedBox(height: 12),
-                  OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: t.textPrimary,
-                      side: BorderSide(color: t.borderSubtle),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      'Sign in with a token instead',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Device Flow · no backend · token stays in Android Keystore',
-                    textAlign: TextAlign.center,
-                    style: appMono(context, size: 10, color: t.textMuted),
-                  ),
-                ],
-              ),
+              child: _SignInBody(async: async),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SignInBody extends ConsumerWidget {
+  const _SignInBody({required this.async});
+  final AsyncValue<AuthState> async;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.tokens;
+    final controller = ref.read(authControllerProvider.notifier);
+    final children = <Widget>[
+      _BrandMark(),
+      const SizedBox(height: 20),
+      Text(
+        'GitMdAnnotations',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: t.textPrimary,
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.4,
+        ),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        'Sign in with your GitHub account to start reviewing specs.',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: t.textMuted,
+          fontSize: 13,
+          height: 1.4,
+        ),
+      ),
+      const SizedBox(height: 24),
+    ];
+
+    // Error banner sits above the action row so the user sees *why* before
+    // reading what to do next. The main action stays clickable.
+    if (async.hasError) {
+      children.add(_ErrorBanner(message: async.error.toString()));
+      children.add(const SizedBox(height: 12));
+    }
+
+    final data = async.value;
+    if (data is AuthDeviceFlowAwaitingUser) {
+      children.add(_DeviceCodePanel(userCode: data.challenge.userCode));
+      children.add(const SizedBox(height: 16));
+    } else if (data is AuthSignedIn) {
+      children.add(_SignedInPanel(login: data.session.identity.name));
+      children.add(const SizedBox(height: 16));
+    }
+
+    if (async.isLoading) {
+      children.add(const _LoadingButton());
+    } else {
+      children.add(
+        _GitHubButton(onPressed: () => controller.startDeviceFlow()),
+      );
+    }
+    children.add(const SizedBox(height: 12));
+    children.add(
+      OutlinedButton(
+        onPressed: async.isLoading ? null : () => _openPatDialog(context, ref),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: t.textPrimary,
+          side: BorderSide(color: t.borderSubtle),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        child: const Text(
+          'Sign in with a token instead',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        ),
+      ),
+    );
+    children.add(const SizedBox(height: 20));
+    children.add(
+      Text(
+        'Device Flow · no backend · token stays in Android Keystore',
+        textAlign: TextAlign.center,
+        style: appMono(context, size: 10, color: t.textMuted),
+      ),
+    );
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    );
+  }
+
+  Future<void> _openPatDialog(BuildContext context, WidgetRef ref) async {
+    final pat = await showDialog<String>(
+      context: context,
+      builder: (ctx) => const _PatDialog(),
+    );
+    if (pat == null || pat.isEmpty) return;
+    await ref.read(authControllerProvider.notifier).signInWithPat(pat);
+  }
+}
+
+class _DeviceCodePanel extends StatelessWidget {
+  const _DeviceCodePanel({required this.userCode});
+  final String userCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: t.accentSoftBg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            userCode,
+            textAlign: TextAlign.center,
+            style: appMono(
+              context,
+              size: 22,
+              weight: FontWeight.w700,
+              color: t.accentPrimary,
+            ).copyWith(letterSpacing: 2.4),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Open github.com/login/device and enter this code.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: t.textMuted, fontSize: 11, height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SignedInPanel extends StatelessWidget {
+  const _SignedInPanel({required this.login});
+  final String login;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: t.statusSuccess.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle_rounded, size: 16, color: t.statusSuccess),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              'Signed in as @$login',
+              style: TextStyle(
+                color: t.statusSuccess,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: t.statusDanger.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: t.statusDanger.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline_rounded, size: 16, color: t.statusDanger),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: t.statusDanger,
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -136,6 +307,86 @@ class _GitHubButton extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LoadingButton extends StatelessWidget {
+  const _LoadingButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      height: 48,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: t.textPrimary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SizedBox(
+        height: 18,
+        width: 18,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(t.textPrimary),
+        ),
+      ),
+    );
+  }
+}
+
+class _PatDialog extends StatefulWidget {
+  const _PatDialog();
+
+  @override
+  State<_PatDialog> createState() => _PatDialogState();
+}
+
+class _PatDialogState extends State<_PatDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return AlertDialog(
+      backgroundColor: t.surfaceElevated,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      title: Text(
+        'Paste personal access token',
+        style: TextStyle(color: t.textPrimary, fontSize: 15),
+      ),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        obscureText: true,
+        decoration: InputDecoration(
+          hintText: 'ghp_…',
+          hintStyle: appMono(context, size: 12, color: t.textMuted),
+          isDense: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide(color: t.borderSubtle),
+          ),
+        ),
+        style: appMono(context, size: 13),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+          child: const Text('Sign in'),
+        ),
+      ],
     );
   }
 }
