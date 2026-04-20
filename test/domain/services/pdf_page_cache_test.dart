@@ -275,5 +275,22 @@ void main() {
       await cache.close(handle);
       expect(port.closedHandleIds, ['/a.pdf']);
     });
+
+    test('close(handle) is idempotent (second call is a no-op)', () async {
+      // The provider layer fires `ref.onDispose` blindly, so a handle may
+      // be closed more than once as pdf screens come and go. The cache
+      // must absorb repeated closes and NOT forward them to the port a
+      // second time — double-closing a real `pdfx` document is a crash
+      // hazard, and the port contract promises one-close-per-open.
+      final port = FakePdfRasterPort()
+        ..register(path: '/a.pdf', pageCount: 1);
+      final cache = PdfPageCache(port: port);
+      final handle = await cache.open('/a.pdf');
+      await cache.close(handle);
+      // A second close must not throw and must not re-forward to the port.
+      await cache.close(handle);
+      expect(port.closedHandleIds, hasLength(1));
+      expect(port.closedHandleIds.single, '/a.pdf');
+    });
   });
 }

@@ -167,11 +167,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     // With a 400-tall viewport and ~840-tall pages (600*1.4 aspect),
-    // at most 2–3 pages lay out — certainly not all 20.
+    // only page 1 is fully visible and ListView.builder's default 250 px
+    // cacheExtent is not enough to realize page 2 (page 2 starts at
+    // y=~840, far past 400+250). So only 1 page renders. Upper bound is
+    // pinned tight (<=2) to catch regressions that over-realize — a bug
+    // that leaked 15 pages through would have slid under a naive
+    // `< 20` check.
     expect(
       port.renderCalls.length,
-      lessThan(20),
-      reason: 'lazy rendering: ListView.builder must not realize every page',
+      lessThanOrEqualTo(2),
+      reason: 'lazy rendering: only the visible page (plus at most one '
+          'cacheExtent neighbor) should realize',
     );
     expect(
       port.renderCalls.length,
