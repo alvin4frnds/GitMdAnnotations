@@ -4,3 +4,8 @@
 # emits `\n`. Lock them to LF so Windows autocrlf doesn't convert them
 # to CRLF on checkout and break the golden-match assertion.
 test/golden/*.svg text eol=lf
+
+# Integration-test PDF fixtures are binary — force that even though
+# `* text=auto` would normally detect it correctly, to make the intent
+# explicit and survive autodetect edge cases.
+integration_test/fixtures/*.pdf binary
