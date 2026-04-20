@@ -209,4 +209,62 @@ void main() {
       InkPointerPhase.cancel,
     ]);
   });
+
+  testWidgets(
+      'PointerSample.x/y are LOCAL to the overlay, not global screen coords',
+      (tester) async {
+    // Pins the mapper's choice of `event.localPosition` over
+    // `event.position`. Without this, swapping local→global would silently
+    // offset every stroke by the overlay's on-screen origin in T7.
+    //
+    // Layout: InkOverlay is offset by (200, 100) from screen origin via a
+    // Padding wrapper. A tap at the global Offset(205, 107) lands 5px
+    // right / 7px down from the overlay's top-left corner; the reported
+    // PointerSample must reflect the LOCAL (5, 7), not the global values.
+    final sink = <_Reported>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 200, top: 100),
+              child: SizedBox(
+                width: 400,
+                height: 300,
+                child: InkOverlay(
+                  groups: const [],
+                  activeStroke: ValueNotifier<List<Offset>>(const []),
+                  currentStrokeColor: const Color(0xFFDC2626),
+                  currentStrokeWidth: 2.1,
+                  onSample: (phase, sample) =>
+                      sink.add((phase: phase, sample: sample)),
+                  nowProvider: () => DateTime.utc(2026, 4, 20),
+                  hitTestBehavior: HitTestBehavior.opaque,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Sanity: the overlay really is offset where we expect.
+    final topLeft = tester.getTopLeft(find.byType(InkOverlay));
+    expect(topLeft, const Offset(200, 100));
+
+    final gesture = await tester.startGesture(
+      const Offset(205, 107),
+      kind: PointerDeviceKind.stylus,
+    );
+    await tester.pump();
+
+    expect(sink, hasLength(1));
+    expect(sink.single.phase, InkPointerPhase.down);
+    expect(sink.single.sample.x, closeTo(5.0, 1e-6));
+    expect(sink.single.sample.y, closeTo(7.0, 1e-6));
+
+    await gesture.up();
+    await tester.pump();
+  });
 }
