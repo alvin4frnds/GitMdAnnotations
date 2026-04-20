@@ -112,12 +112,28 @@ void main() {
       expect(xs, containsAll(<double>[10.0, 15.0, 20.0]));
     });
 
-    test('extendStroke emits state so hasActiveStroke flips to true', () {
+    test('beginStroke flips hasActiveStroke to true', () {
       final container = _buildContainer();
       final c = container.read(annotationControllerProvider(_jobA).notifier);
       c.beginStroke(_stylus(10, 20), anchor: _anchor());
       final state = container.read(annotationControllerProvider(_jobA));
       expect(state.hasActiveStroke, isTrue);
+    });
+
+    test('extendStroke emits a new state instance on each sample', () {
+      // Regression pin: extendStroke must call _emit() so widgets watching
+      // the provider rebuild on every mid-stroke sample. If the _emit()
+      // inside extendStroke is ever removed, the two reads below would
+      // return the same (identical) state instance and this test fails.
+      final container = _buildContainer();
+      final c = container.read(annotationControllerProvider(_jobA).notifier);
+      c.beginStroke(_stylus(10, 20), anchor: _anchor());
+      final before = container.read(annotationControllerProvider(_jobA));
+      c.extendStroke(_stylus(15, 25));
+      final after = container.read(annotationControllerProvider(_jobA));
+      expect(identical(before, after), isFalse,
+          reason: 'extendStroke must emit a fresh AnnotationState');
+      expect(after.hasActiveStroke, isTrue);
     });
   });
 
