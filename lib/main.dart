@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/controllers/auth_controller.dart';
 import 'app/dev_seed.dart';
 import 'app/providers/auth_providers.dart';
+import 'app/providers/spec_providers.dart';
 import 'bootstrap.dart';
 import 'ui/screens/job_list/job_list_screen.dart';
+import 'ui/screens/repo_picker/repo_picker_screen.dart';
 import 'ui/screens/sign_in/sign_in_screen.dart';
 import 'ui/theme/app_theme.dart';
 import 'ui/theme/tokens.dart';
@@ -36,22 +38,28 @@ class _App extends StatelessWidget {
   }
 }
 
-/// Shows [SignInScreen] until auth settles into [AuthSignedIn], then the
-/// [JobListScreen]. A router-driven shell replaces this in M1b.
+/// Routes between SignIn → RepoPicker → JobList based on auth + repo
+/// selection state. Wrapped in [SafeArea] so no screen paints under the
+/// system status bar / nav bar / display cutout. (Flutter renders
+/// edge-to-edge by default on Android 15+.)
 ///
-/// Wrapped in [SafeArea] so neither screen paints under the system status
-/// bar / nav bar / display cutout. Flutter renders edge-to-edge by default
-/// on Android 15+, and without this the status-bar clock collides with the
-/// top row of the job list.
+/// A router-driven shell replaces this when routing grows beyond three
+/// states.
 class _AuthGate extends ConsumerWidget {
   const _AuthGate();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final data = ref.watch(authControllerProvider).value;
-    final screen = data is AuthSignedIn
-        ? const JobListScreen()
-        : const SignInScreen();
+    final repo = ref.watch(currentRepoProvider);
+    final Widget screen;
+    if (data is! AuthSignedIn) {
+      screen = const SignInScreen();
+    } else if (repo == null) {
+      screen = const RepoPickerScreen();
+    } else {
+      screen = const JobListScreen();
+    }
     return SafeArea(child: screen);
   }
 }

@@ -5,6 +5,7 @@ import 'app/dev_seed.dart';
 import 'app/providers/annotation_providers.dart';
 import 'app/providers/auth_providers.dart';
 import 'app/providers/pdf_providers.dart';
+import 'app/providers/repo_picker_providers.dart';
 import 'app/providers/review_providers.dart';
 import 'app/providers/spec_providers.dart';
 import 'app/providers/sync_providers.dart';
@@ -14,6 +15,7 @@ import 'infra/auth/github_oauth_adapter.dart';
 import 'infra/clock/system_clock.dart';
 import 'infra/fs/fs_adapter.dart';
 import 'infra/git/git_adapter.dart';
+import 'infra/github/dio_github_repos_adapter.dart';
 import 'infra/id/system_id_generator.dart';
 import 'infra/pdf/pdfx_adapter.dart';
 import 'infra/png/png_flattener_adapter.dart';
@@ -63,6 +65,7 @@ ProviderScope buildAppScope({required Widget child, DevSeed? devSeed}) {
       idGeneratorProvider.overrideWithValue(SystemIdGenerator()),
       pdfRasterPortProvider.overrideWithValue(PdfxAdapter()),
       pngFlattenerProvider.overrideWithValue(PngFlattenerAdapter()),
+      gitHubReposPortProvider.overrideWithValue(DioGitHubReposAdapter()),
       gitPortProvider.overrideWith((ref) {
         // Capture `ref` so the credentials loader stays lazy; resolving
         // storage at provider-define time would require a container which
