@@ -50,6 +50,22 @@ class RepoPickerOpening extends RepoPickerState {
   final GitHubRepo repo;
 }
 
+/// Clone-or-open on the picked repo failed (auth, network, on-device
+/// filesystem quirks, corrupt existing workdir). UI surfaces [message]
+/// to the user and re-enables interactions so a different repo can be
+/// picked. [previousRepos] preserves the loaded list so the UI doesn't
+/// bounce back to the spinner.
+class RepoPickerCloneFailed extends RepoPickerState {
+  const RepoPickerCloneFailed({
+    required this.repo,
+    required this.message,
+    required this.previousRepos,
+  });
+  final GitHubRepo repo;
+  final String message;
+  final List<GitHubRepo> previousRepos;
+}
+
 /// AsyncNotifier that loads the signed-in user's repos on first build
 /// and handles pick / retry intents.
 ///
@@ -100,6 +116,13 @@ class RepoPickerController extends AsyncNotifier<RepoPickerState> {
       );
       return;
     }
+    // Snapshot the currently-loaded list so we can restore it on clone
+    // failure — otherwise the UI would fall back to showing an empty
+    // picker and the user loses the list they already saw.
+    final previous = state.value;
+    final previousRepos = previous is RepoPickerLoaded
+        ? previous.repos
+        : const <GitHubRepo>[];
     state = AsyncValue.data(RepoPickerOpening(repo));
     final docs = await getApplicationDocumentsDirectory();
     final workdir = '${docs.path}/repos/${repo.owner}/${repo.name}';
@@ -114,25 +137,25 @@ class RepoPickerController extends AsyncNotifier<RepoPickerState> {
             workdir: workdir,
           );
     } catch (e) {
-      // Clone failed — fall back to the loaded state and surface the
-      // error via a SnackBar in the UI. Keeping the Loaded list visible
-      // is more useful than bouncing to a full-screen error because the
-      // user may want to pick a different repo.
-      state = AsyncValue.error(e, StackTrace.current);
+      // Clone failed. Surface a real error state (not AsyncValue.error —
+      // that gets swallowed in the UI because `hasValue` stays true on
+      // the previous Opening frame). Keep the repo list visible so the
+      // user can try a different one without bouncing back to loading.
+      state = AsyncValue.data(RepoPickerCloneFailed(
+        repo: repo,
+        message: e.toString(),
+        previousRepos: previousRepos,
+      ));
       return;
     }
     ref.read(currentWorkdirProvider.notifier).state = workdir;
     ref.read(currentRepoProvider.notifier).state = repoRef;
     // Re-emit the loaded list so the UI can render "picked <name>"
     // feedback before the gate flips to JobList.
-    final previous = state.value;
-    if (previous is RepoPickerOpening) {
-      state = AsyncValue.data(RepoPickerLoaded(
-        // We don't have the list cached on `RepoPickerOpening`; reload
-        // — cheap because `_load` is just a single HTTP GET and it
-        // won't block the navigator since the UI gate already flipped.
-        await _repos.listUserRepos(auth.session.token),
-      ));
-    }
+    state = AsyncValue.data(RepoPickerLoaded(
+      previousRepos.isNotEmpty
+          ? previousRepos
+          : await _repos.listUserRepos(auth.session.token),
+    ));
   }
 }

@@ -99,6 +99,16 @@ flutter:
     # `integration_test/fixtures/` directory during a
     # `flutter test integration_test/...` run.
     - integration_test/fixtures/hello.pdf
+    # Mozilla's Trust Store (from https://curl.se/docs/caextract.html).
+    # Our forked libgit2 is linked against mbedTLS 2.28 which does not
+    # ship a CA bundle, and Android's system CA directory lives under
+    # /system/etc/security/cacerts/ with hash-named files that mbedTLS'
+    # cert-path parser can't consume. At bootstrap we copy this asset
+    # to the app's cache dir and hand the path to libgit2 via
+    # Libgit2.setSSLCertLocations — without this every HTTPS clone from
+    # github.com fails with "certificate is not correctly signed by the
+    # trusted CA".
+    - assets/ca/cacert.pem
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

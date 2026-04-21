@@ -6,6 +6,7 @@ import 'app/controllers/auth_controller.dart';
 import 'app/dev_seed.dart';
 import 'app/providers/auth_providers.dart';
 import 'app/providers/spec_providers.dart';
+import 'app/ssl_trust_store.dart';
 import 'bootstrap.dart';
 import 'ui/screens/job_list/job_list_screen.dart';
 import 'ui/screens/repo_picker/repo_picker_screen.dart';
@@ -19,6 +20,9 @@ Future<void> main() async {
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ]);
+  // Must run before any HTTPS git op. Cheap — skips rewrite on warm
+  // starts because the cached .pem survives in the cache dir.
+  await installBundledTrustStore();
   final devSeed = await prepareDevSeed();
   runApp(buildAppScope(devSeed: devSeed, child: const _App()));
 }

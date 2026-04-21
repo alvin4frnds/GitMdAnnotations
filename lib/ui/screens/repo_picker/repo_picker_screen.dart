@@ -98,6 +98,16 @@ class _Body extends ConsumerWidget {
         repos.isEmpty ? const _EmptyState() : _RepoList(repos: repos),
       RepoPickerOpening(:final repo) =>
         _OpeningState(repo: repo),
+      RepoPickerCloneFailed(
+        :final repo,
+        :final message,
+        :final previousRepos,
+      ) =>
+        _CloneFailedState(
+          repo: repo,
+          message: message,
+          previousRepos: previousRepos,
+        ),
     };
   }
 }
@@ -131,6 +141,69 @@ class _EmptyState extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CloneFailedState extends StatelessWidget {
+  const _CloneFailedState({
+    required this.repo,
+    required this.message,
+    required this.previousRepos,
+  });
+  final GitHubRepo repo;
+  final String message;
+  final List<GitHubRepo> previousRepos;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Column(
+      children: [
+        Container(
+          color: t.statusDanger.withValues(alpha: 0.10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.error_outline_rounded,
+                  size: 18, color: t.statusDanger),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Couldn\'t open ${repo.fullName}',
+                      style: appMono(
+                        context,
+                        size: 12,
+                        weight: FontWeight.w600,
+                        color: t.statusDanger,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      message,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: t.statusDanger,
+                        fontSize: 11,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: previousRepos.isEmpty
+              ? const _EmptyState()
+              : _RepoList(repos: previousRepos),
+        ),
+      ],
     );
   }
 }

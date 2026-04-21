@@ -32,3 +32,8 @@ scratch/
 .env.local
 *.pem
 *.key
+# …but do track the bundled Mozilla CA trust store — it's public data
+# (published at https://curl.se/docs/caextract.html) and the app fails
+# HTTPS git ops without it (no system CA store reachable from
+# untrusted_app SELinux context on Android).
+!assets/ca/cacert.pem
