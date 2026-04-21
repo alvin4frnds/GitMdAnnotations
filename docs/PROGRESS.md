@@ -47,8 +47,8 @@ docs/
 
 ## Current state
 
-**Milestone:** 1c 🟡 — core flow code-complete; **M1c-close QA pending on device**. 1d 🟡 — T1 (ChangelogViewer) done; T2–T5 pending. Phase 1 completion plan: [`docs/implementation-plan2.md`](implementation-plan2.md).
-**Last updated:** 2026-04-21 (late).
+**Milestone:** 1c 🟡 — core flow code-complete; **M1c-close QA pending on device**. 1d 🟡 — T1–T4 done; T5 (battery profiling, needs 4-hour device run) pending. Phase 1 completion plan: [`docs/implementation-plan2.md`](implementation-plan2.md).
+**Last updated:** 2026-04-21 (late, after W5.2/5.3/5.4 + spec-reader-md real rendering).
 
 ### Phase 1 completion snapshot
 
@@ -67,14 +67,14 @@ Across the two pushes documented in `docs/implementation-plan2.md`:
 | **W4.3** | Review draft auto-save (5s tick, coalesces keystrokes, pop-save on dispose); delegated to parallel agent; +6 tests | ✅ |
 | **W4.4** | M1c close-out QA round (ADB golden-path on tablet + triage) | ⏳ (interactive; needs credentials + device) |
 | **W5.1** | ChangelogViewer — `ChangelogAggregator` service + controller + timeline UI + JobList left-rail nav entry; delegated to parallel agent; +15 tests | ✅ |
-| **W5.2** | Settings / Export backups via Storage Access Framework | ⏳ |
-| **W5.3** | Recovery flows (corrupted `.git` surfacing + expired-token re-auth polish) | ⏳ |
-| **W5.4** | Cold-start NFR-2 tuning (preload last-opened job metadata) | ⏳ |
+| **W5.2** | Settings screen (ACCOUNT / REPOSITORY / DATA sections) + Export backups via Storage Access Framework (`shared_storage` 0.8.1, recursive SAF copy, sealed `ExportOutcome`); delegated to parallel agent; +9 tests | ✅ |
+| **W5.3** | Recovery flows — `loadLastSession` validates workdir+`.git` existence and clears stale keys on mismatch; `SyncController.syncUp` auto-signs-out on `PushRejectedAuth` so revoked tokens don't persist; +4 tests | ✅ |
+| **W5.4** | Cold-start NFR-2 preload — persist `(repo, workdir, jobId)` via `SecureStoragePort` on every `RepoPickerController.pick()` + JobList row tap; `main()` rehydrates before `runApp` and overrides `currentRepoProvider` / `currentWorkdirProvider` so `_AuthGate` lands on JobList directly; `ColdStartTracker` writes 3 checkpoints to `dart:developer` for `adb logcat | grep gitmdscribe.nfr2`; sign-out clears the keys; delegated to parallel agent; +16 tests | ✅ |
 | **W5.5** | Battery NFR-8 profiling (4h continuous review on OPD2504) | ⏳ (needs device + measurement window) |
 | **W6** | NFR-1 real-stylus p95, NFR-7 TalkBack, NFR-9 storage LRU, NFR-10 on-device sync timing | ⏳ |
 | Hygiene | `SyncController` now uses `ClockPort` (closes the M1a-T11 Low entry in `Issues.md`); push-error classifier enumerates structured categories (closes the M1a-T10 Medium) | ✅ |
 
-**Test count:** 668 → **696 passing** (+28 this push). Same 2 pre-existing `sign_in_screen_test.dart` flakes (independent of this work).
+**Test count:** 668 → **726 passing** (+58 across the push). Same 2 pre-existing `sign_in_screen_test.dart` flakes (independent of this work).
 **APK:** ships `libgit2.so` + `libmbedtls.so` + `libmbedx509.so` + `libmbedcrypto.so` under each of `lib/{arm64-v8a,armeabi-v7a,x86_64}/`. Real HTTPS clones/fetches/pushes against `github.com` now possible.
 
 ### Completed before 1a proper (UI spike)
@@ -159,10 +159,10 @@ Per IMPLEMENTATION.md §6.4. Will expand as tasks start.
 
 | # | Task | Status |
 |---|---|---|
-| T1 | `ChangelogViewer` — parse `## Changelog` across all jobs, render a timeline | ⏳ |
-| T2 | Settings: "Export backups" via Storage Access Framework | ⏳ |
-| T3 | Recovery flows: corrupted `.git` surfacing + expired-token re-auth polish | ⏳ |
-| T4 | Cold-start NFR-2 tuning (preload last-opened job metadata) | ⏳ |
+| T1 | `ChangelogViewer` — parse `## Changelog` across all jobs, render a timeline | ✅ |
+| T2 | Settings: "Export backups" via Storage Access Framework | ✅ |
+| T3 | Recovery flows: corrupted `.git` surfacing + expired-token re-auth polish | ✅ |
+| T4 | Cold-start NFR-2 tuning (preload last-opened job metadata) | ✅ |
 | T5 | Battery profiling against NFR-8 (4+ hours active review on OPD2504) | ⏳ |
 | M1d-close | QA + triage + NFR measurement gates (NFR-1 real stylus, NFR-7 TalkBack, NFR-9 LRU, NFR-10 sync) | ⏳ |
 
