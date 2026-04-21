@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/controllers/review_controller.dart';
 import '../../../app/controllers/review_orchestrator.dart';
 import '../../../app/providers/annotation_providers.dart';
+import '../../../app/providers/spec_providers.dart';
 import '../../../domain/entities/anchor.dart';
 import '../../../domain/entities/ink_tool.dart';
 import '../../../domain/entities/job_ref.dart';
@@ -59,11 +60,16 @@ class _AnnotationCanvasScreenState
   /// never clobbered by a route rebuild.
   bool _defaultInkApplied = false;
 
-  // TODO(markdown-anchor): derive real line+sourceSha from tap Offset once
-  // MarkdownRenderer is wired (IMPLEMENTATION.md §4.4). For T7 we use the
-  // same sentinel anchor as AnnotationController.build().
-  Anchor _placeholderAnchor() =>
-      MarkdownAnchor(lineNumber: 1, sourceSha: '');
+  // TODO(markdown-anchor): derive real line from tap Offset once the
+  // MarkdownRenderer owns a line-position index (IMPLEMENTATION.md §4.4).
+  // Until then every stroke is anchored to line 1, but we stamp the REAL
+  // spec source SHA so `CommitPlanner._assertAnchorsMatchSource` accepts
+  // the submit. Previously we sent `sourceSha: ''` and every submit blew
+  // up with `CommitPlannerAnchorShaMismatch`.
+  Anchor _placeholderAnchor() {
+    final sha = ref.read(specFileProvider(widget.jobRef)).value?.sha ?? '';
+    return MarkdownAnchor(lineNumber: 1, sourceSha: sha);
+  }
 
   @override
   void dispose() {

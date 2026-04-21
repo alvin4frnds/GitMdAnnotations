@@ -5,6 +5,7 @@ import '../../../app/controllers/review_controller.dart';
 import '../../../app/controllers/review_orchestrator.dart';
 import '../../../app/providers/annotation_providers.dart';
 import '../../../app/providers/pdf_providers.dart';
+import '../../../app/providers/spec_providers.dart';
 import '../../../domain/entities/anchor.dart';
 import '../../../domain/entities/job_ref.dart';
 import '../../../domain/entities/pdf_document_handle.dart';
@@ -53,15 +54,18 @@ class _SpecReaderPdfScreenState
   int _visiblePage = 1;
 
   // TODO(pdf-anchor): derive (page, bbox) in PDF-page coordinates from
-  // the PDF page dims + local tap offset; wire sourceSha from the spec
-  // repository. IMPLEMENTATION.md §4.4 "anchor_for(page, bbox)". For T9
-  // we hand every stroke a sentinel anchor so the controller's
-  // beginStroke contract stays satisfied.
-  Anchor _placeholderAnchor() => PdfAnchor(
-        page: _visiblePage,
-        bbox: const Rect(left: 0, top: 0, right: 0, bottom: 0),
-        sourceSha: '',
-      );
+  // the PDF page dims + local tap offset; IMPLEMENTATION.md §4.4
+  // "anchor_for(page, bbox)". Until then every stroke's bbox is a
+  // zero-area rect, but the sourceSha is the real PDF content SHA so
+  // `CommitPlanner._assertAnchorsMatchSource` accepts the submit.
+  Anchor _placeholderAnchor() {
+    final sha = ref.read(specFileProvider(widget.jobRef)).value?.sha ?? '';
+    return PdfAnchor(
+      page: _visiblePage,
+      bbox: const Rect(left: 0, top: 0, right: 0, bottom: 0),
+      sourceSha: sha,
+    );
+  }
 
   @override
   void dispose() {
