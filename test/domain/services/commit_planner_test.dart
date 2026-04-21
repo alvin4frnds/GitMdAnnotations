@@ -9,6 +9,8 @@ import 'package:gitmdannotations_tablet/domain/entities/spec_file.dart';
 import 'package:gitmdannotations_tablet/domain/entities/stroke.dart';
 import 'package:gitmdannotations_tablet/domain/entities/stroke_group.dart';
 import 'package:gitmdannotations_tablet/domain/services/commit_planner.dart';
+import 'package:gitmdannotations_tablet/domain/services/commit_planner_error.dart';
+import 'package:gitmdannotations_tablet/domain/services/planned_write.dart';
 
 const _specSha = 'a3f91c';
 

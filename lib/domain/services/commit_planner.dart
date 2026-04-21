@@ -1,10 +1,10 @@
-import 'dart:typed_data';
-
 import '../entities/anchor.dart';
 import '../entities/job_ref.dart';
 import '../entities/source_kind.dart';
 import '../entities/spec_file.dart';
 import '../entities/stroke_group.dart';
+import 'commit_planner_error.dart';
+import 'planned_write.dart';
 
 /// Plans atomic file writes for the two tablet-side commits (IMPLEMENTATION.md
 /// §4.7 / PRD §5.6): **Submit Review** (`review: <jobId>`) and **Approve**
@@ -17,6 +17,15 @@ import '../entities/stroke_group.dart';
 /// revision may grow a bytes variant.
 ///
 /// §3.7 invariants throw typed [CommitPlannerError]s.
+///
+/// §3.7 invariant split (collaboration note):
+/// [CommitPlanner] enforces anchor kind/SHA match, PDF page parity, and
+/// annotation pairing. It does NOT verify the SVG payload's internal
+/// `data-source-sha` attribute — that belongs to `SvgSerializer`
+/// (`lib/domain/services/svg_serializer.dart`); callers wiring the two must
+/// pass `SvgSource.sourceSha` == `SpecFile.sha`. It also does NOT verify
+/// that [updatedSpecOrSidecar] contains the appended changelog line — that
+/// is `ChangelogWriter`'s concern; callers compose the two.
 class CommitPlanner {
   const CommitPlanner();
 
@@ -48,6 +57,7 @@ class CommitPlanner {
   }
 
   /// Plan **Approve**: empty `05-approved` + updated spec/sidecar.
+  // Skips anchor / annotation-pairing invariants: approve introduces no new annotations.
   PlannedCommit planApprove({
     required JobRef job,
     required SpecFile source,
@@ -136,74 +146,4 @@ class CommitPlanner {
       }
     }
   }
-}
-
-/// Commit message + writes applied atomically as one commit.
-class PlannedCommit {
-  const PlannedCommit({required this.message, required this.writes});
-  final String message;
-  final List<PlannedWrite> writes;
-}
-
-/// Sealed root of the two write variants; see [CommitPlanner] for motivation.
-sealed class PlannedWrite {
-  const PlannedWrite({required this.path});
-  final String path;
-}
-
-class PlannedTextWrite extends PlannedWrite {
-  const PlannedTextWrite({required super.path, required this.contents});
-  final String contents;
-}
-
-class PlannedBinaryWrite extends PlannedWrite {
-  const PlannedBinaryWrite({required super.path, required this.bytes});
-  final Uint8List bytes;
-}
-
-/// Markdown annotation pair: git-diffable SVG + flattened PNG.
-class MarkdownAnnotations {
-  const MarkdownAnnotations({required this.svg, required this.png});
-  final String svg;
-  final Uint8List png;
-}
-
-/// PDF annotation set keyed by 1-based page number. Keys must match.
-class PdfAnnotationSet {
-  const PdfAnnotationSet({required this.svgByPage, required this.pngByPage});
-  final Map<int, String> svgByPage;
-  final Map<int, Uint8List> pngByPage;
-}
-
-/// Sealed root of typed §3.7 invariant violations.
-sealed class CommitPlannerError implements Exception {
-  const CommitPlannerError();
-}
-
-class CommitPlannerAnchorKindMismatch extends CommitPlannerError {
-  const CommitPlannerAnchorKindMismatch({required this.groupId});
-  final String groupId;
-}
-
-class CommitPlannerAnchorShaMismatch extends CommitPlannerError {
-  const CommitPlannerAnchorShaMismatch({
-    required this.groupId,
-    required this.anchorSha,
-    required this.specSha,
-  });
-  final String groupId;
-  final String anchorSha;
-  final String specSha;
-}
-
-class CommitPlannerPdfPageSetMismatch extends CommitPlannerError {
-  const CommitPlannerPdfPageSetMismatch(
-      {required this.svgPages, required this.pngPages});
-  final Set<int> svgPages;
-  final Set<int> pngPages;
-}
-
-class CommitPlannerMissingPair extends CommitPlannerError {
-  const CommitPlannerMissingPair(this.reason);
-  final String reason;
 }
