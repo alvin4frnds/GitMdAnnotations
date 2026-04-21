@@ -11,6 +11,7 @@ import '../../../domain/entities/ink_tool.dart';
 import '../../../domain/entities/job_ref.dart';
 import '../../../domain/entities/pointer_sample.dart';
 import '../../../domain/entities/stroke.dart';
+import '../../../domain/services/markdown_line_resolver.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/ink_overlay/ink_overlay.dart';
 import '../review_panel/review_panel_screen.dart';
@@ -61,15 +62,31 @@ class _AnnotationCanvasScreenState
   /// never clobbered by a route rebuild.
   bool _defaultInkApplied = false;
 
-  // TODO(markdown-anchor): derive real line from tap Offset once the
-  // MarkdownRenderer owns a line-position index (IMPLEMENTATION.md §4.4).
-  // Until then every stroke is anchored to line 1, but we stamp the REAL
-  // spec source SHA so `CommitPlanner._assertAnchorsMatchSource` accepts
-  // the submit. Previously we sent `sourceSha: ''` and every submit blew
-  // up with `CommitPlannerAnchorShaMismatch`.
-  Anchor _placeholderAnchor() {
-    final sha = ref.read(specFileProvider(widget.jobRef)).value?.sha ?? '';
-    return MarkdownAnchor(lineNumber: 1, sourceSha: sha);
+  // Proportional mapping from the stroke's content-local Y to a source line:
+  // reads the markdown RepaintBoundary's height via
+  // `markdownRasterBoundaryKeyProvider` (registered by `AnnotationMainContent`)
+  // and scales against the spec's line count. Paragraph-level accurate; exact
+  // per-block measurement is IMPLEMENTATION.md §4.4 future work. Falls back to
+  // line 1 when the render box hasn't laid out yet or the spec is unavailable
+  // — preserves the sha-stamped invariant that
+  // `CommitPlanner._assertAnchorsMatchSource` relies on.
+  Anchor _computeAnchor(PointerSample sample) {
+    final spec = ref.read(specFileProvider(widget.jobRef)).value;
+    final sha = spec?.sha ?? '';
+    if (spec == null) {
+      return MarkdownAnchor(lineNumber: 1, sourceSha: sha);
+    }
+    final key = ref.read(markdownRasterBoundaryKeyProvider);
+    final renderObject = key?.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) {
+      return MarkdownAnchor(lineNumber: 1, sourceSha: sha);
+    }
+    final line = resolveMarkdownLine(
+      sampleY: sample.y,
+      contentHeight: renderObject.size.height,
+      totalLines: countMarkdownLines(spec.contents),
+    );
+    return MarkdownAnchor(lineNumber: line, sourceSha: sha);
   }
 
   @override
@@ -108,7 +125,7 @@ class _AnnotationCanvasScreenState
         }
         _capturingPointer = true;
         _activeStrokeNotifier.value = [Offset(sample.x, sample.y)];
-        controller.beginStroke(sample, anchor: _placeholderAnchor());
+        controller.beginStroke(sample, anchor: _computeAnchor(sample));
       case InkPointerPhase.move:
         if (!_capturingPointer || !allowed.contains(sample.kind)) {
           return;
