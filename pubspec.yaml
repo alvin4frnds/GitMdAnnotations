@@ -38,7 +38,12 @@ dependencies:
   url_launcher: ^6.3.1
   flutter_secure_storage: ^9.2.2
   path_provider: ^2.1.5
-  libgit2dart: ^1.2.2
+  # Local fork that adds Android NDK-built libgit2.so under android/jniLibs/
+  # and patches lib/src/util.dart to handle Android's dynamic-loader path.
+  # See docs/Issues.md — "libgit2dart has no Android plugin" entry.
+  # Published package `libgit2dart ^1.2.2` ships no Android support.
+  libgit2dart:
+    path: ../libgit2dart-fork
   # PDF rasterization — IMPLEMENTATION.md §4.4 / D-12 fixes the renderer
   # as `pdfx` (MIT). Consumed only from `lib/infra/pdf/pdfx_adapter.dart`;
   # domain code talks to `PdfRasterPort`.

@@ -370,10 +370,9 @@ packages:
   libgit2dart:
     dependency: "direct main"
     description:
-      name: libgit2dart
-      sha256: d34af8cb6286bc51b99a9a4d49f331637d4ee2255f3fbabebff69502c2652352
-      url: "https://pub.dev"
-    source: hosted
+      path: "../libgit2dart-fork"
+      relative: true
+    source: path
     version: "1.2.2"
   lints:
     dependency: transitive
