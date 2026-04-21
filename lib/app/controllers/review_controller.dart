@@ -26,6 +26,16 @@ export 'review_state.dart'
         ReviewSubmissionSuccess,
         ReviewSubmissionFailure;
 
+/// Factory that produces a periodic [Timer]. Pulled into a typedef so
+/// tests can inject a manual driver (see
+/// `reviewAutoSaveTimerFactoryProvider`) and step the tick deterministically
+/// without sleeping. Production wiring (`bootstrap.dart` default) returns
+/// `Timer.periodic`.
+typedef PeriodicTimerFactory = Timer Function(
+  Duration duration,
+  void Function(Timer) callback,
+);
+
 /// Per-job review controller: owns typed Q&A + notes, auto-saves drafts,
 /// and composes the review-submit / approve commits via the domain
 /// services.
@@ -33,7 +43,8 @@ export 'review_state.dart'
 /// Scoped `autoDispose.family<JobRef>` so the in-memory state dies with
 /// the route (consistent with `AnnotationController`). On dispose the
 /// periodic auto-save timer is cancelled so Riverpod won't warn about a
-/// leaked Timer.
+/// leaked Timer, and any pending dirty edits are flushed with a final
+/// save so keystrokes made within the last tick window aren't lost.
 ///
 /// The controller itself is a thin state-machine over two collaborators
 /// fetched from providers:
@@ -43,10 +54,9 @@ export 'review_state.dart'
 /// Splitting these out keeps this file under the §2.6 200-line cap.
 class ReviewController
     extends AutoDisposeFamilyAsyncNotifier<ReviewState, JobRef> {
-  static const Duration _autoSaveTick = Duration(seconds: 3);
-
   Timer? _timer;
   bool _dirty = false;
+  bool _persisting = false;
   ReviewState? _cached;
 
   ReviewDraftStore get _draftStore => ref.read(reviewDraftStoreProvider);
@@ -54,15 +64,36 @@ class ReviewController
 
   @override
   Future<ReviewState> build(JobRef arg) async {
-    final draft = await _draftStore.load(arg);
+    final draftStore = ref.read(reviewDraftStoreProvider);
+    final draft = await draftStore.load(arg);
+    final tick = ref.read(reviewAutoSaveIntervalProvider);
+    final factory = ref.read(reviewAutoSaveTimerFactoryProvider);
+    // Capture the draft store reference out of [ref] so the dispose
+    // callback doesn't touch the (already-disposing) provider container.
     ref.onDispose(() {
       _timer?.cancel();
       _timer = null;
+      // Pop-save: flush any edits that happened inside the last tick
+      // window. Fire-and-forget — the notifier is disposing, there's no
+      // state left to update. The draft store is a pure FS helper so it
+      // completes safely independent of the Riverpod container lifecycle.
+      if (_dirty && !_persisting) {
+        _dirty = false;
+        final s = _current();
+        unawaited(draftStore.save(
+          arg,
+          answers: s.answers,
+          freeFormNotes: s.freeFormNotes,
+        ));
+      }
+      // Null [_cached] so any still-running [_maybePersist] task bails
+      // before touching `state` (which throws post-dispose).
+      _cached = null;
     });
-    // Periodic failsafe: if a microtask-driven save ever misses an edit,
-    // the periodic tick picks it up within 3 s. Tests never depend on
-    // this — every observable save path fires via [_schedulePersist].
-    _timer = Timer.periodic(_autoSaveTick, (_) => _maybePersist(arg));
+    // Periodic failsafe: a dirty draft is coalesced onto disk within one
+    // tick (default 5 s). In-flight writes are skipped rather than
+    // queued — the next tick picks up whatever the latest state is.
+    _timer = factory(tick, (_) => _maybePersist(arg));
     final initial = ReviewState(
       answers: draft?.answers ?? const <String, String>{},
       freeFormNotes: draft?.freeFormNotes ?? '',
@@ -75,22 +106,27 @@ class ReviewController
 
   // -- Intents --------------------------------------------------------
 
-  /// Mutates the answer for [questionId] and schedules a draft save.
+  /// Mutates the answer for [questionId] and marks the draft dirty. The
+  /// periodic auto-save tick (see `reviewAutoSaveIntervalProvider`) picks
+  /// up the change on its next fire. Keystroke bursts therefore coalesce
+  /// into at most one disk write per tick.
   void setAnswer(String questionId, String value) {
     final current = _current();
+    if (current.answers[questionId] == value) return;
     final next = Map<String, String>.from(current.answers)
       ..[questionId] = value;
     _emit(current.copyWith(answers: next));
     _dirty = true;
-    _schedulePersist(arg);
   }
 
-  /// Replaces the free-form notes body and schedules a draft save.
+  /// Replaces the free-form notes body and marks the draft dirty. Disk
+  /// persistence happens on the next auto-save tick or on controller
+  /// dispose (pop-save), whichever comes first.
   void setFreeFormNotes(String value) {
     final current = _current();
+    if (current.freeFormNotes == value) return;
     _emit(current.copyWith(freeFormNotes: value));
     _dirty = true;
-    _schedulePersist(arg);
   }
 
   // -- Submit / Approve ----------------------------------------------
@@ -161,18 +197,13 @@ class ReviewController
     state = AsyncValue.data(next);
   }
 
-  /// Schedule a draft save on the next microtask. Coalesces bursts of
-  /// keystrokes — multiple `setAnswer` calls in one frame only yield one
-  /// disk write.
-  void _schedulePersist(JobRef job) {
-    // A single microtask is enough: if the notifier disposes before it
-    // runs, the scheduled call sees [_dirty] flipped false via the
-    // post-build guard inside [_maybePersist].
-    scheduleMicrotask(() => _maybePersist(job));
-  }
-
+  /// Tick handler for the periodic auto-save timer. Writes the current
+  /// draft only when it has changed since the last successful save, and
+  /// skips outright while a previous write is still in flight — this
+  /// guarantees we never stack duplicate writes against the FS port.
   Future<void> _maybePersist(JobRef job) async {
-    if (!_dirty) return;
+    if (!_dirty || _persisting) return;
+    _persisting = true;
     _dirty = false;
     try {
       final s = _current();
@@ -181,12 +212,15 @@ class ReviewController
         answers: s.answers,
         freeFormNotes: s.freeFormNotes,
       );
+      if (_cached == null) return; // disposed mid-save
       final now = ref.read(clockProvider).now();
       _emit(_current().copyWith(lastAutoSaveAt: now));
     } catch (_) {
       // Swallow — a failed auto-save must not take the whole review
-      // surface down. The next mutation re-sets [_dirty] and retries.
+      // surface down. Re-mark dirty so the next tick retries.
       _dirty = true;
+    } finally {
+      _persisting = false;
     }
   }
 }

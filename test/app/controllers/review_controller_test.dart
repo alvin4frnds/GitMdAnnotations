@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -18,10 +19,82 @@ import 'package:gitmdannotations_tablet/domain/entities/stroke.dart';
 import 'package:gitmdannotations_tablet/domain/entities/stroke_group.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_file_system.dart';
+import 'package:gitmdannotations_tablet/domain/ports/file_system_port.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_git_port.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_id_generator.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_png_flattener.dart';
 import 'package:gitmdannotations_tablet/domain/services/open_question_extractor.dart';
+
+/// Manual periodic-timer driver used by the auto-save tests. Captures the
+/// callback that [ReviewController.build] registers so tests can call
+/// [fire] to advance one tick without waiting on real time.
+class _FakeTimer implements Timer {
+  _FakeTimer(this.callback);
+  final void Function(Timer) callback;
+  bool _cancelled = false;
+  int _ticks = 0;
+
+  void fire() {
+    if (_cancelled) return;
+    _ticks++;
+    callback(this);
+  }
+
+  @override
+  void cancel() {
+    _cancelled = true;
+  }
+
+  @override
+  bool get isActive => !_cancelled;
+
+  @override
+  int get tick => _ticks;
+}
+
+class _TimerSeam {
+  _FakeTimer? timer;
+  Timer spawn(Duration _, void Function(Timer) cb) {
+    final t = _FakeTimer(cb);
+    timer = t;
+    return t;
+  }
+}
+
+/// [FakeFileSystem] wrapper that blocks [writeString] until an external
+/// [Completer] fires. Used to simulate a slow disk write so tests can
+/// verify the in-flight-skip guard in [ReviewController._maybePersist].
+class _GatedFileSystem implements FileSystemPort {
+  _GatedFileSystem({required this.gate});
+  final Completer<void> gate;
+  final FakeFileSystem _inner = FakeFileSystem();
+  int writeCount = 0;
+
+  @override
+  Future<void> writeString(String path, String contents) async {
+    writeCount++;
+    await gate.future;
+    await _inner.writeString(path, contents);
+  }
+
+  @override
+  Future<bool> exists(String path) => _inner.exists(path);
+  @override
+  Future<List<FsEntry>> listDir(String dir) => _inner.listDir(dir);
+  @override
+  Future<String> readString(String path) => _inner.readString(path);
+  @override
+  Future<List<int>> readBytes(String path) => _inner.readBytes(path);
+  @override
+  Future<void> writeBytes(String path, List<int> bytes) =>
+      _inner.writeBytes(path, bytes);
+  @override
+  Future<void> mkdirp(String path) => _inner.mkdirp(path);
+  @override
+  Future<void> remove(String path) => _inner.remove(path);
+  @override
+  Future<String> appDocsPath(String sub) => _inner.appDocsPath(sub);
+}
 
 final _repo = const RepoRef(owner: 'acme', name: 'widgets');
 final _jobA = JobRef(repo: _repo, jobId: 'spec-a');
@@ -62,31 +135,37 @@ class _Env {
     required this.git,
     required this.clock,
     required this.png,
+    required this.timerSeam,
   });
 
   final ProviderContainer container;
-  final FakeFileSystem fs;
+  final FileSystemPort fs;
   final FakeGitPort git;
   final FakeClock clock;
   final FakePngFlattener png;
+  final _TimerSeam timerSeam;
 }
 
 _Env _buildEnv({
-  FakeFileSystem? fs,
+  FileSystemPort? fs,
   FakeGitPort? git,
   FakeClock? clock,
   FakePngFlattener? png,
+  List<Override> extraOverrides = const [],
 }) {
   final fs0 = fs ?? FakeFileSystem();
   final git0 = git ?? FakeGitPort(initial: {'claude-jobs': <String, String>{}});
   final clock0 = clock ?? FakeClock(_t0);
   final png0 = png ?? FakePngFlattener();
+  final seam = _TimerSeam();
   final container = ProviderContainer(overrides: [
     fileSystemProvider.overrideWithValue(fs0),
     gitPortProvider.overrideWithValue(git0),
     clockProvider.overrideWithValue(clock0),
     idGeneratorProvider.overrideWithValue(FakeIdGenerator()),
     pngFlattenerProvider.overrideWithValue(png0),
+    reviewAutoSaveTimerFactoryProvider.overrideWithValue(seam.spawn),
+    ...extraOverrides,
   ]);
   addTearDown(container.dispose);
   return _Env(
@@ -95,6 +174,7 @@ _Env _buildEnv({
     git: git0,
     clock: clock0,
     png: png0,
+    timerSeam: seam,
   );
 }
 
@@ -169,7 +249,7 @@ void main() {
   });
 
   group('ReviewController auto-save', () {
-    test('setAnswer persists the draft and stamps lastAutoSaveAt from the clock',
+    test('timer tick persists the draft and stamps lastAutoSaveAt from the clock',
         () async {
       final env = _buildEnv();
       // Keep an active subscription so autoDispose doesn't drop the
@@ -184,7 +264,15 @@ void main() {
       await env.container.read(reviewControllerProvider(_jobA).future);
 
       notifier.setAnswer('Q1', 'draft answer');
-      // Let the scheduled save microtask run + state propagation settle.
+      // No microtask-save path now — the draft must not be on disk yet.
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        await env.fs.exists('/docs/drafts/spec-a/03-review.md.draft'),
+        isFalse,
+        reason: 'auto-save should not fire until the timer ticks',
+      );
+
+      env.timerSeam.timer!.fire();
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
 
@@ -194,6 +282,161 @@ void main() {
       expect(decoded['answers'], {'Q1': 'draft answer'});
       final async = env.container.read(reviewControllerProvider(_jobA));
       expect(async.value?.lastAutoSaveAt, _t0);
+    });
+
+    test('tick is a no-op when the draft is unchanged since the last save',
+        () async {
+      final env = _buildEnv();
+      final sub =
+          env.container.listen(reviewControllerProvider(_jobA), (_, _) {});
+      addTearDown(sub.close);
+      final notifier =
+          env.container.read(reviewControllerProvider(_jobA).notifier);
+      await env.container.read(reviewControllerProvider(_jobA).future);
+
+      notifier.setAnswer('Q1', 'v1');
+      env.timerSeam.timer!.fire();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      // Bump the clock so we can detect whether a second save occurred —
+      // lastAutoSaveAt would advance if it did.
+      final firstSaveAt = env.container
+          .read(reviewControllerProvider(_jobA))
+          .value!
+          .lastAutoSaveAt;
+      env.clock.advance(const Duration(seconds: 30));
+      env.timerSeam.timer!.fire();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      final afterSecondTick = env.container
+          .read(reviewControllerProvider(_jobA))
+          .value!
+          .lastAutoSaveAt;
+      expect(afterSecondTick, firstSaveAt,
+          reason: 'clean-tick should not restamp lastAutoSaveAt');
+    });
+
+    test('multiple keystrokes between ticks coalesce into a single write',
+        () async {
+      final env = _buildEnv();
+      final sub =
+          env.container.listen(reviewControllerProvider(_jobA), (_, _) {});
+      addTearDown(sub.close);
+      final notifier =
+          env.container.read(reviewControllerProvider(_jobA).notifier);
+      await env.container.read(reviewControllerProvider(_jobA).future);
+
+      notifier.setAnswer('Q1', 'a');
+      notifier.setAnswer('Q1', 'ab');
+      notifier.setAnswer('Q1', 'abc');
+      env.timerSeam.timer!.fire();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      final draft =
+          await env.fs.readString('/docs/drafts/spec-a/03-review.md.draft');
+      final decoded = jsonDecode(draft) as Map<String, dynamic>;
+      expect(decoded['answers'], {'Q1': 'abc'},
+          reason: 'tick should write only the latest state');
+    });
+
+    test('timer is cancelled on controller dispose', () async {
+      final env = _buildEnv();
+      final sub =
+          env.container.listen(reviewControllerProvider(_jobA), (_, _) {});
+      await env.container.read(reviewControllerProvider(_jobA).future);
+      final timer = env.timerSeam.timer!;
+      expect(timer.isActive, isTrue);
+
+      sub.close();
+      // autoDispose only fires after the microtask queue drains the
+      // listener-release signal.
+      await Future<void>.delayed(Duration.zero);
+
+      expect(timer.isActive, isFalse);
+    });
+
+    test('pop-save flushes dirty edits on dispose before the next tick',
+        () async {
+      final env = _buildEnv();
+      final sub =
+          env.container.listen(reviewControllerProvider(_jobA), (_, _) {});
+      final notifier =
+          env.container.read(reviewControllerProvider(_jobA).notifier);
+      await env.container.read(reviewControllerProvider(_jobA).future);
+
+      notifier.setAnswer('Q1', 'unsaved edit');
+      // Screen pops before the timer fires.
+      sub.close();
+      // Let the dispose microtask + pop-save future settle.
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      final draft =
+          await env.fs.readString('/docs/drafts/spec-a/03-review.md.draft');
+      final decoded = jsonDecode(draft) as Map<String, dynamic>;
+      expect(decoded['answers'], {'Q1': 'unsaved edit'});
+    });
+
+    test('reopen rehydrates from the persisted draft', () async {
+      // End-to-end restore: tick persists → dispose → new subscription
+      // on the same jobRef reads back the prior answers.
+      final env = _buildEnv();
+      final sub =
+          env.container.listen(reviewControllerProvider(_jobA), (_, _) {});
+      final notifier =
+          env.container.read(reviewControllerProvider(_jobA).notifier);
+      await env.container.read(reviewControllerProvider(_jobA).future);
+
+      notifier.setAnswer('Q1', 'persisted');
+      notifier.setFreeFormNotes('notes body');
+      env.timerSeam.timer!.fire();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      sub.close();
+      await Future<void>.delayed(Duration.zero);
+
+      // Fresh subscription on the same JobRef — autoDispose spins up a new
+      // notifier which must replay the persisted draft.
+      final sub2 =
+          env.container.listen(reviewControllerProvider(_jobA), (_, _) {});
+      addTearDown(sub2.close);
+      final restored =
+          await env.container.read(reviewControllerProvider(_jobA).future);
+      expect(restored.answers, {'Q1': 'persisted'});
+      expect(restored.freeFormNotes, 'notes body');
+    });
+
+    test('in-flight write is not duplicated by a concurrent tick', () async {
+      // A slow draft store blocks the first save; the second tick fires
+      // while it's still in flight and must skip rather than stack.
+      final gate = Completer<void>();
+      final slow = _GatedFileSystem(gate: gate);
+      final env = _buildEnv(fs: slow);
+      final sub =
+          env.container.listen(reviewControllerProvider(_jobA), (_, _) {});
+      addTearDown(sub.close);
+      final notifier =
+          env.container.read(reviewControllerProvider(_jobA).notifier);
+      await env.container.read(reviewControllerProvider(_jobA).future);
+
+      notifier.setAnswer('Q1', 'v1');
+      env.timerSeam.timer!.fire(); // start persist, blocks on gate
+      await Future<void>.delayed(Duration.zero);
+      env.timerSeam.timer!.fire(); // second tick while first is in flight
+      await Future<void>.delayed(Duration.zero);
+
+      expect(slow.writeCount, 1,
+          reason: 'second tick must skip while first is in flight');
+
+      gate.complete();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(slow.writeCount, 1,
+          reason: 'no retroactive write should fire after the gate opens');
     });
   });
 
