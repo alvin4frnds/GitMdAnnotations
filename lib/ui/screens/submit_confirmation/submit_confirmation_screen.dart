@@ -13,14 +13,14 @@ import '../../theme/tokens.dart';
 import '../_shared/modal_shell.dart';
 import 'planned_writes_preview.dart';
 
-/// Modal shown when the user taps "Submit review" on the review panel.
-/// Previews the four files that will be written + the commit message, and
-/// warns about offline push deferral.
+/// Modal confirmation shown when the user taps "Submit review". Previews
+/// the four files that will be written + the commit message, warns about
+/// offline push deferral, and dispatches the commit through
+/// [ReviewController.submit] when the user confirms.
 ///
-/// T7: preview is driven by [PlannedWritesPreview] which calls
-/// [ReviewController] to construct the actual planned writes from the
-/// current draft state. The primary button routes through
-/// [ReviewController.submit].
+/// Cancel closes the dialog with `null`. Submit closes the dialog with
+/// the terminal [ReviewSubmission] (either [ReviewSubmissionSuccess] or
+/// [ReviewSubmissionFailure]) so the caller can surface a SnackBar.
 class SubmitConfirmationScreen extends ConsumerWidget {
   const SubmitConfirmationScreen({
     required this.jobRef,
@@ -38,8 +38,9 @@ class SubmitConfirmationScreen extends ConsumerWidget {
   final List<StrokeGroup> strokeGroups;
   final GitIdentity identity;
 
-  /// Fired once the Submit commit lands (success or failure — the caller
-  /// usually closes the modal and surfaces a toast / error screen).
+  /// Fired once the Submit commit lands (success or failure). Callers
+  /// typically use the `showDialog` return value instead, but this stays
+  /// for widgets that want to observe without awaiting.
   final ValueChanged<ReviewSubmission>? onCommitted;
 
   @override
@@ -132,17 +133,22 @@ class SubmitConfirmationScreen extends ConsumerWidget {
       ],
       footer: ModalFooter(
         buttons: [
-          const GhostButton(label: 'Cancel'),
+          GhostButton(
+            label: 'Cancel',
+            onPressed: isSubmitting
+                ? null
+                : () => Navigator.of(context).pop(null),
+          ),
           PrimaryButton(
             label: isSubmitting ? 'Committing...' : 'Submit & commit',
-            onPressed: isSubmitting ? null : () => _submit(ref),
+            onPressed: isSubmitting ? null : () => _submit(context, ref),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _submit(WidgetRef ref) async {
+  Future<void> _submit(BuildContext context, WidgetRef ref) async {
     final notifier = ref.read(reviewControllerProvider(jobRef).notifier);
     await notifier.submit(
       source: source,
@@ -150,9 +156,14 @@ class SubmitConfirmationScreen extends ConsumerWidget {
       strokeGroups: strokeGroups,
       identity: identity,
     );
-    final submission = ref.read(reviewControllerProvider(jobRef)).value?.submission;
-    if (submission != null) {
-      onCommitted?.call(submission);
+    final submission =
+        ref.read(reviewControllerProvider(jobRef)).value?.submission;
+    if (submission is ReviewSubmissionSuccess ||
+        submission is ReviewSubmissionFailure) {
+      onCommitted?.call(submission!);
+      if (context.mounted) {
+        Navigator.of(context).pop(submission);
+      }
     }
   }
 }

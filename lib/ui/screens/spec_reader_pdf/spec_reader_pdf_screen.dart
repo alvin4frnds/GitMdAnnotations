@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/review_controller.dart';
 import '../../../app/controllers/review_orchestrator.dart';
 import '../../../app/providers/annotation_providers.dart';
 import '../../../app/providers/pdf_providers.dart';
@@ -131,17 +132,25 @@ class _SpecReaderPdfScreenState
           :final strokeGroups,
           :final identity,
         ):
-        await showDialog<bool>(
+        final result = await showDialog<ReviewSubmission>(
           context: context,
-          builder: (dialogCtx) => SubmitConfirmationScreen(
+          builder: (_) => SubmitConfirmationScreen(
             jobRef: widget.jobRef,
             source: source,
             questions: questions,
             strokeGroups: strokeGroups,
             identity: identity,
-            onCommitted: (_) => Navigator.of(dialogCtx).pop(true),
           ),
         );
+        if (!mounted || result == null) return;
+        switch (result) {
+          case ReviewSubmissionSuccess():
+            _toast('Review committed locally. Push on next Sync Up.');
+          case ReviewSubmissionFailure(:final error):
+            _toast('Submit failed: $error');
+          case ReviewSubmissionIdle() || ReviewSubmissionInProgress():
+            break;
+        }
     }
   }
 

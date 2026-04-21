@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/review_controller.dart';
 import '../../../app/controllers/review_orchestrator.dart';
 import '../../../app/providers/annotation_providers.dart';
 import '../../../domain/entities/anchor.dart';
@@ -141,17 +142,25 @@ class _AnnotationCanvasScreenState
           :final strokeGroups,
           :final identity,
         ):
-        await showDialog<bool>(
+        final result = await showDialog<ReviewSubmission>(
           context: context,
-          builder: (dialogCtx) => SubmitConfirmationScreen(
+          builder: (_) => SubmitConfirmationScreen(
             jobRef: widget.jobRef,
             source: source,
             questions: questions,
             strokeGroups: strokeGroups,
             identity: identity,
-            onCommitted: (_) => Navigator.of(dialogCtx).pop(true),
           ),
         );
+        if (!mounted || result == null) return;
+        switch (result) {
+          case ReviewSubmissionSuccess():
+            _toast('Review committed locally. Push on next Sync Up.');
+          case ReviewSubmissionFailure(:final error):
+            _toast('Submit failed: $error');
+          case ReviewSubmissionIdle() || ReviewSubmissionInProgress():
+            break;
+        }
     }
   }
 
@@ -194,11 +203,13 @@ class _AnnotationCanvasScreenState
                 Container(width: 1, color: t.borderSubtle),
                 Expanded(
                   child: AnnotationMainContent(
+                    jobRef: widget.jobRef,
                     groups: state.groups,
                     activeStroke: _activeStrokeNotifier,
                     currentStrokeColor: strokeColor,
                     currentStrokeWidth: strokeWidth,
                     currentStrokeOpacity: strokeOpacity,
+                    drawingEnabled: state.drawingEnabled,
                     onSample: _onSample,
                     nowProvider: ref.read(clockProvider).now,
                   ),

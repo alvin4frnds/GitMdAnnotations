@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/review_controller.dart';
 import '../../../app/controllers/review_orchestrator.dart';
+import '../../../app/providers/spec_providers.dart';
 import '../../../domain/entities/job_ref.dart';
 import '../../../domain/services/open_question_extractor.dart';
 import '../../theme/tokens.dart';
@@ -10,41 +12,34 @@ import 'chrome_bar.dart';
 import 'markdown_pane.dart';
 import 'typed_review_pane.dart';
 
-/// Review panel — Screen 6 of the M1a mockups, T7-wired to
-/// [reviewControllerProvider].
-///
-/// Split-pane layout: left 1fr annotated markdown (with faint ink-stroke
-/// hints at three anchor points), right 420 px typed review panel on a
-/// sunken surface. Top chrome mirrors the shell style: mono breadcrumb
-/// left, live auto-save caption mid-right, primary Submit button far
-/// right.
-///
-/// PDF-source jobs flow through the same panel: the open questions list
-/// arrives empty and the right pane renders only the free-form notes
-/// section. PDF Submit is routed through the PDF annotation surface in
-/// a future milestone — the Submit button here currently triggers
-/// markdown-path composition inside [ReviewController.submit] when the
-/// caller supplies a markdown [SpecFile].
+/// Review panel — split-pane: real spec markdown on the left, typed
+/// review + free-form notes on the right. Questions default to the
+/// extractor output of the live `SpecFile` so callers no longer have to
+/// hand-plumb them (they previously defaulted to empty, which hid the
+/// question cards).
 class ReviewPanelScreen extends ConsumerWidget {
   const ReviewPanelScreen({
     required this.jobRef,
-    this.questions = const <OpenQuestion>[],
+    this.questions,
     this.onSubmitTap,
     super.key,
   });
 
   final JobRef jobRef;
-  final List<OpenQuestion> questions;
+
+  /// If supplied, overrides the auto-extracted question list (used by
+  /// tests and mockup screenshots). Null in production — the screen
+  /// extracts questions itself off the loaded spec.
+  final List<OpenQuestion>? questions;
 
   /// Fired when the user taps "Submit review" in the chrome. Default
-  /// behaviour (null) runs the [ReviewOrchestrator] → [showDialog] flow
-  /// defined below, which is what the wired app uses. Callers (tests,
-  /// screenshots) can still pass a no-op to bypass.
+  /// (null) runs the [ReviewOrchestrator] → [showDialog] flow below.
   final VoidCallback? onSubmitTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
+    final resolvedQuestions = questions ?? _extractQuestions(ref);
     return ColoredBox(
       color: t.surfaceBackground,
       child: Column(
@@ -57,12 +52,12 @@ class ReviewPanelScreen extends ConsumerWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Expanded(child: MarkdownPane()),
+                Expanded(child: MarkdownPane(jobRef: jobRef)),
                 SizedBox(
                   width: 420,
                   child: TypedReviewPane(
                     jobRef: jobRef,
-                    questions: questions,
+                    questions: resolvedQuestions,
                   ),
                 ),
               ],
@@ -71,6 +66,12 @@ class ReviewPanelScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  List<OpenQuestion> _extractQuestions(WidgetRef ref) {
+    final spec = ref.watch(specFileProvider(jobRef)).value;
+    if (spec == null) return const <OpenQuestion>[];
+    return const OpenQuestionExtractor().extract(spec.contents);
   }
 
   Future<void> _onSubmit(BuildContext context, WidgetRef ref) async {
@@ -88,18 +89,29 @@ class ReviewPanelScreen extends ConsumerWidget {
           :final strokeGroups,
           :final identity,
         ):
-        await showDialog<bool>(
+        final outcome = await showDialog<ReviewSubmission>(
           context: context,
-          builder: (dialogCtx) => SubmitConfirmationScreen(
+          builder: (_) => SubmitConfirmationScreen(
             jobRef: jobRef,
             source: source,
             questions: questions,
             strokeGroups: strokeGroups,
             identity: identity,
-            onCommitted: (_) => Navigator.of(dialogCtx).pop(true),
           ),
         );
+        if (!context.mounted || outcome == null) return;
+        _announceSubmission(context, outcome);
     }
+  }
+
+  void _announceSubmission(BuildContext context, ReviewSubmission outcome) {
+    final message = switch (outcome) {
+      ReviewSubmissionSuccess() =>
+        'Review committed locally. Push on next Sync Up.',
+      ReviewSubmissionFailure(:final error) => 'Submit failed: $error',
+      ReviewSubmissionIdle() || ReviewSubmissionInProgress() => null,
+    };
+    if (message != null) _toast(context, message);
   }
 
   void _toast(BuildContext context, String message) {

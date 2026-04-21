@@ -59,15 +59,23 @@ class _App extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.build(AppTokens.light),
       darkTheme: AppTheme.build(AppTokens.dark),
+      // Wrap the Navigator (not just `home`) so every pushed route —
+      // SpecReader, AnnotationCanvas, ReviewPanel, Settings, … — sits
+      // inside the system-bar insets. Without this, only the initial
+      // `home` was SafeArea-wrapped and pushed routes painted under the
+      // status bar / display cutout.
+      builder: (context, child) => SafeArea(
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: _AuthGate(tracker: tracker),
     );
   }
 }
 
 /// Routes between SignIn → RepoPicker → JobList based on auth + repo
-/// selection state. Wrapped in [SafeArea] so no screen paints under the
-/// system status bar / nav bar / display cutout. (Flutter renders
-/// edge-to-edge by default on Android 15+.)
+/// selection state. SafeArea is applied by `MaterialApp.builder` so
+/// every route (this one plus anything pushed via Navigator) sits
+/// inside the system-bar insets on Android 15+ edge-to-edge.
 ///
 /// Also owns two cross-cutting listeners tied to NFR-2 cold-start:
 ///
@@ -123,6 +131,8 @@ class _AuthGate extends ConsumerWidget {
     // Scaffold is required so ScaffoldMessenger.showSnackBar has a
     // descendant to render into — without it, any sync-result toast
     // throws `_scaffolds.isNotEmpty` and crashes the listener callback.
-    return Scaffold(body: SafeArea(child: screen));
+    // SafeArea is applied globally via MaterialApp.builder so pushed
+    // routes inherit it.
+    return Scaffold(body: screen);
   }
 }

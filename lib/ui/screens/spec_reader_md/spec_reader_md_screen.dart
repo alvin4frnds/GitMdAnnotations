@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/review_controller.dart';
 import '../../../app/controllers/review_orchestrator.dart';
 import '../../../app/providers/spec_providers.dart';
 import '../../../domain/entities/job_ref.dart';
@@ -133,17 +134,25 @@ class _TopChrome extends ConsumerWidget {
           :final strokeGroups,
           :final identity,
         ):
-        await showDialog<bool>(
+        final result = await showDialog<ReviewSubmission>(
           context: context,
-          builder: (dialogCtx) => SubmitConfirmationScreen(
+          builder: (_) => SubmitConfirmationScreen(
             jobRef: jobRef!,
             source: source,
             questions: questions,
             strokeGroups: strokeGroups,
             identity: identity,
-            onCommitted: (_) => Navigator.of(dialogCtx).pop(true),
           ),
         );
+        if (!context.mounted || result == null) return;
+        switch (result) {
+          case ReviewSubmissionSuccess():
+            _toast(context, 'Review committed locally. Push on next Sync Up.');
+          case ReviewSubmissionFailure(:final error):
+            _toast(context, 'Submit failed: $error');
+          case ReviewSubmissionIdle() || ReviewSubmissionInProgress():
+            break;
+        }
     }
   }
 
