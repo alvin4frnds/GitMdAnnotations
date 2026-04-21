@@ -193,6 +193,27 @@ void main() {
     });
   });
 
+  group('ReviewSerializer — zero questions', () {
+    test('empty questions list suppresses the Answers section entirely', () {
+      final clock = FakeClock(DateTime(2026, 4, 20, 9, 32));
+      final serializer = ReviewSerializer(clock: clock);
+
+      final out = serializer.buildReviewMd(
+        job: _job('spec-noqs'),
+        source: _md(sha: 'abc'),
+        questions: const [],
+        answers: const <String, String>{},
+        freeFormNotes: 'Spec reads cleanly; no open questions.',
+        strokeGroups: [_mdGroup(line: 12, ts: '2026-04-20T09:00:00Z')],
+      );
+
+      expect(out, isNot(contains('## Answers to open questions')));
+      // Sanity: the rest of the document is still well-formed.
+      expect(out, contains('## Free-form notes'));
+      expect(out, contains('## Spatial references'));
+    });
+  });
+
   group('ReviewSerializer — stroke-group letter overflow', () {
     test('27 stroke groups throws StateError with actionable message', () {
       final clock = FakeClock(DateTime(2026, 4, 20, 9, 32));

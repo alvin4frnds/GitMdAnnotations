@@ -12,6 +12,10 @@ import 'open_question_extractor.dart';
 /// The wall-clock used for the `Reviewed at:` line is obtained via the
 /// injected [Clock] (never `DateTime.now()`), so tests can drive deterministic
 /// output with `FakeClock`.
+///
+/// Output is a UTF-8 string — callers MUST encode as UTF-8 (not Latin-1) when
+/// writing to bytes because the header contains an em-dash (U+2014) and
+/// Spatial-references lines contain an arrow (U+2192).
 class ReviewSerializer {
   const ReviewSerializer({required Clock clock}) : _clock = clock;
 
@@ -29,6 +33,8 @@ class ReviewSerializer {
   /// Content contract (per IMPLEMENTATION.md §3.5):
   ///   * `answers` missing a key for a question → an empty quote line `> `
   ///     is emitted so the section structure stays visible.
+  ///   * Empty `questions` → the `## Answers to open questions` section is
+  ///     omitted entirely (no header, no trailing blank).
   ///   * Empty `freeFormNotes` → the `## Free-form notes` section is omitted
   ///     entirely (no header, no trailing blank).
   ///   * Empty `strokeGroups` → the `## Spatial references` section is
@@ -54,8 +60,9 @@ class ReviewSerializer {
       ..writeln('**Reviewed at:** $reviewedAt local time')
       ..writeln();
 
-    _writeAnswers(buf, questions, answers);
-
+    if (questions.isNotEmpty) {
+      _writeAnswers(buf, questions, answers);
+    }
     if (freeFormNotes.isNotEmpty) {
       _writeFreeFormNotes(buf, freeFormNotes);
     }
