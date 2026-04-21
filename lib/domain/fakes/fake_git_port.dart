@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../entities/changelog_entry.dart';
 import '../entities/commit.dart';
 import '../entities/git_identity.dart';
@@ -18,6 +20,12 @@ class FakeGitPort implements GitPort {
 
   /// Branch name -> (path -> contents) working tree snapshot.
   final Map<String, Map<String, String>> branches;
+
+  /// Branch name -> (path -> bytes) working tree snapshot for writes that
+  /// specified raw [FileWrite.bytes]. Kept separate from [branches] so
+  /// existing string-oriented assertions still work; tests that care about
+  /// PNG round-trips read from this map directly.
+  final Map<String, Map<String, Uint8List>> binaryBranches = {};
 
   final Map<String, List<Commit>> _log = {};
   final Map<String, Map<String, Map<String, String>>> _snapshots = {};
@@ -98,8 +106,18 @@ class FakeGitPort implements GitPort {
     required String branch,
   }) async {
     final tree = branches.putIfAbsent(branch, () => <String, String>{});
+    final binTree =
+        binaryBranches.putIfAbsent(branch, () => <String, Uint8List>{});
     for (final f in files) {
-      tree[f.path] = f.contents;
+      if (f.bytes != null) {
+        binTree[f.path] = Uint8List.fromList(f.bytes!);
+        // Drop any stale string-based entry at the same path so readers
+        // don't see two truths.
+        tree.remove(f.path);
+      } else {
+        tree[f.path] = f.contents;
+        binTree.remove(f.path);
+      }
     }
     final existing = _log[branch] ?? <Commit>[];
     final parents = existing.isEmpty ? <String>[] : [existing.first.sha];

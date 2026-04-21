@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../entities/changelog_entry.dart';
 import '../entities/commit.dart';
 import '../entities/git_identity.dart';
@@ -61,19 +63,42 @@ abstract class GitPort {
 
 /// A single file write that will be staged + committed as part of
 /// [GitPort.commit]. [path] is relative to the repo workdir.
+///
+/// When [bytes] is non-null, adapters MUST write those raw bytes (used for
+/// PNG payloads from the review commit — they can't round-trip through a
+/// UTF-8 [contents] string). When [bytes] is null, adapters write
+/// [contents] as UTF-8. The two-field shape keeps source compatibility
+/// with every pre-T7 callsite that passes just `contents`.
 class FileWrite {
-  const FileWrite({required this.path, required this.contents});
+  const FileWrite({
+    required this.path,
+    required this.contents,
+    this.bytes,
+  });
 
   final String path;
   final String contents;
+  final Uint8List? bytes;
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is FileWrite && other.path == path && other.contents == contents;
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! FileWrite) return false;
+    if (other.path != path) return false;
+    if (other.contents != contents) return false;
+    final a = bytes;
+    final b = other.bytes;
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 
   @override
-  int get hashCode => Object.hash(path, contents);
+  int get hashCode => Object.hash(path, contents, bytes?.length);
 
   @override
   String toString() => 'FileWrite(path: $path)';

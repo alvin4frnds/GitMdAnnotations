@@ -172,7 +172,11 @@ class GitAdapter implements GitPort {
       (reqId) => GitReqCommit(
         id: reqId,
         files: files
-            .map((f) => SerializedFileWrite(path: f.path, contents: f.contents))
+            .map((f) => SerializedFileWrite(
+                  path: f.path,
+                  contents: f.contents,
+                  bytes: f.bytes,
+                ))
             .toList(),
         message: message,
         authorName: id.name,

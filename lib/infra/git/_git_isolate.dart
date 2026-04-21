@@ -167,7 +167,12 @@ GitResponse _handleCommit(_IsolateState state, GitReqCommit req) {
     final target = File('$workdir${f.path}');
     final parent = target.parent;
     if (!parent.existsSync()) parent.createSync(recursive: true);
-    target.writeAsStringSync(f.contents);
+    final bytes = f.bytes;
+    if (bytes != null) {
+      target.writeAsBytesSync(bytes);
+    } else {
+      target.writeAsStringSync(f.contents);
+    }
   }
   final index = repo.index;
   index.addAll(req.files.map((f) => f.path).toList());

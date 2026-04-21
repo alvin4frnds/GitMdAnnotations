@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
 import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
@@ -61,6 +63,38 @@ void main() {
         branch: 'claude-jobs',
       );
       expect(commit.message, 'approve: spec-42');
+    });
+  });
+
+  group('FakeGitPort — commit preserves bytes (T7 widening)', () {
+    test('FileWrite.bytes round-trips into binaryBranches verbatim',
+        () async {
+      final fake = FakeGitPort(initial: {'claude-jobs': <String, String>{}});
+      final png = Uint8List.fromList(const [
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x01,
+      ]);
+      await fake.commit(
+        files: [
+          const FileWrite(
+            path: 'jobs/pending/spec-x/03-review.md',
+            contents: 'r',
+          ),
+          FileWrite(
+            path: 'jobs/pending/spec-x/03-annotations.png',
+            contents: '',
+            bytes: png,
+          ),
+        ],
+        message: 'review: spec-x',
+        id: identity,
+        branch: 'claude-jobs',
+      );
+
+      expect(
+        fake.binaryBranches['claude-jobs']![
+            'jobs/pending/spec-x/03-annotations.png'],
+        png,
+      );
     });
   });
 

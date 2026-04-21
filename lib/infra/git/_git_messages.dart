@@ -3,13 +3,25 @@
 /// body can import them without dragging in libgit2 FFI at the UI side.
 library;
 
+import 'dart:typed_data';
+
 /// Serialized form of `FileWrite` — the domain value object is hostile to
 /// `SendPort.send` because its class lives outside `dart:core`. Plain
 /// string fields cross isolate boundaries without ceremony.
+///
+/// [bytes] is the T7 widening: when non-null, the isolate writes these
+/// raw bytes instead of [contents]. Used by the review commit to persist
+/// the flattened PNG payload alongside text files in a single atomic
+/// commit.
 class SerializedFileWrite {
-  const SerializedFileWrite({required this.path, required this.contents});
+  const SerializedFileWrite({
+    required this.path,
+    required this.contents,
+    this.bytes,
+  });
   final String path;
   final String contents;
+  final Uint8List? bytes;
 }
 
 /// Sealed root of every request. Every subclass carries the monotonically
