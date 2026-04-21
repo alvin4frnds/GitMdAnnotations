@@ -52,14 +52,15 @@ class JobListScreen extends ConsumerWidget {
 // Left rail
 // ---------------------------------------------------------------------------
 
-class _LeftRail extends StatelessWidget {
+class _LeftRail extends ConsumerWidget {
   const _LeftRail({required this.async});
   final AsyncValue<JobListState> async;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
     final counts = _phaseCounts(async);
+    final repo = ref.watch(currentRepoProvider);
     return Container(
       width: 208,
       decoration: BoxDecoration(
@@ -70,6 +71,13 @@ class _LeftRail extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _RepoSwitcherButton(
+            repo: repo,
+            onPressed: () => _confirmChangeRepo(context, ref),
+          ),
+          const SizedBox(height: 16),
+          Divider(height: 1, color: t.borderSubtle),
+          const SizedBox(height: 16),
           const _SectionHeader(label: 'Phase'),
           const SizedBox(height: 8),
           _FilterRow(label: 'All', count: '${counts.all}', selected: true),
@@ -94,6 +102,36 @@ class _LeftRail extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Same confirm-dialog + clear-state flow Settings uses. Duplicated
+  /// rather than extracted because it's ten lines of UI glue — if a
+  /// third call site shows up, lift it into a shared helper.
+  Future<void> _confirmChangeRepo(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Change repository?'),
+        content: const Text(
+          'You stay signed in. Pending local commits remain on disk under '
+          "the current repo's workdir — switch back to see them again.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Change repo'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await clearLastSession(ref.read(secureStorageProvider));
+    ref.read(currentRepoProvider.notifier).state = null;
+    ref.read(currentWorkdirProvider.notifier).state = null;
   }
 
   /// Pushes the cross-job changelog timeline. Entry point wired from the
@@ -259,6 +297,63 @@ class _NewSpecButton extends StatelessWidget {
             Text(
               'New spec',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Top-of-sidebar repo switcher. Shows the active repo as
+/// `owner/name` in mono plus a small ⇄ affordance so the user can
+/// flip to another repo without digging into Settings. Tapping runs
+/// the same confirm-dialog + clear-state flow as Settings → Change.
+/// Renders a muted placeholder when no repo is active (in practice
+/// _AuthGate would have routed to RepoPicker in that case — this is
+/// belt-and-braces for widget-test surfaces).
+class _RepoSwitcherButton extends StatelessWidget {
+  const _RepoSwitcherButton({required this.repo, required this.onPressed});
+
+  final RepoRef? repo;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final label = repo == null ? 'No repository' : '${repo!.owner}/${repo!.name}';
+    return InkWell(
+      onTap: repo == null ? null : onPressed,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: t.surfaceSunken,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: t.borderSubtle),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.folder_open_rounded, size: 14, color: t.textMuted),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: appMono(
+                  context,
+                  size: 12,
+                  weight: FontWeight.w600,
+                  color: repo == null ? t.textMuted : t.textPrimary,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              Icons.swap_horiz_rounded,
+              size: 16,
+              color: repo == null ? t.textMuted : t.accentPrimary,
             ),
           ],
         ),
