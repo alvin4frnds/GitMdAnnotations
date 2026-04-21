@@ -141,5 +141,39 @@ void main() {
       expect(out.contains('\r'), isFalse);
       expect(out.endsWith('\n'), isTrue);
     });
+
+    test('ignores duplicate-looking line in a non-Changelog section', () {
+      // The formatted bullet for `entry` is:
+      // `- 2026-04-20 14:32 tablet: Hi.`
+      // That exact byte-equal string appears as a plain bullet inside an
+      // `## Answers` block (e.g. a user quoted/pasted a previous changelog
+      // bullet into their answer), but is NOT present in the `## Changelog`
+      // section. The duplicate-detection scan must be scoped to the
+      // Changelog section only, otherwise the entry would be silently
+      // dropped.
+      const input = '# Title\n\n'
+          '## Answers\n\n'
+          '- 2026-04-20 14:32 tablet: Hi.\n\n'
+          '## Changelog\n\n'
+          '- 2026-04-18 09:00 desktop: First.\n';
+      final out = writer.append(input, entry);
+      // The new bullet must be present in the changelog section, and the
+      // outer (unrelated) occurrence must not short-circuit append.
+      const expected = '# Title\n\n'
+          '## Answers\n\n'
+          '- 2026-04-20 14:32 tablet: Hi.\n\n'
+          '## Changelog\n\n'
+          '- 2026-04-18 09:00 desktop: First.\n'
+          '- 2026-04-20 14:32 tablet: Hi.\n';
+      expect(out, expected);
+    });
+
+    test('on header-only section inserts blank line before first bullet', () {
+      const input = '# Title\n\n## Changelog\n';
+      expect(
+        writer.append(input, entry),
+        '# Title\n\n## Changelog\n\n- 2026-04-20 14:32 tablet: Hi.\n',
+      );
+    });
   });
 }

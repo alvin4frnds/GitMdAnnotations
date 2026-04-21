@@ -24,9 +24,6 @@ class ChangelogWriter {
   String append(String existing, ChangelogEntry entry) {
     final line = formatLine(entry);
     final normalized = existing.replaceAll('\r\n', '\n');
-    if (_containsLine(normalized, line)) {
-      return existing;
-    }
     if (normalized.isEmpty) {
       return '## Changelog\n\n$line\n';
     }
@@ -35,6 +32,12 @@ class ChangelogWriter {
       final withTrailing =
           normalized.endsWith('\n') ? normalized : '$normalized\n';
       return '$withTrailing\n## Changelog\n\n$line\n';
+    }
+    // Scope duplicate detection to the Changelog section only: a byte-equal
+    // occurrence anywhere else (e.g. a quoted bullet in an Answers block,
+    // a code fence) must NOT silently drop the new entry.
+    if (_containsLineInSection(normalized, headerIdx, line)) {
+      return existing;
     }
     return _insertIntoSection(normalized, headerIdx, line);
   }
@@ -68,9 +71,21 @@ class ChangelogWriter {
     return '- $y-$mo-$d $h:$mi ${entry.author}: ${entry.description}';
   }
 
-  bool _containsLine(String text, String line) {
-    for (final l in text.split('\n')) {
-      if (l == line) return true;
+  /// Scan only the Changelog section for a byte-equal [line]. Section
+  /// boundary matches [_insertIntoSection]: from the line AFTER the
+  /// `## Changelog` header up to (but not including) the next line starting
+  /// with `## `, else EOF.
+  bool _containsLineInSection(String text, int headerIdx, String line) {
+    final lines = text.split('\n');
+    var endIdx = lines.length;
+    for (var i = headerIdx + 1; i < lines.length; i++) {
+      if (lines[i].startsWith('## ')) {
+        endIdx = i;
+        break;
+      }
+    }
+    for (var i = headerIdx + 1; i < endIdx; i++) {
+      if (lines[i] == line) return true;
     }
     return false;
   }
@@ -92,9 +107,26 @@ class ChangelogWriter {
         break;
       }
     }
+    // Detect whether the section currently has any non-empty content
+    // (bullet or otherwise) between the header and the section boundary.
+    var hasContent = false;
+    for (var i = headerIdx + 1; i < endIdx; i++) {
+      if (lines[i].isNotEmpty) {
+        hasContent = true;
+        break;
+      }
+    }
     var insertAt = endIdx;
     while (insertAt > headerIdx + 1 && lines[insertAt - 1].isEmpty) {
       insertAt--;
+    }
+    // Canonical shape per IMPLEMENTATION.md §3.3: blank line after header
+    // before first bullet. When this new bullet becomes the FIRST bullet in
+    // an existing section, ensure a blank separator line exists between
+    // `## Changelog` and the bullet.
+    if (!hasContent && insertAt == headerIdx + 1) {
+      lines.insert(insertAt, '');
+      insertAt++;
     }
     lines.insert(insertAt, line);
     final out = lines.join('\n');
