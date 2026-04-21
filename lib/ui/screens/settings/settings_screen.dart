@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/controllers/auth_controller.dart';
 import '../../../app/controllers/settings_controller.dart';
+import '../../../app/last_session.dart';
 import '../../../app/providers/auth_providers.dart';
 import '../../../app/providers/settings_providers.dart';
 import '../../../app/providers/spec_providers.dart';
@@ -64,6 +65,12 @@ class SettingsScreen extends ConsumerWidget {
                   value: _repoValue(repo),
                   mono: repo != null,
                 ),
+                if (repo != null) ...[
+                  const SizedBox(height: 8),
+                  _ChangeRepoRow(
+                    onChange: () => _confirmChangeRepo(context, ref),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 const _SectionHeader('DATA'),
                 const SizedBox(height: 8),
@@ -89,6 +96,40 @@ class SettingsScreen extends ConsumerWidget {
   static String _repoValue(RepoRef? repo) {
     if (repo == null) return 'No repository selected';
     return '${repo.owner}/${repo.name}';
+  }
+
+  Future<void> _confirmChangeRepo(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Change repository?'),
+        content: const Text(
+          'You stay signed in. Pending local commits remain on disk under '
+          "the current repo's workdir — switch back to see them again.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Change repo'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    // Drop the in-memory repo + workdir so _AuthGate re-routes to
+    // RepoPicker on the next frame, and clear the persisted
+    // last-session keys so the NFR-2 cold-start preload doesn't
+    // silently restore the same repo on the next cold launch.
+    await clearLastSession(ref.read(secureStorageProvider));
+    ref.read(currentRepoProvider.notifier).state = null;
+    ref.read(currentWorkdirProvider.notifier).state = null;
+    if (context.mounted) {
+      Navigator.of(context).maybePop();
+    }
   }
 
   Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
@@ -227,6 +268,57 @@ class _SignOutRow extends StatelessWidget {
               ),
             ),
             child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Row with a "Change repo" affordance, styled like `_SignOutRow` but
+/// with the accent color — switching repo is routine, not destructive.
+/// Tapping fires [onChange]; SettingsScreen wraps the call in a confirm
+/// dialog then clears `currentRepoProvider` + `currentWorkdirProvider`
+/// and the persisted last-session keys so `_AuthGate` re-routes to the
+/// RepoPicker on the next frame.
+class _ChangeRepoRow extends StatelessWidget {
+  const _ChangeRepoRow({required this.onChange});
+  final VoidCallback onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      decoration: BoxDecoration(
+        color: t.surfaceElevated,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: t.borderSubtle),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Icon(Icons.swap_horiz_rounded, size: 16, color: t.accentPrimary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Change repository',
+              style: TextStyle(
+                color: t.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: onChange,
+            style: TextButton.styleFrom(
+              foregroundColor: t.accentPrimary,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ),
+            child: const Text('Change'),
           ),
         ],
       ),
