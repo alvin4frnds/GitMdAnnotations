@@ -32,6 +32,16 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 - **Detail:** `APP_MODE=real` can't be exercised because `_prodClientId = 'OVERRIDE_ME'`. Fixed = registered GitHub OAuth App, client id wired in, one end-to-end sign-in verified on-device.
 - **Proposed fix:** Register the OAuth App, replace `_prodClientId`, and add a manual smoke-test checklist entry to `docs/PROGRESS.md`.
 
+### Issue: `shared_storage 0.8.1` plugin needs a pub-cache patch to build against AGP 8+
+- **Severity:** Medium
+- **Source:** M1d install-on-tablet (2026-04-21)
+- **Screen/area:** `android/` build chain, Settings → Export backups (W5.2).
+- **Detail:** `shared_storage 0.8.1` is the latest version whose Flutter SDK constraint matches ours (0.9+ / 0.10.x failed resolution earlier). Its `android/build.gradle` predates AGP 8 and needs two fixes before `fvm flutter build apk` succeeds:
+  1. **No `namespace`** — AGP 8+ requires every library module to declare one. Add `namespace 'io.alexrintt.sharedstorage'` under the `android { … }` block.
+  2. **`compileSdkVersion 30`** — too old to resolve `android:attr/lStar` (added in API 31) that newer AndroidX appcompat pulled transitively by our app references. Bump to `compileSdkVersion 35` to match the app.
+- **Current workaround:** both lines are patched directly in the developer's pub cache at `C:/Users/Praveen/AppData/Local/Pub/Cache/hosted/pub.dev/shared_storage-0.8.1/android/build.gradle`. The repo-side fallback (a `subprojects { plugins.withId("com.android.library") { … namespace = project.group.toString() } }` block in `android/build.gradle.kts`) would cover the namespace gap by itself, but `compileSdk` cannot be overridden safely at configure or afterEvaluate time — it must be set inside the plugin's own build script. The pub cache patch survives `fvm flutter pub get` but NOT `fvm flutter pub cache clean` and does NOT propagate to a fresh clone.
+- **Proposed fix:** vendor `shared_storage` into a `vendor/` dir (or fork it on GitHub) with the two fixes landed permanently; swap the `pubspec.yaml` pin to `path: vendor/shared_storage` or `git: { url, ref }`. Or drop `shared_storage` in favor of a direct MethodChannel to Android's SAF APIs — smaller surface, no external dep.
+
 ### ~~Issue: libgit2dart is discontinued on pub.dev~~ — Closed in W1 (2026-04-21)
 - ~~**Severity:** Medium~~
 - ~~**Source:** M1a T10 (2026-04-20)~~
