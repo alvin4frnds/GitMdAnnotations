@@ -1,4 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- INTERNET is required at runtime for every network op in the app:
+         GitHub Device Flow + REST API calls (GithubOAuthAdapter,
+         DioGitHubReposAdapter) and libgit2 HTTPS clone/fetch/push
+         against github.com. Debug + profile variants already declared
+         it, but release builds use only the main manifest — omitting
+         it here silently fails every socket on-device, which is what
+         the Sign-In "stuck on spinner" bug in M1c-close QA was. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="GitMdScribe"
         android:name="${applicationName}"
