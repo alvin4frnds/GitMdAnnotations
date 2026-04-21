@@ -1,18 +1,54 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/review_controller.dart';
+import '../../../app/providers/review_providers.dart';
+import '../../../domain/entities/git_identity.dart';
+import '../../../domain/entities/job_ref.dart';
+import '../../../domain/entities/spec_file.dart';
+import '../../../domain/entities/stroke_group.dart';
+import '../../../domain/services/open_question_extractor.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../_shared/modal_shell.dart';
+import 'planned_writes_preview.dart';
 
 /// Modal shown when the user taps "Submit review" on the review panel.
 /// Previews the four files that will be written + the commit message, and
 /// warns about offline push deferral.
-class SubmitConfirmationScreen extends StatelessWidget {
-  const SubmitConfirmationScreen({super.key});
+///
+/// T7: preview is driven by [PlannedWritesPreview] which calls
+/// [ReviewController] to construct the actual planned writes from the
+/// current draft state. The primary button routes through
+/// [ReviewController.submit].
+class SubmitConfirmationScreen extends ConsumerWidget {
+  const SubmitConfirmationScreen({
+    required this.jobRef,
+    required this.source,
+    required this.questions,
+    required this.strokeGroups,
+    required this.identity,
+    this.onCommitted,
+    super.key,
+  });
+
+  final JobRef jobRef;
+  final SpecFile source;
+  final List<OpenQuestion> questions;
+  final List<StrokeGroup> strokeGroups;
+  final GitIdentity identity;
+
+  /// Fired once the Submit commit lands (success or failure — the caller
+  /// usually closes the modal and surfaces a toast / error screen).
+  final ValueChanged<ReviewSubmission>? onCommitted;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
+    final async = ref.watch(reviewControllerProvider(jobRef));
+    final isSubmitting =
+        async.value?.submission is ReviewSubmissionInProgress;
+
     return ModalShell(
       cardWidth: 520,
       header: ModalHeader(
@@ -37,41 +73,10 @@ class SubmitConfirmationScreen extends StatelessWidget {
             children: [
               const ModalCaption('Files to be committed'),
               const SizedBox(height: 10),
-              _FileListRow(
-                prefix: '+',
-                name: '03-review.md',
-                meta: '1.8 KB',
-                first: true,
-              ),
-              _FileListRow(
-                prefix: '+',
-                name: '03-annotations.svg',
-                meta: '612 B (3 groups)',
-              ),
-              _FileListRow(
-                prefix: '+',
-                name: '03-annotations.png',
-                meta: '164 KB',
-              ),
-              _FileListRow(
-                prefix: '~',
-                name: '02-spec.md',
-                meta: 'changelog +1 line',
-              ),
-            ],
-          ),
-        ),
-        ModalSunkenSection(
-          topBorder: false,
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const ModalCaption('Changelog preview'),
-              const SizedBox(height: 6),
-              Text(
-                '- 2026-04-20 09:32 tablet: User clarified auth flow — TOTP required.',
-                style: appMono(context, size: 11, color: t.textPrimary),
+              PlannedWritesPreview(
+                jobRef: jobRef,
+                source: source,
+                strokeGroups: strokeGroups,
               ),
             ],
           ),
@@ -84,7 +89,7 @@ class SubmitConfirmationScreen extends StatelessWidget {
               const ModalCaption('commit message'),
               const SizedBox(height: 6),
               Text(
-                'review: spec-auth-flow-totp',
+                'review: ${jobRef.jobId}',
                 style: appMono(context, size: 11, color: t.textPrimary),
               ),
             ],
@@ -125,75 +130,29 @@ class SubmitConfirmationScreen extends StatelessWidget {
           ),
         ),
       ],
-      footer: const ModalFooter(
+      footer: ModalFooter(
         buttons: [
-          GhostButton(label: 'Cancel'),
-          PrimaryButton(label: 'Submit & commit'),
+          const GhostButton(label: 'Cancel'),
+          PrimaryButton(
+            label: isSubmitting ? 'Committing...' : 'Submit & commit',
+            onPressed: isSubmitting ? null : () => _submit(ref),
+          ),
         ],
       ),
     );
   }
-}
 
-class _FileListRow extends StatelessWidget {
-  final String prefix;
-  final String name;
-  final String meta;
-  final bool first;
-
-  const _FileListRow({
-    required this.prefix,
-    required this.name,
-    required this.meta,
-    this.first = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final isAdd = prefix == '+';
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          top: first
-              ? BorderSide.none
-              : BorderSide(color: t.borderSubtle.withValues(alpha: 0.6)),
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 14,
-            child: Text(
-              prefix,
-              style: appMono(
-                context,
-                size: 12,
-                weight: FontWeight.w700,
-                color: isAdd ? t.statusSuccess : t.statusWarning,
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              name,
-              style: appMono(context, size: 12, color: t.textPrimary),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            meta,
-            style: TextStyle(
-              color: t.textMuted,
-              fontSize: 11,
-              fontFamily: 'monospace',
-            ),
-          ),
-        ],
-      ),
+  Future<void> _submit(WidgetRef ref) async {
+    final notifier = ref.read(reviewControllerProvider(jobRef).notifier);
+    await notifier.submit(
+      source: source,
+      questions: questions,
+      strokeGroups: strokeGroups,
+      identity: identity,
     );
+    final submission = ref.read(reviewControllerProvider(jobRef)).value?.submission;
+    if (submission != null) {
+      onCommitted?.call(submission);
+    }
   }
 }

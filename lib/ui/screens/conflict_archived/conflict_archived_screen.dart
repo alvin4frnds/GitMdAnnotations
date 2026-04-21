@@ -1,17 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/sync_controller.dart';
+import '../../../app/providers/sync_providers.dart';
+import '../../../domain/ports/git_port.dart';
+import '../../../domain/services/sync_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../_shared/modal_shell.dart';
 
 /// Modal shown after a Sync Up when the remote had diverging commits. Remote
 /// wins; the local commits are archived to the on-device backup folder.
-class ConflictArchivedScreen extends StatelessWidget {
+///
+/// T7 reads the latest [SyncConflictArchived] event out of
+/// [SyncController]. If the sync has already settled to [SyncDone] by the
+/// time this screen mounts, we fall back to a placeholder caption — M1c
+/// P2 follow-up extends `SyncDone` with a nullable `backup` so the banner
+/// survives the terminal transition.
+class ConflictArchivedScreen extends ConsumerWidget {
   const ConflictArchivedScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
+    final async = ref.watch(syncControllerProvider);
+    final backup = _latestBackup(async.value);
     return ModalShell(
       cardWidth: 580,
       header: ModalHeader(
@@ -19,15 +32,13 @@ class ConflictArchivedScreen extends StatelessWidget {
         iconBg: t.statusWarning.withValues(alpha: 0.15),
         iconColor: t.statusWarning,
         heading: 'Remote had newer commits',
-        descriptionSpans: [
-          const TextSpan(
-            text: 'Your local changes were archived. ',
-          ),
-          const TextSpan(
+        descriptionSpans: const [
+          TextSpan(text: 'Your local changes were archived. '),
+          TextSpan(
             text: 'Remote takes priority',
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
-          const TextSpan(
+          TextSpan(
             text: ' on conflict. Your work is safe at the path below.',
           ),
         ],
@@ -37,20 +48,15 @@ class ConflictArchivedScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: const [
+            children: [
               _InfoRow(
                 label: 'Backup path',
-                value:
-                    '~/GitMdScribe/backups/payments-api/claude-jobs-2026-04-20T10-43-01/',
+                value: backup?.path ?? '(not available — sync completed)',
                 first: true,
               ),
               _InfoRow(
-                label: 'Backed-up commits',
-                value: 'f31ac44 review: spec-auth-flow-totp',
-              ),
-              _InfoRow(
-                label: 'Remote now at',
-                value: 'a1e9cc2 revise: spec-auth-flow-totp',
+                label: 'Backed-up commit',
+                value: backup?.commitSha ?? '-',
               ),
             ],
           ),
@@ -89,6 +95,18 @@ class ConflictArchivedScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Extracts the latest archived [BackupRef] from the sync controller's
+  /// state. Only [SyncInProgress(SyncConflictArchived(...))] carries it —
+  /// the terminal [SyncDone] state currently drops it on the floor (the
+  /// P2 `SyncDone.backup` follow-up is tracked separately).
+  BackupRef? _latestBackup(SyncState? state) {
+    if (state is SyncInProgress) {
+      final p = state.latest;
+      if (p is SyncConflictArchived) return p.backup;
+    }
+    return null;
   }
 }
 
