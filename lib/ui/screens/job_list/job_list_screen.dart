@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/controllers/job_list_controller.dart';
+import '../../../app/controllers/spec_importer.dart';
 import '../../../app/controllers/sync_controller.dart';
 import '../../../app/last_session.dart';
 import '../../../app/providers/auth_providers.dart';
+import '../../../app/providers/spec_import_providers.dart';
 import '../../../app/providers/spec_providers.dart';
 import '../../../app/providers/sync_providers.dart';
 import '../../../domain/entities/job.dart';
@@ -14,6 +16,7 @@ import '../../../domain/entities/source_kind.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../changelog_viewer/changelog_viewer_screen.dart';
+import '../repo_browser/repo_browser_screen.dart';
 import '../settings/settings_screen.dart';
 import '../spec_reader_md/spec_reader_md_screen.dart';
 import '../spec_reader_pdf/spec_reader_pdf_screen.dart';
@@ -90,7 +93,11 @@ class _LeftRail extends ConsumerWidget {
           const SizedBox(height: 16),
           Divider(height: 1, color: t.borderSubtle),
           const SizedBox(height: 16),
-          _NewSpecButton(onPressed: () {}),
+          _NewSpecButton(
+            onPressed: repo == null
+                ? null
+                : () => _openRepoBrowser(context),
+          ),
           const SizedBox(height: 8),
           _ChangelogNavButton(
             onPressed: () => _openChangelog(context),
@@ -132,6 +139,18 @@ class _LeftRail extends ConsumerWidget {
     await clearLastSession(ref.read(secureStorageProvider));
     ref.read(currentRepoProvider.notifier).state = null;
     ref.read(currentWorkdirProvider.notifier).state = null;
+  }
+
+  /// Pushes the in-repo file browser so the user can pick a `.md` anywhere
+  /// in the working tree and convert it to a spec. The outcome flows
+  /// through `specImportControllerProvider` — see the listener in
+  /// [_TopChrome] for the success-case JobList refresh + SnackBar.
+  void _openRepoBrowser(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(body: RepoBrowserScreen()),
+      ),
+    );
   }
 
   /// Pushes the cross-job changelog timeline. Entry point wired from the
@@ -271,7 +290,7 @@ class _FilterRow extends StatelessWidget {
 }
 
 class _NewSpecButton extends StatelessWidget {
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   const _NewSpecButton({required this.onPressed});
 
   @override
@@ -284,6 +303,8 @@ class _NewSpecButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: t.accentPrimary,
           foregroundColor: Colors.white,
+          disabledBackgroundColor: t.surfaceSunken,
+          disabledForegroundColor: t.textMuted,
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 10),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -490,6 +511,36 @@ class _TopChrome extends ConsumerWidget {
       } else if (nextVal is SyncErrored) {
         messenger?.showSnackBar(SnackBar(
           content: Text('Sync failed: ${nextVal.error}'),
+          backgroundColor: t.statusDanger,
+          duration: const Duration(seconds: 6),
+        ));
+      }
+    });
+    // Import-spec listener — mirrors the sync listener above. Success
+    // invalidates the list so the new row shows up; failure / error
+    // surface as a SnackBar. Cancel / idle are silent no-ops.
+    ref.listen<AsyncValue<SpecImportOutcome?>>(specImportControllerProvider,
+        (prev, next) {
+      final prevVal = prev?.value;
+      final nextVal = next.value;
+      if (prevVal == nextVal && !next.hasError) return;
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      if (nextVal is SpecImportSuccess) {
+        messenger?.showSnackBar(SnackBar(
+          content: Text('Imported ${nextVal.job.jobId}'),
+          duration: const Duration(seconds: 4),
+        ));
+        ref.invalidate(jobListControllerProvider);
+        ref.invalidate(pendingPushCountProvider);
+      } else if (nextVal is SpecImportFailure) {
+        messenger?.showSnackBar(SnackBar(
+          content: Text('Import failed: ${nextVal.message}'),
+          backgroundColor: t.statusDanger,
+          duration: const Duration(seconds: 6),
+        ));
+      } else if (next.hasError) {
+        messenger?.showSnackBar(SnackBar(
+          content: Text('Import failed: ${next.error}'),
           backgroundColor: t.statusDanger,
           duration: const Duration(seconds: 6),
         ));
