@@ -60,6 +60,12 @@ dependencies:
   # as `pdfx` (MIT). Consumed only from `lib/infra/pdf/pdfx_adapter.dart`;
   # domain code talks to `PdfRasterPort`.
   pdfx: ^2.9.2
+  # PDF writer for the composite `03-annotations.pdf` artifact (markdown
+  # raster background + vector stroke overlay). Consumed only from
+  # `lib/domain/services/annotation_pdf_composer.dart`; domain code
+  # builds the `pw.Document` directly because the composer is pure-Dart
+  # and runs on the caller's isolate at submit time.
+  pdf: ^3.11.3
 
 dev_dependencies:
   flutter_test:

@@ -15,6 +15,7 @@ import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_file_system.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_git_port.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_id_generator.dart';
+import 'package:gitmdannotations_tablet/domain/fakes/fake_markdown_rasterizer.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_png_flattener.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_secure_storage.dart';
 import 'package:gitmdannotations_tablet/domain/ports/secure_storage_port.dart';
@@ -65,6 +66,8 @@ void main() {
             clockProvider.overrideWithValue(clock),
             idGeneratorProvider.overrideWithValue(FakeIdGenerator()),
             pngFlattenerProvider.overrideWithValue(png),
+            markdownRasterizerProvider
+                .overrideWithValue(FakeMarkdownRasterizer()),
             authPortProvider.overrideWithValue(auth),
             secureStorageProvider.overrideWithValue(storage),
             currentWorkdirProvider.overrideWith((_) => '/workdir'),

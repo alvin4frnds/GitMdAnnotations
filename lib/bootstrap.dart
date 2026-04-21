@@ -20,6 +20,7 @@ import 'infra/fs/fs_adapter.dart';
 import 'infra/git/git_adapter.dart';
 import 'infra/github/dio_github_repos_adapter.dart';
 import 'infra/id/system_id_generator.dart';
+import 'infra/pdf/markdown_rasterizer_adapter.dart';
 import 'infra/pdf/pdfx_adapter.dart';
 import 'infra/png/png_flattener_adapter.dart';
 import 'infra/storage/keystore_adapter.dart';
@@ -81,6 +82,11 @@ ProviderScope buildAppScope({
       idGeneratorProvider.overrideWithValue(SystemIdGenerator()),
       pdfRasterPortProvider.overrideWithValue(PdfxAdapter()),
       pngFlattenerProvider.overrideWithValue(PngFlattenerAdapter()),
+      markdownRasterizerProvider.overrideWith(
+        (ref) => MarkdownRasterizerAdapter(
+          boundaryKey: () => ref.read(markdownRasterBoundaryKeyProvider),
+        ),
+      ),
       gitHubReposPortProvider.overrideWithValue(DioGitHubReposAdapter()),
       backupExportPortProvider
           .overrideWithValue(SharedStorageBackupExportAdapter()),

@@ -81,10 +81,22 @@ class CommitPlanner {
     PdfAnnotationSet? pdf,
   ) sync* {
     if (source.sourceKind == SourceKind.markdown) {
+      // Four artifacts per submit:
+      //   .svg — legacy vector (IMPLEMENTATION.md §3.4)
+      //   .png — legacy flattened raster (§4.5)
+      //   .pdf — composite markdown-background + vector-stroke overlay
+      //   .json — format-agnostic sidecar (anchors + stroke points)
+      // The `.svg` + `.png` pair stays until downstream tooling is
+      // confirmed PDF/JSON-ready; then the planner trims to just the
+      // new pair.
       yield PlannedTextWrite(
           path: _p(job, '03-annotations.svg'), contents: md!.svg);
       yield PlannedBinaryWrite(
           path: _p(job, '03-annotations.png'), bytes: md.png);
+      yield PlannedBinaryWrite(
+          path: _p(job, '03-annotations.pdf'), bytes: md.pdf);
+      yield PlannedTextWrite(
+          path: _p(job, '03-annotations.json'), contents: md.json);
       return;
     }
     final pages = pdf!.svgByPage.keys.toList()..sort();

@@ -22,6 +22,7 @@ import 'package:gitmdannotations_tablet/domain/fakes/fake_file_system.dart';
 import 'package:gitmdannotations_tablet/domain/ports/file_system_port.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_git_port.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_id_generator.dart';
+import 'package:gitmdannotations_tablet/domain/fakes/fake_markdown_rasterizer.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_png_flattener.dart';
 import 'package:gitmdannotations_tablet/domain/services/open_question_extractor.dart';
 
@@ -164,6 +165,7 @@ _Env _buildEnv({
     clockProvider.overrideWithValue(clock0),
     idGeneratorProvider.overrideWithValue(FakeIdGenerator()),
     pngFlattenerProvider.overrideWithValue(png0),
+    markdownRasterizerProvider.overrideWithValue(FakeMarkdownRasterizer()),
     reviewAutoSaveTimerFactoryProvider.overrideWithValue(seam.spawn),
     ...extraOverrides,
   ]);

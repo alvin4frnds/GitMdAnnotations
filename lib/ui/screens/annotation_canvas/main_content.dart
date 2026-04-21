@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/providers/annotation_providers.dart';
 import '../../../domain/entities/job_ref.dart';
 import '../../../domain/entities/pointer_sample.dart';
 import '../../../domain/entities/stroke.dart';
@@ -66,7 +68,15 @@ const EdgeInsets kAnnotatedContentPadding =
 ///
 /// `IgnorePointer(ignoring: !drawingEnabled)` still gates the overlay
 /// in pan mode so all pointers fall through to the scroll view.
-class AnnotationMainContent extends StatelessWidget {
+///
+/// Wraps the markdown layer in a [RepaintBoundary] whose [GlobalKey] is
+/// registered into [markdownRasterBoundaryKeyProvider] on mount and
+/// cleared on dispose. `MarkdownRasterizerAdapter` reads that key at
+/// submit time to capture the canonical-width markdown as the
+/// background of `03-annotations.pdf`. Key is owned by this widget's
+/// state (not a global singleton) so a second annotate route on the
+/// stack gets a fresh boundary without colliding.
+class AnnotationMainContent extends ConsumerStatefulWidget {
   const AnnotationMainContent({
     required this.jobRef,
     required this.groups,
@@ -96,6 +106,49 @@ class AnnotationMainContent extends StatelessWidget {
   final DateTime Function() nowProvider;
 
   @override
+  ConsumerState<AnnotationMainContent> createState() =>
+      _AnnotationMainContentState();
+}
+
+class _AnnotationMainContentState extends ConsumerState<AnnotationMainContent> {
+  final GlobalKey _markdownBoundaryKey = GlobalKey(debugLabel: 'canonicalMd');
+
+  @override
+  void initState() {
+    super.initState();
+    // Register the key on the next frame — mutating provider state during
+    // `initState` throws inside Riverpod's assertion net. Post-frame is
+    // soon enough because the rasterizer is only ever called from Submit
+    // Review, which happens well after first paint.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(markdownRasterBoundaryKeyProvider.notifier).state =
+          _markdownBoundaryKey;
+    });
+  }
+
+  @override
+  void dispose() {
+    // Best-effort clear; if the provider container has already been
+    // disposed (e.g. widget-test tear-down unmounts us after the
+    // `ProviderScope`), reading `ref` throws `StateError`. That's fine —
+    // a stale key left in the provider resolves to a null
+    // `currentContext` and the rasterizer adapter maps it to
+    // `MarkdownRasterizeBoundaryMissing`. Only clear if we still own
+    // the slot so a second annotate route that already replaced our
+    // key doesn't get its boundary nulled out from under it.
+    try {
+      final notifier = ref.read(markdownRasterBoundaryKeyProvider.notifier);
+      if (identical(notifier.state, _markdownBoundaryKey)) {
+        notifier.state = null;
+      }
+    } on StateError {
+      // container already gone — nothing to clean up.
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Container(
@@ -103,10 +156,10 @@ class AnnotationMainContent extends StatelessWidget {
       alignment: Alignment.topCenter,
       child: ScrollConfiguration(
         behavior: _AnnotationScrollBehavior(
-          allowStylusScroll: !drawingEnabled,
+          allowStylusScroll: !widget.drawingEnabled,
         ),
         child: CanonicalPage(
-          scrollPhysics: hasActiveStylusStroke
+          scrollPhysics: widget.hasActiveStylusStroke
               ? const NeverScrollableScrollPhysics()
               : const BouncingScrollPhysics(),
           child: Stack(
@@ -120,24 +173,27 @@ class AnnotationMainContent extends StatelessWidget {
               // page margins unreachable to the stylus — user could
               // only start a stroke on a line that already had text
               // under it.
-              SizedBox(
-                width: double.infinity,
-                child: Padding(
-                  padding: kAnnotatedContentPadding,
-                  child: MarkdownStub(jobRef: jobRef),
+              RepaintBoundary(
+                key: _markdownBoundaryKey,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Padding(
+                    padding: kAnnotatedContentPadding,
+                    child: MarkdownStub(jobRef: widget.jobRef),
+                  ),
                 ),
               ),
               Positioned.fill(
                 child: IgnorePointer(
-                  ignoring: !drawingEnabled,
+                  ignoring: !widget.drawingEnabled,
                   child: InkOverlay(
-                    groups: groups,
-                    activeStroke: activeStroke,
-                    currentStrokeColor: currentStrokeColor,
-                    currentStrokeWidth: currentStrokeWidth,
-                    currentStrokeOpacity: currentStrokeOpacity,
-                    onSample: onSample,
-                    nowProvider: nowProvider,
+                    groups: widget.groups,
+                    activeStroke: widget.activeStroke,
+                    currentStrokeColor: widget.currentStrokeColor,
+                    currentStrokeWidth: widget.currentStrokeWidth,
+                    currentStrokeOpacity: widget.currentStrokeOpacity,
+                    onSample: widget.onSample,
+                    nowProvider: widget.nowProvider,
                     hitTestBehavior: HitTestBehavior.opaque,
                   ),
                 ),

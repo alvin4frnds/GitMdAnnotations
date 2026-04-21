@@ -23,11 +23,22 @@ class PlannedBinaryWrite extends PlannedWrite {
   final Uint8List bytes;
 }
 
-/// Markdown annotation pair: git-diffable SVG + flattened PNG.
+/// Markdown annotation bundle: git-diffable SVG + flattened PNG
+/// (legacy artifacts kept for downstream-tooling compatibility during
+/// migration), plus the new composite `03-annotations.pdf` (markdown
+/// raster background + vector stroke overlay) and its JSON sidecar
+/// (format-agnostic anchor + stroke store).
 class MarkdownAnnotations {
-  const MarkdownAnnotations({required this.svg, required this.png});
+  const MarkdownAnnotations({
+    required this.svg,
+    required this.png,
+    required this.pdf,
+    required this.json,
+  });
   final String svg;
   final Uint8List png;
+  final Uint8List pdf;
+  final String json;
 }
 
 /// PDF annotation set keyed by 1-based page number. Keys must match.

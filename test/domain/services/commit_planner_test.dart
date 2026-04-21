@@ -65,17 +65,33 @@ StrokeGroup _pdfGroup({String sha = _specSha, int page = 1}) => StrokeGroup(
 
 Uint8List _png([int b = 0x89]) => Uint8List.fromList([b, 0x50, 0x4E, 0x47]);
 
+Uint8List _pdfBytes([int b = 0x25]) =>
+    Uint8List.fromList([b, 0x50, 0x44, 0x46, 0x2D, 0x31]);
+
+MarkdownAnnotations _mdAnnotations({
+  String svg = '<svg/>',
+  Uint8List? png,
+  Uint8List? pdf,
+  String json = '{}',
+}) =>
+    MarkdownAnnotations(
+      svg: svg,
+      png: png ?? _png(),
+      pdf: pdf ?? _pdfBytes(),
+      json: json,
+    );
+
 void main() {
   group('planReview markdown', () {
-    test('writes exactly 03-review.md, annotations svg+png, and updated spec',
+    test(
+        'writes review.md, the four annotation artifacts, and updated spec',
         () {
       const planner = CommitPlanner();
       final plan = planner.planReview(
         job: _job(),
         source: _md(),
         reviewMd: '# Review',
-        markdownAnnotations:
-            MarkdownAnnotations(svg: '<svg/>', png: _png()),
+        markdownAnnotations: _mdAnnotations(),
         pdfAnnotations: null,
         updatedSpecOrSidecar: '# spec + changelog',
         strokeGroups: [_mdGroup()],
@@ -86,6 +102,8 @@ void main() {
           'jobs/pending/spec-auth/03-review.md',
           'jobs/pending/spec-auth/03-annotations.svg',
           'jobs/pending/spec-auth/03-annotations.png',
+          'jobs/pending/spec-auth/03-annotations.pdf',
+          'jobs/pending/spec-auth/03-annotations.json',
           'jobs/pending/spec-auth/02-spec.md',
         },
       );
@@ -98,7 +116,7 @@ void main() {
         source: _md(id: 'spec-auth-flow'),
         reviewMd: '# Review',
         markdownAnnotations:
-            MarkdownAnnotations(svg: '<svg/>', png: _png()),
+            _mdAnnotations(),
         pdfAnnotations: null,
         updatedSpecOrSidecar: '# spec',
         strokeGroups: const [],
@@ -106,19 +124,18 @@ void main() {
       expect(plan.message, 'review: spec-auth-flow');
     });
 
-    test('empty stroke groups still emits the four write paths', () {
+    test('empty stroke groups still emits all six write paths', () {
       const planner = CommitPlanner();
       final plan = planner.planReview(
         job: _job(),
         source: _md(),
         reviewMd: '# Review',
-        markdownAnnotations:
-            MarkdownAnnotations(svg: '<svg/>', png: _png()),
+        markdownAnnotations: _mdAnnotations(),
         pdfAnnotations: null,
         updatedSpecOrSidecar: '# spec',
         strokeGroups: const [],
       );
-      expect(plan.writes.length, 4);
+      expect(plan.writes.length, 6);
     });
 
     test('PNG is emitted as a binary write carrying the exact bytes', () {
@@ -128,8 +145,7 @@ void main() {
         job: _job(),
         source: _md(),
         reviewMd: '# Review',
-        markdownAnnotations:
-            MarkdownAnnotations(svg: '<svg/>', png: bytes),
+        markdownAnnotations: _mdAnnotations(png: bytes),
         pdfAnnotations: null,
         updatedSpecOrSidecar: '# spec',
         strokeGroups: const [],
@@ -210,7 +226,7 @@ void main() {
           source: _md(),
           reviewMd: '# R',
           markdownAnnotations:
-              MarkdownAnnotations(svg: '<svg/>', png: _png()),
+              _mdAnnotations(),
           pdfAnnotations: null,
           updatedSpecOrSidecar: '# spec',
           strokeGroups: [_pdfGroup()],
@@ -227,7 +243,7 @@ void main() {
           source: _md(sha: 'newsha'),
           reviewMd: '# R',
           markdownAnnotations:
-              MarkdownAnnotations(svg: '<svg/>', png: _png()),
+              _mdAnnotations(),
           pdfAnnotations: null,
           updatedSpecOrSidecar: '# spec',
           strokeGroups: [_mdGroup(sha: 'oldsha')],
@@ -298,7 +314,7 @@ void main() {
           source: _pdf(),
           reviewMd: '# R',
           markdownAnnotations:
-              MarkdownAnnotations(svg: '<svg/>', png: _png()),
+              _mdAnnotations(),
           pdfAnnotations: null,
           updatedSpecOrSidecar: '# s',
           strokeGroups: const [],
@@ -381,7 +397,7 @@ void main() {
         source: _md(id: 'spec-xyz-1'),
         reviewMd: '# R',
         markdownAnnotations:
-            MarkdownAnnotations(svg: '<svg/>', png: _png()),
+            _mdAnnotations(),
         pdfAnnotations: null,
         updatedSpecOrSidecar: '# s',
         strokeGroups: const [],

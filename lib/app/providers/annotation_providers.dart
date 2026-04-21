@@ -1,9 +1,11 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/job_ref.dart';
 import '../../domain/entities/pointer_sample.dart';
 import '../../domain/ports/clock_port.dart';
 import '../../domain/ports/id_generator_port.dart';
+import '../../domain/ports/markdown_rasterizer_port.dart';
 import '../controllers/annotation_controller.dart';
 
 /// Binds the [Clock] port at composition root. Tests override with
@@ -49,3 +51,25 @@ final annotationControllerProvider =
     NotifierProvider.family<AnnotationController, AnnotationState, JobRef>(
   AnnotationController.new,
 );
+
+/// Holds the [GlobalKey] of the [RepaintBoundary] wrapping the canonical
+/// markdown in the annotate screen. Set by `AnnotationMainContent` on
+/// mount and cleared on dispose; read by `MarkdownRasterizerAdapter` at
+/// review-submit time to capture the markdown background for
+/// `03-annotations.pdf`.
+///
+/// Nullable because the adapter may be invoked (via test scaffolding or
+/// a race with screen teardown) when no boundary is mounted — the
+/// adapter maps null to [MarkdownRasterizeBoundaryMissing] so the
+/// submit pipeline fails loudly instead of silently omitting the PDF.
+final markdownRasterBoundaryKeyProvider =
+    StateProvider<GlobalKey?>((ref) => null);
+
+/// Binds the [MarkdownRasterizerPort] at composition root.
+/// `bootstrap.dart` wires the real adapter (reads the key above);
+/// tests override with a fake that returns preset bytes.
+final markdownRasterizerProvider = Provider<MarkdownRasterizerPort>((ref) {
+  throw UnimplementedError(
+    'markdownRasterizerProvider must be overridden at composition root',
+  );
+});

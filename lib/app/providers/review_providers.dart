@@ -36,6 +36,7 @@ final reviewSubmitterProvider = Provider<ReviewSubmitter>(
     fs: ref.watch(fileSystemProvider),
     git: ref.watch(gitPortProvider),
     pngFlattener: ref.watch(pngFlattenerProvider),
+    markdownRasterizer: ref.watch(markdownRasterizerProvider),
   ),
 );
 

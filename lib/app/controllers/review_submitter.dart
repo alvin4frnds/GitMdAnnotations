@@ -11,13 +11,18 @@ import '../../domain/entities/stroke_group.dart';
 import '../../domain/ports/clock_port.dart';
 import '../../domain/ports/file_system_port.dart';
 import '../../domain/ports/git_port.dart';
+import '../../domain/ports/markdown_rasterizer_port.dart';
 import '../../domain/ports/png_flattener_port.dart';
+import '../../domain/services/annotation_pdf_composer.dart';
+import '../../domain/services/annotation_sidecar_serializer.dart';
 import '../../domain/services/changelog_writer.dart';
 import '../../domain/services/commit_planner.dart';
 import '../../domain/services/planned_write.dart';
 import '../../domain/services/review_serializer.dart';
 import '../../domain/services/svg_serializer.dart';
 import '../../domain/services/open_question_extractor.dart';
+import '../../ui/screens/annotation_canvas/main_content.dart'
+    show kAnnotatedContentWidth;
 
 /// Stateless composition of the domain-service stack for Submit Review and
 /// Approve commits. Splitting this out keeps [ReviewController] focused on
@@ -30,15 +35,18 @@ class ReviewSubmitter {
     required FileSystemPort fs,
     required GitPort git,
     required PngFlattener pngFlattener,
+    required MarkdownRasterizerPort markdownRasterizer,
   })  : _clock = clock,
         _fs = fs,
         _git = git,
-        _pngFlattener = pngFlattener;
+        _pngFlattener = pngFlattener,
+        _markdownRasterizer = markdownRasterizer;
 
   final Clock _clock;
   final FileSystemPort _fs;
   final GitPort _git;
   final PngFlattener _pngFlattener;
+  final MarkdownRasterizerPort _markdownRasterizer;
 
   /// Composes and commits the typed review per PRD §5.6 FR-1.25/1.26.
   ///
@@ -66,19 +74,39 @@ class ReviewSubmitter {
       strokeGroups: strokeGroups,
     );
 
-    // Annotation pair (markdown path only in Phase 1; PDF review lands
-    // in a future milestone — see TabletApp-PRD §5.5).
+    // Annotation bundle for markdown path: legacy svg + png retained
+    // for downstream tooling, new composite pdf + json sidecar added
+    // per the canonical-width zoom-to-fill milestone.
+    //
+    // The PDF and JSON use canonical coords (page size = canonical
+    // width × the raster's natural height from the mounted
+    // RepaintBoundary); the SVG coords are untouched and match what the
+    // on-screen InkOverlay captured.
     MarkdownAnnotations? markdownAnnotations;
     if (source.sourceKind == SourceKind.markdown) {
-      final svg = const SvgSerializer().serialize(
-        strokeGroups,
-        SvgSource(sourceFile: source.path, sourceSha: source.sha),
-      );
+      final svgSource =
+          SvgSource(sourceFile: source.path, sourceSha: source.sha);
+      final svg = const SvgSerializer().serialize(strokeGroups, svgSource);
       final png = await _pngFlattener.flatten(
         groups: strokeGroups,
         canvas: CanvasSize(width: 1024, height: 1024),
       );
-      markdownAnnotations = MarkdownAnnotations(svg: svg, png: png);
+      final raster = await _markdownRasterizer.rasterize();
+      final pdf = await const AnnotationPdfComposer().compose(
+        backgroundPng: raster.pngBytes,
+        canonicalWidth: raster.canonicalWidth,
+        canonicalHeight: raster.canonicalHeight,
+        groups: strokeGroups,
+      );
+      final json = const AnnotationSidecarSerializer(
+        canonicalWidth: kAnnotatedContentWidth,
+      ).serialize(strokeGroups, svgSource);
+      markdownAnnotations = MarkdownAnnotations(
+        svg: svg,
+        png: png,
+        pdf: pdf,
+        json: json,
+      );
     }
 
     final updatedChangelog = await _composeChangelog(
