@@ -4,9 +4,10 @@ import 'tokens.dart';
 
 /// Builds the app's [ThemeData] from [AppTokens].
 ///
-/// Typography uses the system default for now (Roboto on Android). Bundling
-/// Inter / JetBrains Mono / Caveat as asset fonts is a follow-up — see the
-/// Font TODO in the UI-spike commit.
+/// Typography: Inter (body) and JetBrains Mono (code/breadcrumb) are bundled
+/// as asset fonts — see `pubspec.yaml` fonts block and `assets/fonts/*.otf/.ttf`.
+/// Caveat (handwriting) is still system italic; revisit when the annotation
+/// canvas ships margin-note polish (M1d).
 class AppTheme {
   static ThemeData build(AppTokens t) {
     final base = t.brightness == Brightness.dark ? ThemeData.dark() : ThemeData.light();
@@ -15,6 +16,17 @@ class AppTheme {
       brightness: t.brightness,
       scaffoldBackgroundColor: t.surfaceBackground,
       canvasColor: t.surfaceBackground,
+      // Applies to the whole subtree unless a TextStyle supplies fontFamily
+      // itself (e.g. appMono uses JetBrainsMono).
+      textTheme: (t.brightness == Brightness.dark
+              ? ThemeData.dark().textTheme
+              : ThemeData.light().textTheme)
+          .apply(
+        fontFamily: 'Inter',
+        bodyColor: t.textPrimary,
+        displayColor: t.textPrimary,
+      ),
+      primaryTextTheme: base.primaryTextTheme.apply(fontFamily: 'Inter'),
       colorScheme: ColorScheme(
         brightness: t.brightness,
         primary: t.accentPrimary,
@@ -27,10 +39,6 @@ class AppTheme {
         onSurface: t.textPrimary,
       ),
       dividerColor: t.borderSubtle,
-      textTheme: base.textTheme.apply(
-        bodyColor: t.textPrimary,
-        displayColor: t.textPrimary,
-      ),
       appBarTheme: AppBarTheme(
         backgroundColor: t.surfaceElevated,
         foregroundColor: t.textPrimary,
@@ -64,10 +72,12 @@ class AppTheme {
   }
 }
 
-/// Monospace text style used for commit SHAs, file paths, log lines, etc.
+/// Monospace text style used for commit SHAs, file paths, log lines, and
+/// the JobList header breadcrumb. Uses bundled JetBrains Mono — see
+/// `pubspec.yaml` fonts section and `assets/fonts/JetBrainsMono-*.ttf`.
 TextStyle appMono(BuildContext context, {double size = 12, FontWeight? weight, Color? color}) {
   return TextStyle(
-    fontFamily: 'monospace',
+    fontFamily: 'JetBrainsMono',
     fontSize: size,
     fontWeight: weight ?? FontWeight.w400,
     color: color ?? context.tokens.textPrimary,

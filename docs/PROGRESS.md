@@ -47,8 +47,8 @@ docs/
 
 ## Current state
 
-**Milestone:** 1b closed ✅. Next up → **1c** (review submission + Sync Up + conflicts). See IMPLEMENTATION.md §6.3; task board will be expanded here when 1c begins.
-**Last updated:** 2026-04-20.
+**Milestone:** 1c 🟡 (in progress — T1–T6 green, T7 navigation wiring + close-out QA remaining). 1d ⏳ pending. Phase 1 completion plan: [`docs/implementation-plan2.md`](implementation-plan2.md).
+**Last updated:** 2026-04-21.
 
 ### Completed before 1a proper (UI spike)
 
@@ -111,9 +111,45 @@ Per IMPLEMENTATION.md §6.2. Fresh subagent per task; sequential execution withi
 | T11 | Pen-latency measurement against NFR-1 (<25 ms p95) on OPD2504 | ✅ |
 | M1b-close | QA round + triage + Medium/Low to Issues.md | ✅ |
 
-### Milestones 1c–1d
+### Milestone 1c task board — review submission + Sync Up + conflicts (in progress)
 
-See IMPLEMENTATION.md §6.3–6.4. Task boards expand here when each milestone starts.
+Per IMPLEMENTATION.md §6.3. Status reconstructed from the commit log on 2026-04-21; next-action column notes what stands between the task and "done".
+
+| # | Task | Status | Evidence / next action |
+|---|---|---|---|
+| T1 | `ReviewSerializer` golden tests (`03-review.md` structure) | ✅ | `f9ae728` + follow-up `2b4fdc4` |
+| T2 | `ChangelogWriter` (append idempotency + format) | ✅ | `bdc985a` + fix `5725d6f` |
+| T3 | `CommitPlanner.planReview` + `.planApprove` | ✅ | `434e401` + split `1c5813e` |
+| T4 | `ConflictResolver` remote-wins archival | ✅ | `bde0a08` |
+| T5 | `SyncService.syncUp` + `ConflictResolver` wiring | ✅ | `ef48f92` + follow-up `30799b8` |
+| T6 | Integration test: diverged-branch conflict E2E | ✅ on host | `c4bc604` + `37a3e71`; on-device run pending until the two Issues.md High git bugs below are fixed |
+| T7 | Review panel UI + Submit + Approve + conflict banner + auto-save timer | 🟡 | `5a3fbae` + `b4deb27` + `2f43b04` + `8df5fb8` + `0cc6fb2` landed; **still unbuilt:** JobList→SpecReader→Canvas→ReviewPanel navigation wiring, review-draft auto-save timer |
+| M1c-close | QA + triage + fix | ⏳ | `docs/_m1c_qa_round1/` scaffolding present locally; needs to be run once navigation wiring + two Issues.md High bugs (claude-jobs branch bootstrap, resetHard ref-name) are fixed |
+
+### Milestone 1d task board — polish + NFRs (pending)
+
+Per IMPLEMENTATION.md §6.4. Will expand as tasks start.
+
+| # | Task | Status |
+|---|---|---|
+| T1 | `ChangelogViewer` — parse `## Changelog` across all jobs, render a timeline | ⏳ |
+| T2 | Settings: "Export backups" via Storage Access Framework | ⏳ |
+| T3 | Recovery flows: corrupted `.git` surfacing + expired-token re-auth polish | ⏳ |
+| T4 | Cold-start NFR-2 tuning (preload last-opened job metadata) | ⏳ |
+| T5 | Battery profiling against NFR-8 (4+ hours active review on OPD2504) | ⏳ |
+| M1d-close | QA + triage + NFR measurement gates (NFR-1 real stylus, NFR-7 TalkBack, NFR-9 LRU, NFR-10 sync) | ⏳ |
+
+### Cross-milestone: latent defects surfaced during emulator verification (2026-04-21)
+
+Not on the original M1c/M1d task lists, but blocking real-device sync.
+
+| # | Task | Status | Evidence / next action |
+|---|---|---|---|
+| X1 | `libgit2dart` has no Android plugin — APK shipped no `libgit2.so` for any ABI | 🟡 | Forked locally at `../libgit2dart-fork/` with x86_64 + arm64-v8a + armeabi-v7a NDK builds; integration test `integration_test/libgit2_android_load_test.dart` passes on emulator (`b91a11a`). **Remaining:** OpenSSL cross-compile so HTTPS works against github.com; publish fork as git repo; on-tablet smoke test. See Issues.md "libgit2dart has no Android plugin" entry. |
+| X2 | Inter + JetBrains Mono bundled, replacing system-fallback Roboto on breadcrumbs | ✅ | `assets/fonts/*` + `pubspec.yaml` + `lib/ui/theme/app_theme.dart` — closes Issues.md:21-26 |
+| X3 | `claude-jobs` branch bootstrap from `origin/claude-jobs` missing in `GitAdapter.cloneOrOpen` | ⏳ | Issues.md High; fix planned in `_handleCloneOrOpen` |
+| X4 | `ConflictResolver.archiveAndReset` passes ref-name to SHA-only `resetHard` | ⏳ | Issues.md High; fix planned in `_handleResetHard` (resolve via `Revparse.single`) |
+| X5 | RepoPicker UI (deferred since M1a) — blocks real-device JobList | ⏳ | New route between SignIn and JobList. Current `DEV_SEED_ENABLED` dart-define stubs past it for dev-loop work |
 
 ## Change log
 
