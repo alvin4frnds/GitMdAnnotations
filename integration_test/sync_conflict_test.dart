@@ -189,8 +189,11 @@ void _seedOrigin(Directory originBare, Directory tmpRoot) {
 }
 
 /// Clones [remoteUrl] into [workdir] and creates a local
-/// `refs/heads/claude-jobs`. Real `cloneOrOpen` checks out only `main`;
-/// the M1c `claude-jobs` bootstrap path is still deferred.
+/// `refs/heads/claude-jobs`. Duplicate of the bootstrap logic now
+/// inside `GitAdapter.cloneOrOpen` (`_bootstrapLocalSidecarBranch`);
+/// kept here so the test harness matches the exact sequence used
+/// before that fix landed, pinning that the adapter is a pure
+/// superset of the historical workaround.
 void _bootstrapWorkdirWithJobsBranch(Directory workdir, String remoteUrl) {
   final repo = git2.Repository.clone(
     url: remoteUrl,

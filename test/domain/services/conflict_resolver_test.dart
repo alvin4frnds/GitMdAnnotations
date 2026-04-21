@@ -24,6 +24,12 @@ class _RecordingFake extends FakeGitPort {
   }
 
   @override
+  Future<void> fetch(RepoRef repo, {required String branch}) {
+    calls.add('fetch:$branch');
+    return super.fetch(repo, branch: branch);
+  }
+
+  @override
   Future<void> resetHard(String ref) {
     calls.add('reset:$ref');
     return super.resetHard(ref);
@@ -48,7 +54,8 @@ void main() {
       expect(fake.calls.first, 'backup:claude-jobs@$_backupRoot');
     });
 
-    test('calls backup -> resetHard(origin/claude-jobs) -> mergeInto in order',
+    test(
+        'calls backup -> fetch claude-jobs + main -> reset -> merge in order',
         () async {
       final fake = _RecordingFake();
       final resolver = ConflictResolver(git: fake);
@@ -57,6 +64,14 @@ void main() {
 
       expect(fake.calls, [
         'backup:claude-jobs@$_backupRoot',
+        // Fetch is mandatory before reset: push only observed the remote
+        // state over the protocol to detect NFF; refs/remotes/origin/*
+        // locally is still the stale pre-push snapshot. Without this
+        // fetch, resetHard resets to the stale local view and silently
+        // drops any commits another device just pushed. Pinned by
+        // integration_test/sync_conflict_test.dart.
+        'fetch:claude-jobs',
+        'fetch:main',
         'reset:origin/claude-jobs',
         'merge:origin/main->claude-jobs',
       ]);

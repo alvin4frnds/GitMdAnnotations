@@ -120,6 +120,12 @@ PushErrorCategory classifyPushError(Object error) {
     'failed to push some refs',
     'tip of your current branch is behind',
     'pushed branch tip is behind',
+    // libgit2 1.5 native phrasing observed by
+    // integration_test/sync_conflict_test.dart against a file:// bare
+    // repo on 2026-04-21. Semantically a fetch-first-then-merge
+    // divergence, treated as non-fast-forward.
+    'contains commits that are not present locally',
+    'reference that you are trying to update on the remote contains',
   ];
   if (nonFastForwardNeedles.any(msg.contains)) {
     return PushErrorCategory.nonFastForward;

@@ -109,8 +109,56 @@ GitResponse _handleCloneOrOpen(_IsolateState state, GitReqCloneOrOpen req) {
     checkoutBranch: req.defaultBranch,
     callbacks: callbacks,
   );
+  _bootstrapLocalSidecarBranch(repo);
   state.register(req.workdir, repo);
   return GitResponseOk<void>(id: req.id, value: null);
+}
+
+/// After a fresh clone, ensure `refs/heads/claude-jobs` exists locally
+/// whenever the origin has a `claude-jobs` branch. Fixes the
+/// `Issues.md` High: `Repository.clone` only creates `refs/heads/<default>`
+/// plus remote-tracking refs, so the first `adapter.commit(...,
+/// branch: 'claude-jobs')` then fails inside `checkoutBranch` because the
+/// local sidecar branch doesn't exist — only `refs/remotes/origin/claude-jobs`
+/// does. `integration_test/sync_conflict_test.dart` previously worked
+/// around this with a direct libgit2 call before invoking the adapter;
+/// that workaround becomes unnecessary once this lands.
+///
+/// No-op when the origin has no `claude-jobs` branch (the create-from-main
+/// path is `SyncService.syncDown`'s responsibility — see the separate
+/// "claude-jobs bootstrap from origin/main" entry in Issues.md).
+void _bootstrapLocalSidecarBranch(git2.Repository repo) {
+  const sidecar = 'claude-jobs';
+  // Is there already a local claude-jobs? If yes, nothing to do.
+  try {
+    git2.Branch.lookup(repo: repo, name: sidecar);
+    return;
+  } on git2.LibGit2Error {
+    // Fall through — not found is the expected case after clone.
+  }
+  // Find the remote-tracking branch.
+  final git2.Branch remote;
+  try {
+    remote = git2.Branch.lookup(
+      repo: repo,
+      name: 'origin/$sidecar',
+      type: git2.GitBranch.remote,
+    );
+  } on git2.LibGit2Error {
+    // Origin has no sidecar branch yet — create-from-main is handled elsewhere.
+    return;
+  }
+  final targetOid = remote.target;
+  final targetCommit = git2.Commit.lookup(repo: repo, oid: targetOid);
+  final local = git2.Branch.create(
+    repo: repo,
+    name: sidecar,
+    target: targetCommit,
+  );
+  // Track `origin/<sidecar>` so push refspec matching + future NFF
+  // detection see this as a real tracking branch rather than a
+  // fresh-branch push.
+  local.setUpstream('origin/$sidecar');
 }
 
 GitResponse _handleFetch(_IsolateState state, GitReqFetch req) {
@@ -126,10 +174,7 @@ GitResponse _handleFetch(_IsolateState state, GitReqFetch req) {
 GitResponse _handleMerge(_IsolateState state, GitReqMerge req) {
   final repo = _onlyRepo(state);
   checkoutBranch(repo, req.target);
-  final sourceRef = git2.Reference.lookup(
-    repo: repo,
-    name: 'refs/heads/${req.sourceBranch}',
-  );
+  final sourceRef = _lookupLocalOrRemoteRef(repo, req.sourceBranch);
   final analysis = git2.Merge.analysis(repo: repo, theirHead: sourceRef.target);
   final result = analysis.result;
   if (result.contains(git2.GitMergeAnalysis.upToDate)) {
@@ -237,9 +282,47 @@ GitResponse _handlePush(_IsolateState state, GitReqPush req) {
 
 GitResponse _handleResetHard(_IsolateState state, GitReqResetHard req) {
   final repo = _onlyRepo(state);
-  final oid = git2.Oid.fromSHA(repo: repo, sha: req.ref);
+  final oid = _resolveRefToOid(repo, req.ref);
   repo.reset(oid: oid, resetType: git2.GitReset.hard);
   return GitResponseOk<void>(id: req.id, value: null);
+}
+
+/// Hex-SHA fast path, RevParse fallback for anything else (branch refs
+/// like `'origin/claude-jobs'`, tag names, `'HEAD~3'`, etc.).
+///
+/// Fixes the `Issues.md` High where callers like
+/// `ConflictResolver.archiveAndReset` pass `'origin/claude-jobs'` but
+/// `git2.Oid.fromSHA` validates against a hex regex and throws
+/// `ArgumentError` for non-hex input. Historical behavior preserved for
+/// the hex path so existing SHA-based callers (integration tests, future
+/// direct-SHA resets) are unchanged.
+git2.Oid _resolveRefToOid(git2.Repository repo, String ref) {
+  if (_hexSha.hasMatch(ref)) {
+    return git2.Oid.fromSHA(repo: repo, sha: ref);
+  }
+  final obj = git2.RevParse.single(repo: repo, spec: ref);
+  if (obj is git2.Commit) return obj.oid;
+  if (obj is git2.Tag) return obj.targetOid;
+  throw ArgumentError.value(
+    ref,
+    'ref',
+    'resolved to ${obj.runtimeType}, not a commit or tag',
+  );
+}
+
+final _hexSha = RegExp(r'^[0-9a-fA-F]{7,40}$');
+
+/// Resolves [name] to a [git2.Reference], trying `refs/heads/<name>`
+/// first (local branch) and then `refs/remotes/<name>` (remote-tracking).
+/// Lets the merge/sync code pass either `'main'` (local) or
+/// `'origin/main'` (remote-tracking) without caring about the namespace.
+git2.Reference _lookupLocalOrRemoteRef(git2.Repository repo, String name) {
+  try {
+    return git2.Reference.lookup(repo: repo, name: 'refs/heads/$name');
+  } on git2.LibGit2Error {
+    // Fall through — not a local branch, try remote-tracking.
+  }
+  return git2.Reference.lookup(repo: repo, name: 'refs/remotes/$name');
 }
 
 Future<GitResponse> _handleBackup(

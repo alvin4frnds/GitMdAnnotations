@@ -35,6 +35,10 @@ void main() {
             'behind its remote counterpart',
         'failed to push some refs to https://github.com/owner/repo.git',
         ' ! [rejected]        main -> main (non-fast-forward)',
+        // libgit2 1.5 native — caught end-to-end by
+        // integration_test/sync_conflict_test.dart 2026-04-21:
+        'cannot push because a reference that you are trying to update on '
+            'the remote contains commits that are not present locally.',
       ];
 
       for (final raw in nonFastForwardMessages) {

@@ -42,6 +42,15 @@ class ConflictResolver {
       'claude-jobs',
       backupRoot: backupRoot,
     );
+    // Refresh the local remote-tracking refs before reset. Push observed
+    // the remote state over the wire to detect non-fast-forward, but it
+    // does not update `refs/remotes/origin/<branch>` — so
+    // `resetHard('origin/claude-jobs')` without this fetch would reset to
+    // the stale pre-push snapshot and silently drop remote commits added
+    // by other devices. integration_test/sync_conflict_test.dart surfaces
+    // this — the remote-added file is only visible after the fetch.
+    await git.fetch(repo, branch: 'claude-jobs');
+    await git.fetch(repo, branch: 'main');
     await git.resetHard('origin/claude-jobs');
     await git.mergeInto('origin/main', target: 'claude-jobs');
     return backup;
