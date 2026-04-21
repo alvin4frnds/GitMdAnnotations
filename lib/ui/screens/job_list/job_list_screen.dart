@@ -62,7 +62,7 @@ class _LeftRail extends ConsumerWidget {
     final counts = _phaseCounts(async);
     final repo = ref.watch(currentRepoProvider);
     return Container(
-      width: 208,
+      width: 416,
       decoration: BoxDecoration(
         color: t.surfaceElevated,
         border: Border(right: BorderSide(color: t.borderSubtle)),
