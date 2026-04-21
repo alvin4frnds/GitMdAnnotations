@@ -27,6 +27,20 @@ class ReviewSerializer {
   /// future extension to keep the MVP surface tight.
   static const _letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
+  /// Excel-style labels: A, B, … Z, AA, AB, … ZZ, AAA, … Converts a
+  /// zero-based stroke-group index into its label. Unbounded; in
+  /// practice submits stay well under the three-letter range.
+  static String _labelFor(int index) {
+    final buf = StringBuffer();
+    var n = index;
+    while (true) {
+      buf.write(_letters[n % 26]);
+      n = n ~/ 26 - 1;
+      if (n < 0) break;
+    }
+    return buf.toString().split('').reversed.join();
+  }
+
   /// Renders a review markdown document. Output uses LF newlines and always
   /// ends in exactly one trailing newline.
   ///
@@ -116,7 +130,7 @@ class ReviewSerializer {
     buf.writeln('## Spatial references');
     buf.writeln();
     for (var i = 0; i < groups.length; i++) {
-      buf.writeln('- Stroke group ${_letters[i]} \u2192 ${_anchorRef(groups[i].anchor)}');
+      buf.writeln('- Stroke group ${_labelFor(i)} \u2192 ${_anchorRef(groups[i].anchor)}');
     }
     buf.writeln();
   }
@@ -135,13 +149,15 @@ class ReviewSerializer {
   }
 
   void _assertStrokeGroupCapacity(int count) {
-    if (count > _letters.length) {
+    if (count < 0) {
       throw StateError(
-        'ReviewSerializer supports at most ${_letters.length} stroke groups '
-        '(A..Z); received $count. Multi-letter labels (AA, AB, ...) are a '
-        'deferred future extension.',
+        'ReviewSerializer received a negative stroke-group count ($count)',
       );
     }
+    // Upper bound removed: [_labelFor] emits Excel-style labels (AA, AB,
+    // … ZZ, AAA, …), unbounded in practice. The prior A..Z cap was a
+    // placeholder from the initial serializer and started blowing up
+    // real submits once users began marking up long specs.
   }
 
   /// `writeln` appends a trailing `\n` after each block, which leaves a

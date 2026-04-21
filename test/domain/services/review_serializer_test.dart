@@ -214,35 +214,8 @@ void main() {
     });
   });
 
-  group('ReviewSerializer — stroke-group letter overflow', () {
-    test('27 stroke groups throws StateError with actionable message', () {
-      final clock = FakeClock(DateTime(2026, 4, 20, 9, 32));
-      final serializer = ReviewSerializer(clock: clock);
-      final groups = List<StrokeGroup>.generate(
-        27,
-        (i) => _mdGroup(line: i + 1, ts: '2026-04-20T09:00:00Z'),
-      );
-
-      expect(
-        () => serializer.buildReviewMd(
-          job: _job('spec-overflow'),
-          source: _md(sha: 'abc'),
-          questions: const [],
-          answers: const {},
-          freeFormNotes: '',
-          strokeGroups: groups,
-        ),
-        throwsA(
-          isA<StateError>().having(
-            (e) => e.message,
-            'message',
-            contains('26'),
-          ),
-        ),
-      );
-    });
-
-    test('26 stroke groups succeeds and last letter is Z', () {
+  group('ReviewSerializer — stroke-group labeling', () {
+    test('26 stroke groups produces A..Z labels', () {
       final clock = FakeClock(DateTime(2026, 4, 20, 9, 32));
       final serializer = ReviewSerializer(clock: clock);
       final groups = List<StrokeGroup>.generate(
@@ -259,7 +232,31 @@ void main() {
         strokeGroups: groups,
       );
 
+      expect(out, contains('- Stroke group A → line 1'));
       expect(out, contains('- Stroke group Z → line 26'));
+    });
+
+    test('27th group rolls over to AA, and 52nd to AZ, 53rd to BA', () {
+      final clock = FakeClock(DateTime(2026, 4, 20, 9, 32));
+      final serializer = ReviewSerializer(clock: clock);
+      final groups = List<StrokeGroup>.generate(
+        53,
+        (i) => _mdGroup(line: i + 1, ts: '2026-04-20T09:00:00Z'),
+      );
+
+      final out = serializer.buildReviewMd(
+        job: _job('spec-long'),
+        source: _md(sha: 'abc'),
+        questions: const [],
+        answers: const {},
+        freeFormNotes: '',
+        strokeGroups: groups,
+      );
+
+      expect(out, contains('- Stroke group Z → line 26'));
+      expect(out, contains('- Stroke group AA → line 27'));
+      expect(out, contains('- Stroke group AZ → line 52'));
+      expect(out, contains('- Stroke group BA → line 53'));
     });
   });
 
