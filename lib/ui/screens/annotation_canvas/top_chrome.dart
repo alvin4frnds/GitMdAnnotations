@@ -13,6 +13,7 @@ class AnnotationTopChrome extends StatelessWidget {
   const AnnotationTopChrome({
     required this.onUndo,
     required this.onRedo,
+    this.onOpenReviewPanel,
     super.key,
   });
 
@@ -26,6 +27,12 @@ class AnnotationTopChrome extends StatelessWidget {
   /// Tapped when the user taps the redo button. Same always-enabled
   /// policy as [onUndo].
   final VoidCallback onRedo;
+
+  /// Tapped when the user taps the "Review panel ->" link. Null leaves
+  /// the link inert (fine for the mockup surface); the wired canvas
+  /// screen supplies a callback that pushes `ReviewPanelScreen(jobRef:)`
+  /// onto the navigator.
+  final VoidCallback? onOpenReviewPanel;
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +70,7 @@ class AnnotationTopChrome extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           TextButton(
-            onPressed: () {},
+            onPressed: onOpenReviewPanel,
             child: Text(
               'Review panel \u2192',
               style: TextStyle(color: t.textPrimary, fontSize: 13),

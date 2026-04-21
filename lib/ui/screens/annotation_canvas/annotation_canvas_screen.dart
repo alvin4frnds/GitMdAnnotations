@@ -7,6 +7,7 @@ import '../../../domain/entities/job_ref.dart';
 import '../../../domain/entities/pointer_sample.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/ink_overlay/ink_overlay.dart';
+import '../review_panel/review_panel_screen.dart';
 import 'left_rail.dart';
 import 'main_content.dart';
 import 'top_chrome.dart';
@@ -102,6 +103,16 @@ class _AnnotationCanvasScreenState
   void _redo() =>
       ref.read(annotationControllerProvider(widget.jobRef).notifier).redo();
 
+  void _openReviewPanel() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          body: ReviewPanelScreen(jobRef: widget.jobRef),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
@@ -115,7 +126,11 @@ class _AnnotationCanvasScreenState
       color: t.surfaceBackground,
       child: Column(
         children: [
-          AnnotationTopChrome(onUndo: _undo, onRedo: _redo),
+          AnnotationTopChrome(
+            onUndo: _undo,
+            onRedo: _redo,
+            onOpenReviewPanel: _openReviewPanel,
+          ),
           Container(height: 1, color: t.borderSubtle),
           Expanded(
             child: Row(
