@@ -243,6 +243,7 @@ class _AnnotationCanvasScreenState
                     currentStrokeWidth: strokeWidth,
                     currentStrokeOpacity: strokeOpacity,
                     drawingEnabled: state.drawingEnabled,
+                    hasActiveStylusStroke: state.hasActiveStroke,
                     onSample: _onSample,
                     nowProvider: ref.read(clockProvider).now,
                   ),
