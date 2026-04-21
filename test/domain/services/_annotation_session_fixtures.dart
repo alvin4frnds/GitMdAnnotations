@@ -20,6 +20,7 @@ AnnotationSession newSession({
   int undoDepth = 50,
   FakeIdGenerator? gen,
   FakeClock? clock,
+  Set<PointerKind>? allowedPointerKinds,
 }) {
   return AnnotationSession(
     initialAnchor: initial ?? markdownAnchor,
@@ -27,6 +28,8 @@ AnnotationSession newSession({
     clock: clock ?? FakeClock(at ?? baseInstant),
     idGenerator: gen ?? FakeIdGenerator(),
     undoDepth: undoDepth,
+    allowedPointerKinds:
+        allowedPointerKinds ?? const {PointerKind.stylus},
   );
 }
 

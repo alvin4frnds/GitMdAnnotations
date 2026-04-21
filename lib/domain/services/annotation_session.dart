@@ -20,6 +20,7 @@ class AnnotationSession {
     required Clock clock,
     required IdGenerator idGenerator,
     this.undoDepth = 50,
+    this.allowedPointerKinds = const {PointerKind.stylus},
   })  : _tool = tool,
         _clock = clock,
         _ids = idGenerator,
@@ -27,7 +28,21 @@ class AnnotationSession {
     if (undoDepth < 1) {
       throw ArgumentError.value(undoDepth, 'undoDepth', 'must be >= 1');
     }
+    if (allowedPointerKinds.isEmpty) {
+      throw ArgumentError.value(
+        allowedPointerKinds,
+        'allowedPointerKinds',
+        'must contain at least one kind',
+      );
+    }
   }
+
+  /// Pointer kinds that are allowed to drive strokes. Defaults to
+  /// `{PointerKind.stylus}` — palm rejection per PRD §5.4 FR-1.16/FR-1.17.
+  /// Desktop/emulator dev loops can widen this set via bootstrap so mouse
+  /// events exercise the annotation canvas; production tablet builds keep
+  /// the default.
+  final Set<PointerKind> allowedPointerKinds;
 
   /// Maximum number of most-recent strokes that can be undone. Strokes
   /// drawn earlier than the cap remain in [snapshot] but cannot be popped
@@ -62,7 +77,7 @@ class AnnotationSession {
   // -- Stroke input ----------------------------------------------------
 
   void beginStroke(PointerSample sample, {required Anchor anchor}) {
-    if (sample.kind != PointerKind.stylus) {
+    if (!allowedPointerKinds.contains(sample.kind)) {
       // Palm rejection (rule 1). Silent no-op.
       return;
     }
@@ -79,14 +94,14 @@ class AnnotationSession {
   void extendStroke(PointerSample sample) {
     final active = _active;
     if (active == null) return; // idle — drop stray move event
-    if (sample.kind != PointerKind.stylus) return;
+    if (!allowedPointerKinds.contains(sample.kind)) return;
     active.points.add(_pointFrom(sample));
   }
 
   void endStroke(PointerSample sample) {
     final active = _active;
     if (active == null) return; // idle — drop stray up event
-    if (sample.kind == PointerKind.stylus) {
+    if (allowedPointerKinds.contains(sample.kind)) {
       active.points.add(_pointFrom(sample));
     }
     _commit(active);

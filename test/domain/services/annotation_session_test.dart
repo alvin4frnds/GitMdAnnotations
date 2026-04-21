@@ -319,5 +319,72 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test('throws ArgumentError when allowedPointerKinds is empty '
+        '(session with no allowed kinds would silently drop everything)', () {
+      expect(
+        () => AnnotationSession(
+          initialAnchor: markdownAnchor,
+          tool: InkTool.pen,
+          clock: FakeClock(baseInstant),
+          idGenerator: FakeIdGenerator(),
+          allowedPointerKinds: const {},
+        ),
+        throwsArgumentError,
+      );
+    });
+  });
+
+  // Dev-loop — widened allowedPointerKinds --------------------------------
+  // Covers the `--dart-define=ALLOW_MOUSE_ANNOTATION=true` escape hatch
+  // used by the Android emulator / desktop dev loop. Tablet release builds
+  // never set this, so the default-stylus tests above still pin production
+  // behavior.
+  group('Dev-loop — widened allowedPointerKinds', () {
+    const devKinds = {
+      PointerKind.stylus,
+      PointerKind.mouse,
+      PointerKind.touch,
+    };
+
+    test('beginStroke with PointerKind.mouse activates a stroke when mouse '
+        'is in allowedPointerKinds', () {
+      final s = newSession(allowedPointerKinds: devKinds);
+      s.beginStroke(kindSample(PointerKind.mouse), anchor: markdownAnchor);
+      expect(s.hasActiveStroke, isTrue);
+    });
+
+    test('full mouse begin→extend→end commits a stroke with every sample',
+        () {
+      final s = newSession(allowedPointerKinds: devKinds);
+      PointerSample mouseAt(double x, double y) => PointerSample(
+            x: x,
+            y: y,
+            pressure: 0.5,
+            kind: PointerKind.mouse,
+            timestamp: baseInstant,
+          );
+      s.beginStroke(mouseAt(0, 0), anchor: markdownAnchor);
+      s.extendStroke(mouseAt(5, 5));
+      s.extendStroke(mouseAt(10, 10));
+      s.endStroke(mouseAt(15, 15));
+      final pts = s.snapshot().single.strokes.single.points;
+      expect(pts.map((p) => p.x).toList(), [0, 5, 10, 15]);
+    });
+
+    test('default session (no widened set) still drops mouse — the dev flag '
+        'must opt in explicitly', () {
+      final s = newSession(); // default: {stylus}
+      s.beginStroke(kindSample(PointerKind.mouse), anchor: markdownAnchor);
+      expect(s.hasActiveStroke, isFalse);
+      expect(s.snapshot(), isEmpty);
+    });
+
+    test('trackpad still rejected even with mouse+touch widened '
+        '(dev set deliberately excludes trackpad)', () {
+      final s = newSession(allowedPointerKinds: devKinds);
+      s.beginStroke(kindSample(PointerKind.trackpad), anchor: markdownAnchor);
+      expect(s.hasActiveStroke, isFalse);
+    });
   });
 }
