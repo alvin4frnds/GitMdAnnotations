@@ -27,6 +27,10 @@ desktop.ini
 backups/
 scratch/
 
+# Claude Code local state (scheduling, plugin metadata) — per-machine,
+# should not enter source control.
+.claude/
+
 # Secrets and local config
 .env
 .env.local
