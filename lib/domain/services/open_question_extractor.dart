@@ -22,10 +22,16 @@ class OpenQuestion {
 /// Parses the `## Open questions` section of a spec markdown file into
 /// a flat list of [OpenQuestion]s. See IMPLEMENTATION.md §3.5 / §4.3.
 ///
-/// Recognised entry forms inside the section:
+/// Recognised entry forms inside the section (tried in order):
 ///   * `### Q<digits>[a-z]*: <body>`   (any level-3+ heading)
-///   * `<N>. Q<digits>[a-z]*: <body>`  (numbered list)
-///   * `- Q<digits>[a-z]*: <body>`     (bullet list)
+///   * `<N>. Q<digits>[a-z]*: <body>`  (numbered list with Q prefix)
+///   * `- Q<digits>[a-z]*: <body>`     (bullet list with Q prefix)
+///   * `<N>. <body>`                   (bare numbered question)
+///   * `- <body>`                      (bare bullet question)
+///
+/// Bare forms synthesise an id of `Q<position>` starting at 1 within the
+/// section so users don't have to type the `Q1:` prefix explicitly for
+/// the review panel's right-hand cards to appear.
 ///
 /// Section header matching is case-insensitive with trim. The section
 /// ends at the next `## ` heading or EOF. Continuation lines before a
@@ -41,6 +47,8 @@ class OpenQuestionExtractor {
       RegExp(r'^\s*\d+\.\s+(Q\d+[a-z]*)\s*:\s*(.*)$');
   static final RegExp _bullet =
       RegExp(r'^\s*-\s+(Q\d+[a-z]*)\s*:\s*(.*)$');
+  static final RegExp _bareNumbered = RegExp(r'^\s*\d+\.\s+(.+)$');
+  static final RegExp _bareBullet = RegExp(r'^\s*-\s+(.+)$');
   static final RegExp _anyLevel2 = RegExp(r'^\s*##\s+');
 
   List<OpenQuestion> extract(String markdown) {
@@ -57,6 +65,7 @@ class OpenQuestionExtractor {
     final out = <OpenQuestion>[];
     String? currentId;
     final body = StringBuffer();
+    var bareCounter = 0;
     void flush() {
       if (currentId != null) {
         out.add(OpenQuestion(id: currentId!, body: body.toString().trim()));
@@ -76,6 +85,14 @@ class OpenQuestionExtractor {
         flush();
         currentId = match.$1;
         if (match.$2.isNotEmpty) body.write(match.$2);
+        continue;
+      }
+      final bare = _matchBare(line);
+      if (bare != null) {
+        flush();
+        bareCounter += 1;
+        currentId = 'Q$bareCounter';
+        body.write(bare);
         continue;
       }
       if (line.trim().isEmpty) {
@@ -98,6 +115,18 @@ class OpenQuestionExtractor {
     if (n != null) return (n.group(1)!, n.group(2)!.trim());
     final b = _bullet.firstMatch(line);
     if (b != null) return (b.group(1)!, b.group(2)!.trim());
+    return null;
+  }
+
+  /// Bare (Q-prefix-less) fallback — only invoked after every explicit
+  /// form has failed. Returns `null` for lines that aren't list items at
+  /// all (blank, prose, code block, etc.) so continuation-line handling
+  /// still applies. Caller is responsible for synthesising the Q<n> id.
+  String? _matchBare(String line) {
+    final n = _bareNumbered.firstMatch(line);
+    if (n != null) return n.group(1)!.trim();
+    final b = _bareBullet.firstMatch(line);
+    if (b != null) return b.group(1)!.trim();
     return null;
   }
 }
