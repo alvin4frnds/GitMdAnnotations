@@ -46,16 +46,34 @@ class _IsolateState {
   git2.Repository openOrReuse(String workdir) {
     final cached = _repos[workdir];
     if (cached != null) return cached;
+    // Phase 1 is explicitly single-repo: close any previous entries so
+    // `_onlyRepo` doesn't trip when the user switches repos at runtime.
+    _closeOthers(workdir);
     final repo = git2.Repository.open(workdir);
     _repos[workdir] = repo;
     return repo;
   }
 
   void register(String workdir, git2.Repository repo) {
+    _closeOthers(workdir);
     _repos[workdir] = repo;
   }
 
   bool isTracked(String workdir) => _repos.containsKey(workdir);
+
+  /// Frees and drops every tracked repo whose workdir isn't [keep]. Used
+  /// by the register/open paths so switching repos at runtime doesn't
+  /// accumulate `state._repos` entries — Phase 1's `_onlyRepo` guard
+  /// requires exactly one tracked repo.
+  void _closeOthers(String keep) {
+    final stale = _repos.keys.where((k) => k != keep).toList();
+    for (final w in stale) {
+      try {
+        _repos[w]?.free();
+      } catch (_) {}
+      _repos.remove(w);
+    }
+  }
 
   void closeAll() {
     for (final repo in _repos.values) {
