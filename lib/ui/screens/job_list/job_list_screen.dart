@@ -14,6 +14,7 @@ import '../../../domain/entities/source_kind.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../changelog_viewer/changelog_viewer_screen.dart';
+import '../settings/settings_screen.dart';
 import '../spec_reader_md/spec_reader_md_screen.dart';
 import '../spec_reader_pdf/spec_reader_pdf_screen.dart';
 
@@ -86,6 +87,10 @@ class _LeftRail extends StatelessWidget {
           _ChangelogNavButton(
             onPressed: () => _openChangelog(context),
           ),
+          const SizedBox(height: 8),
+          _SettingsNavButton(
+            onPressed: () => _openSettings(context),
+          ),
         ],
       ),
     );
@@ -98,6 +103,16 @@ class _LeftRail extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => const Scaffold(body: ChangelogViewerScreen()),
+      ),
+    );
+  }
+
+  /// Pushes the Settings screen (M1d-T2). Sibling to [_openChangelog];
+  /// the Settings screen owns its own scaffold + back button.
+  void _openSettings(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const SettingsScreen(),
       ),
     );
   }
@@ -281,6 +296,40 @@ class _ChangelogNavButton extends StatelessWidget {
             Icon(Icons.history_rounded, size: 16, color: t.textPrimary),
             const SizedBox(width: 6),
             const Text('Changelog'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Secondary nav button that pushes the Settings screen (M1d-T2).
+/// Same ghost/outlined treatment as [_ChangelogNavButton].
+class _SettingsNavButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _SettingsNavButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: t.textPrimary,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          side: BorderSide(color: t.borderSubtle),
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.settings_rounded, size: 16, color: t.textPrimary),
+            const SizedBox(width: 6),
+            const Text('Settings'),
           ],
         ),
       ),

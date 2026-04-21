@@ -8,11 +8,13 @@ import 'app/providers/auth_providers.dart';
 import 'app/providers/pdf_providers.dart';
 import 'app/providers/repo_picker_providers.dart';
 import 'app/providers/review_providers.dart';
+import 'app/providers/settings_providers.dart';
 import 'app/providers/spec_providers.dart';
 import 'app/providers/sync_providers.dart';
 import 'domain/entities/pointer_sample.dart';
 import 'domain/ports/secure_storage_port.dart';
 import 'infra/auth/github_oauth_adapter.dart';
+import 'infra/backup/shared_storage_backup_export_adapter.dart';
 import 'infra/clock/system_clock.dart';
 import 'infra/fs/fs_adapter.dart';
 import 'infra/git/git_adapter.dart';
@@ -80,6 +82,8 @@ ProviderScope buildAppScope({
       pdfRasterPortProvider.overrideWithValue(PdfxAdapter()),
       pngFlattenerProvider.overrideWithValue(PngFlattenerAdapter()),
       gitHubReposPortProvider.overrideWithValue(DioGitHubReposAdapter()),
+      backupExportPortProvider
+          .overrideWithValue(SharedStorageBackupExportAdapter()),
       gitPortProvider.overrideWith((ref) {
         // Capture `ref` so the credentials loader stays lazy; resolving
         // storage at provider-define time would require a container which
