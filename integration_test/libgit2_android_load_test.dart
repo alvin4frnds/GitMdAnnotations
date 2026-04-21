@@ -35,12 +35,14 @@ void main() {
 
   test('libgit2 reports its compiled-in features', () {
     final features = git2.Libgit2.features;
-    // Our Android build was configured with -DUSE_SSH=OFF -DUSE_HTTPS=OFF
-    // -DREGEX_BACKEND=builtin, so expected features are just the core
-    // THREADS flag. This assertion documents the build config and will
-    // surface a change if the .so is swapped.
+    // Our Android build was configured with
+    //   -DUSE_HTTPS=mbedTLS  -DUSE_SSH=OFF  -DREGEX_BACKEND=builtin
+    // linked against mbedTLS 2.28.8 LTS. This assertion documents the
+    // build config and will surface a regression if the .so is swapped
+    // for one missing HTTPS (which would break every real github.com
+    // clone/fetch/push with "compiled without HTTPS support").
     expect(features, contains(git2.GitFeature.threads));
-    expect(features, isNot(contains(git2.GitFeature.https)));
+    expect(features, contains(git2.GitFeature.https));
     expect(features, isNot(contains(git2.GitFeature.ssh)));
   });
 }

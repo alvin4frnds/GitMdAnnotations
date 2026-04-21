@@ -62,19 +62,10 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 - **Detail:** `_handleResetHard` calls `git2.Oid.fromSHA(repo: repo, sha: req.ref)`, which throws `ArgumentError('<ref> is not a valid sha hex string')` for anything that isn't a 7–40-char hex string. `ConflictResolver.archiveAndReset` passes the string `'origin/claude-jobs'` (a ref name, not a SHA). Only `FakeGitPort.resetHard` currently accepts a ref-name string (by looking it up in its snapshot map). Against the real adapter, the conflict-path Sync Up will always throw `ArgumentError` after backup, instead of resetting. The T6 integration test will surface this on the connected tablet.
 - **Proposed fix:** In `_handleResetHard`, if `req.ref` is not hex (or equivalently: resolve via `Revparse.single(repo: repo, spec: req.ref).oid` first, fall back to `Oid.fromSHA` for raw SHAs). Alternatively, promote the resolution up into `ConflictResolver` and pass already-resolved SHAs (cleaner domain semantics but costs a new port method to resolve `origin/<branch>`).
 
-### Issue: libgit2 Android build is compiled with USE_HTTPS=OFF — can't sync against github.com
-- **Severity:** High (for real sync against public remotes) — the fork's Android `libgit2.so` has no HTTPS transport support. `file://` remotes work (exercised by `integration_test/sync_conflict_test.dart`). `https://github.com/...` clones and pushes will fail with libgit2 error "this version of libgit2 was compiled without HTTPS support".
-- **Source:** M1d Wave 2 (2026-04-21) — surfaced while attempting the OpenSSL/mbedTLS cross-compile.
-- **Screen/area:** `libgit2dart-fork/android/src/main/jniLibs/<abi>/libgit2.so` (built from `libgit2-build/libgit2-1.5.0/build-android-<abi>/`).
-- **Detail:** Tried two HTTPS backend paths:
-  1. **OpenSSL 3.2 cross-compile** — failed because OpenSSL's perl-driven `Configure` script on MSYS2 perl is missing `Locale::Maketext::Simple` and related modules. Pure-perl workaround possible (install CPAN modules) but fragile.
-  2. **mbedTLS 3.6.2 cross-compile + libgit2 relink** — configure passed, build failed. mbedTLS 3.x removed/renamed the 2.x API that libgit2 1.5 was written against: `mbedtls/config.h` (now `build_info.h`; shimmed OK), NTLM's `md4.h` (removed in 3.x; worked around with `-DUSE_NTLMCLIENT=OFF`), but then `streams/mbedtls.c` hit 8 errors against renamed `mbedtls_ssl_config` fields (`ca_chain`, etc.). Deeper libgit2 source patches required.
-- **Workaround:** the `USE_HTTPS=OFF` build compiles clean and is currently what ships. `GitAdapter.cloneOrOpen` with `remoteUrlOverride` pointed at a `file://` URL works (used by the integration test). Real github.com sync does not.
-- **Proposed fix:** pick one —
-  1. **mbedTLS 2.28 LTS** (binary-compatible with libgit2 1.5's API usage) — simplest. ~1 hr to re-cross-compile for 3 ABIs and relink.
-  2. **Patch libgit2's `streams/mbedtls.c`** to target the mbedTLS 3.x API (vendor the diff in the fork). ~4 hrs.
-  3. **OpenSSL with a clean perl** — install a less-stripped perl (Strawberry / ActivePerl) on the Windows toolchain, then rebuild. ~1 hr.
-- Cross-refs the **libgit2dart has no Android plugin** entry below and the **libgit2dart is discontinued on pub.dev** entry above — all three resolve against the same fork.
+### ~~Issue: libgit2 Android build is compiled with USE_HTTPS=OFF — can't sync against github.com~~ — Closed 2026-04-21
+- **Closed:** relinked libgit2 1.5 against **mbedTLS 2.28.8 LTS** (3 ABIs: x86_64, arm64-v8a, armeabi-v7a) with `-DUSE_HTTPS=mbedTLS -DUSE_NTLMCLIENT=OFF`. APK now bundles `libmbedtls.so` + `libmbedx509.so` + `libmbedcrypto.so` alongside `libgit2.so` under every `lib/<abi>/`. `integration_test/libgit2_android_load_test.dart` was extended with `features.contains(GitFeature.https)` and passes on `emulator-5554`. `sync_conflict_test.dart` regression-check passes too. Real `github.com` clone/fetch/push should now work — the tablet-side smoke test (Wave 2.5) is the remaining acceptance step.
+- **What was chosen:** mbedTLS 2.28 LTS (not 3.x) because libgit2 1.5's `streams/mbedtls.c` targets the pre-3.x `ssl_config` struct layout; 3.x rewrite would have needed source patches in the fork. NTLM disabled because libgit2's `deps/ntlmclient/crypt_mbedtls.c` calls `mbedtls_md4_*` which mbedTLS 2.28 doesn't expose by default (MD4 was broken long ago); our auth path is OAuth/PAT so NTLM is unused.
+
 
 ### Issue: libgit2dart has no Android plugin — APK ships zero `libgit2.so`; Sync/Submit will crash on device
 - **Severity:** **High** — the entire on-device git path (Sync Down, Sync Up, Submit Review, Approve) will crash with a native-lib load error the first time anyone exercises it on the tablet. Blocks Phase 1 exit.
