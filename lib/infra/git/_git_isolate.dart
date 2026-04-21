@@ -100,7 +100,8 @@ GitResponse _handleCloneOrOpen(_IsolateState state, GitReqCloneOrOpen req) {
       'cloneOrOpen: ${req.workdir} is non-empty but is not a git repo',
     );
   }
-  final url = 'https://github.com/${req.owner}/${req.name}.git';
+  final url = req.remoteUrlOverride ??
+      'https://github.com/${req.owner}/${req.name}.git';
   final callbacks = buildCallbacks(req.token);
   final repo = git2.Repository.clone(
     url: url,

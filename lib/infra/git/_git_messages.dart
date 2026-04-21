@@ -27,12 +27,20 @@ class GitReqCloneOrOpen extends GitRequest {
     required this.defaultBranch,
     required this.workdir,
     required this.token,
+    this.remoteUrlOverride,
   });
   final String owner;
   final String name;
   final String defaultBranch;
   final String workdir;
   final String? token;
+
+  /// Test-only escape hatch: when non-null, the isolate clones from this
+  /// URL (typically `file:///...` pointing at a local bare repo) instead
+  /// of the production `https://github.com/<owner>/<name>.git`. Production
+  /// callers never set this — the field is threaded from
+  /// `GitAdapter.withRemoteUrlOverride`, which is `@visibleForTesting`.
+  final String? remoteUrlOverride;
 }
 
 class GitReqFetch extends GitRequest {

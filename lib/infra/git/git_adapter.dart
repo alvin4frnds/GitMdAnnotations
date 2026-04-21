@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:isolate';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 import '../../domain/entities/changelog_entry.dart';
 import '../../domain/entities/commit.dart';
 import '../../domain/entities/git_identity.dart';
@@ -30,11 +32,29 @@ typedef CredentialsLoader = Future<String?> Function();
 /// every fake — unaware of authentication plumbing.
 class GitAdapter implements GitPort {
   GitAdapter({CredentialsLoader? credentialsLoader})
-      : _credentialsLoader = credentialsLoader ?? _noCredentials;
+      : _credentialsLoader = credentialsLoader ?? _noCredentials,
+        _remoteUrlOverride = null;
+
+  /// Test-only constructor that pins every subsequent [cloneOrOpen] to
+  /// [remoteUrlOverride] instead of the production
+  /// `https://github.com/<owner>/<name>.git` URL. Used by
+  /// `integration_test/sync_conflict_test.dart` and other integration
+  /// tests that need a local bare-repo fixture reached via `file://`.
+  ///
+  /// The override is intentionally constructor-scoped (not method-scoped)
+  /// so the [GitPort] interface stays production-only — no test concern
+  /// leaks into the domain contract.
+  @visibleForTesting
+  GitAdapter.withRemoteUrlOverride({
+    required String remoteUrlOverride,
+    CredentialsLoader? credentialsLoader,
+  })  : _credentialsLoader = credentialsLoader ?? _noCredentials,
+        _remoteUrlOverride = remoteUrlOverride;
 
   static Future<String?> _noCredentials() async => null;
 
   final CredentialsLoader _credentialsLoader;
+  final String? _remoteUrlOverride;
 
   Isolate? _isolate;
   SendPort? _sendPort;
@@ -112,6 +132,7 @@ class GitAdapter implements GitPort {
         defaultBranch: repo.defaultBranch,
         workdir: workdir,
         token: token,
+        remoteUrlOverride: _remoteUrlOverride,
       ),
     );
     _unwrap<void>(resp);

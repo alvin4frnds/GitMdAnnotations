@@ -45,6 +45,22 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 - **Screen/area:** `integration_test/infra/git/`, `lib/infra/git/_git_isolate.dart`.
 - **Detail:** Integration tests for GitAdapter compile but are all `skip: 'TODO: ...'`. `cloneOrOpen` hard-codes `https://github.com/<owner>/<name>.git` so no local bare-repo harness can exercise it.
 - **Proposed fix:** Add a `@visibleForTesting` `remoteUrlOverride` on `GitAdapter` (or equivalent seam) so integration tests can point at a `file://` bare repo; unskip the suite once it runs green against the connected tablet.
+- **Status (M1c T6, 2026-04-21):** Partially addressed. `GitAdapter.withRemoteUrlOverride` constructor seam landed and is exercised by `integration_test/sync_conflict_test.dart` (new end-to-end coverage of Sync Up conflict flow). The four skipped tests under `integration_test/infra/git/git_adapter_test.dart` are still skipped — they need per-test setup adjustments (`_bootstrapWorkdirWithJobsBranch`-style pre-open of the workdir) and an on-device green run. Tracking that as a follow-up M1c/M1d task.
+
+### Issue: claude-jobs bootstrap from origin/claude-jobs not created by GitAdapter.cloneOrOpen
+- **Severity:** Medium
+- **Source:** M1c T6 (2026-04-21)
+- **Screen/area:** `lib/infra/git/_git_isolate.dart` (`_handleCloneOrOpen`), `lib/domain/services/sync_service.dart`.
+- **Detail:** `_handleCloneOrOpen` passes `checkoutBranch: repo.defaultBranch` to `git2.Repository.clone`, producing only `refs/heads/main`. The first `adapter.commit(..., branch: 'claude-jobs')` then fails inside `checkoutBranch()` because `refs/heads/claude-jobs` doesn't exist locally — only `refs/remotes/origin/claude-jobs` does. `integration_test/sync_conflict_test.dart` works around this by bootstrapping the local branch via a direct libgit2 call before calling the adapter.
+- **Cross-ref:** overlaps with the pre-existing "`claude-jobs` bootstrap from origin/main not yet implemented" entry (M1a T11). That one covers Sync Down's `SyncService.syncDown` bootstrap; this one covers `GitAdapter.cloneOrOpen` creating the sidecar branch locally when it already exists on origin.
+- **Proposed fix:** After `git2.Repository.clone` in `_handleCloneOrOpen`, if `refs/remotes/origin/claude-jobs` exists, create `refs/heads/claude-jobs` pointing at the same Oid. When origin has no `claude-jobs` yet, the Sync Down bootstrap (pre-existing entry) handles the create-from-main path.
+
+### Issue: ConflictResolver.archiveAndReset calls resetHard('origin/claude-jobs') but GitAdapter.resetHard only accepts SHAs
+- **Severity:** High (for real sync) — blocks the remote-wins conflict flow against a real git remote.
+- **Source:** M1c T6 (2026-04-21)
+- **Screen/area:** `lib/infra/git/_git_isolate.dart` (`_handleResetHard`), `lib/domain/services/conflict_resolver.dart`.
+- **Detail:** `_handleResetHard` calls `git2.Oid.fromSHA(repo: repo, sha: req.ref)`, which throws `ArgumentError('<ref> is not a valid sha hex string')` for anything that isn't a 7–40-char hex string. `ConflictResolver.archiveAndReset` passes the string `'origin/claude-jobs'` (a ref name, not a SHA). Only `FakeGitPort.resetHard` currently accepts a ref-name string (by looking it up in its snapshot map). Against the real adapter, the conflict-path Sync Up will always throw `ArgumentError` after backup, instead of resetting. The T6 integration test will surface this on the connected tablet.
+- **Proposed fix:** In `_handleResetHard`, if `req.ref` is not hex (or equivalently: resolve via `Revparse.single(repo: repo, spec: req.ref).oid` first, fall back to `Oid.fromSHA` for raw SHAs). Alternatively, promote the resolution up into `ConflictResolver` and pass already-resolved SHAs (cleaner domain semantics but costs a new port method to resolve `origin/<branch>`).
 
 ### Issue: Push-error classification is heuristic string-matching
 - **Severity:** Medium
