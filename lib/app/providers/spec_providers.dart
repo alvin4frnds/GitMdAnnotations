@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/entities/job_ref.dart';
 import '../../domain/entities/repo_ref.dart';
+import '../../domain/entities/spec_file.dart';
 import '../../domain/ports/file_system_port.dart';
 import '../../domain/services/spec_repository.dart';
 import '../controllers/job_list_controller.dart';
@@ -38,4 +40,22 @@ final currentRepoProvider = StateProvider<RepoRef?>((ref) => null);
 final jobListControllerProvider =
     AsyncNotifierProvider<JobListController, JobListState>(
   JobListController.new,
+);
+
+/// Loads the [SpecFile] for a single [JobRef] from the current
+/// [SpecRepository]. Null when no workdir is set (mirrors
+/// [specRepositoryProvider] so callers don't have to handle two null
+/// layers). Async because [SpecRepository.loadSpec] reads from disk —
+/// tests override via `fileSystemProvider.overrideWithValue(...)` +
+/// `currentWorkdirProvider.overrideWith((_) => '/workdir')` and seed the
+/// spec with `fs.seedFile(...)`.
+///
+/// Used by the Review-panel orchestrator to fetch the exact spec
+/// snapshot used for Submit / Approve composition.
+final specFileProvider = FutureProvider.autoDispose.family<SpecFile?, JobRef>(
+  (ref, job) async {
+    final repo = ref.watch(specRepositoryProvider);
+    if (repo == null) return null;
+    return repo.loadSpec(job);
+  },
 );

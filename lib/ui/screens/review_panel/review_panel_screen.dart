@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/review_orchestrator.dart';
 import '../../../domain/entities/job_ref.dart';
 import '../../../domain/services/open_question_extractor.dart';
 import '../../theme/tokens.dart';
+import '../submit_confirmation/submit_confirmation_screen.dart';
 import 'chrome_bar.dart';
 import 'markdown_pane.dart';
 import 'typed_review_pane.dart';
@@ -34,9 +36,10 @@ class ReviewPanelScreen extends ConsumerWidget {
   final JobRef jobRef;
   final List<OpenQuestion> questions;
 
-  /// Fired when the user taps "Submit review" in the chrome. The caller
-  /// typically pushes a [SubmitConfirmationScreen] onto the navigator to
-  /// preview and confirm the planned writes.
+  /// Fired when the user taps "Submit review" in the chrome. Default
+  /// behaviour (null) runs the [ReviewOrchestrator] → [showDialog] flow
+  /// defined below, which is what the wired app uses. Callers (tests,
+  /// screenshots) can still pass a no-op to bypass.
   final VoidCallback? onSubmitTap;
 
   @override
@@ -48,7 +51,7 @@ class ReviewPanelScreen extends ConsumerWidget {
         children: [
           ReviewChromeBar(
             jobRef: jobRef,
-            onSubmit: onSubmitTap ?? () {},
+            onSubmit: onSubmitTap ?? () => _onSubmit(context, ref),
           ),
           Expanded(
             child: Row(
@@ -67,6 +70,41 @@ class ReviewPanelScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _onSubmit(BuildContext context, WidgetRef ref) async {
+    final orchestrator = ReviewOrchestrator(ref.read);
+    final outcome = await orchestrator.prepare(jobRef);
+    if (!context.mounted) return;
+    switch (outcome) {
+      case ReviewOrchestratorSignInRequired():
+        _toast(context, 'Sign in required to submit');
+      case ReviewOrchestratorSpecUnavailable():
+        _toast(context, 'Spec unavailable - reopen the job');
+      case ReviewOrchestratorReady(
+          :final source,
+          :final questions,
+          :final strokeGroups,
+          :final identity,
+        ):
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogCtx) => SubmitConfirmationScreen(
+            jobRef: jobRef,
+            source: source,
+            questions: questions,
+            strokeGroups: strokeGroups,
+            identity: identity,
+            onCommitted: (_) => Navigator.of(dialogCtx).pop(true),
+          ),
+        );
+    }
+  }
+
+  void _toast(BuildContext context, String message) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
     );
   }
 }

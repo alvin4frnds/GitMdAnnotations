@@ -14,6 +14,7 @@ class AnnotationTopChrome extends StatelessWidget {
     required this.onUndo,
     required this.onRedo,
     this.onOpenReviewPanel,
+    this.onSubmitReview,
     super.key,
   });
 
@@ -33,6 +34,12 @@ class AnnotationTopChrome extends StatelessWidget {
   /// screen supplies a callback that pushes `ReviewPanelScreen(jobRef:)`
   /// onto the navigator.
   final VoidCallback? onOpenReviewPanel;
+
+  /// Tapped when the user taps the primary "Submit Review" button. Null
+  /// leaves the button inert (mockup surface); the wired canvas screen
+  /// supplies a callback that runs the [ReviewOrchestrator] and pushes
+  /// `SubmitConfirmationScreen`.
+  final VoidCallback? onSubmitReview;
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +85,7 @@ class AnnotationTopChrome extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           ElevatedButton(
-            onPressed: () {},
+            onPressed: onSubmitReview,
             child: const Text('Submit Review'),
           ),
         ],
