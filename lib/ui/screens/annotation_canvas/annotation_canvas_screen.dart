@@ -50,6 +50,15 @@ class _AnnotationCanvasScreenState
   /// already drop non-allowed samples.
   bool _capturingPointer = false;
 
+  /// Flipped `true` after the first frame once the theme-appropriate
+  /// default ink color has been pushed into the controller. Without
+  /// this the canvas would keep the controller's theme-agnostic default
+  /// (`#111111`) which reads as near-black on both light and dark
+  /// surfaces. The first-frame injection only runs when the controller
+  /// is still at that default, so a user's explicit color choice is
+  /// never clobbered by a route rebuild.
+  bool _defaultInkApplied = false;
+
   // TODO(markdown-anchor): derive real line+sourceSha from tap Offset once
   // MarkdownRenderer is wired (IMPLEMENTATION.md §4.4). For T7 we use the
   // same sentinel anchor as AnnotationController.build().
@@ -174,6 +183,24 @@ class _AnnotationCanvasScreenState
   Widget build(BuildContext context) {
     final t = context.tokens;
     final state = ref.watch(annotationControllerProvider(widget.jobRef));
+    if (!_defaultInkApplied && state.color == '#111111') {
+      _defaultInkApplied = true;
+      final brightness = Theme.of(context).brightness;
+      // Light mode → red (inkRed); dark mode → yellow (statusWarning).
+      final defaultColor =
+          brightness == Brightness.dark ? t.statusWarning : t.inkRed;
+      final hex = _hexFromColor(defaultColor);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final live =
+            ref.read(annotationControllerProvider(widget.jobRef));
+        if (live.color == '#111111') {
+          ref
+              .read(annotationControllerProvider(widget.jobRef).notifier)
+              .setColor(hex);
+        }
+      });
+    }
     // Preview styling mirrors what AnnotationSession._commit will stamp
     // onto the Stroke on pointer-up, so the in-progress preview looks
     // identical to the committed stroke (no color/width/opacity pop).
@@ -221,6 +248,16 @@ class _AnnotationCanvasScreenState
       ),
     );
   }
+}
+
+/// Formats an opaque [Color] as the `#RRGGBB` string the controller
+/// stores. Drops the alpha channel since `AnnotationState.color` is a
+/// 7-char sRGB hex.
+String _hexFromColor(Color color) {
+  final r = ((color.r * 255.0).round() & 0xff).toRadixString(16).padLeft(2, '0');
+  final g = ((color.g * 255.0).round() & 0xff).toRadixString(16).padLeft(2, '0');
+  final b = ((color.b * 255.0).round() & 0xff).toRadixString(16).padLeft(2, '0');
+  return '#${r.toUpperCase()}${g.toUpperCase()}${b.toUpperCase()}';
 }
 
 /// Parses the `#RRGGBB` hex stored in `AnnotationState.color` into an

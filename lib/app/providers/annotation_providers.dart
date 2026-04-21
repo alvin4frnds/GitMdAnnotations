@@ -33,12 +33,19 @@ final allowedPointerKindsProvider = Provider<Set<PointerKind>>(
   (ref) => const {PointerKind.stylus},
 );
 
-/// Per-job annotation state, scoped to the route via `autoDispose`. When no
-/// widget is listening (the SpecReader screen pops), Riverpod drops the
-/// notifier and its [AnnotationSession] — cold state on next navigation
-/// matches the PRD requirement that "annotation sessions don't leak across
-/// jobs" (IMPLEMENTATION.md §2.2).
-final annotationControllerProvider = NotifierProvider.autoDispose
-    .family<AnnotationController, AnnotationState, JobRef>(
+/// Per-job annotation state. Keyed on [JobRef] via `family` so each job
+/// owns its own in-memory `AnnotationSession`.
+///
+/// Previously `autoDispose` per IMPLEMENTATION.md §2.2 ("annotation
+/// sessions don't leak across jobs"), but that dropped the stroke set
+/// when the user popped AnnotationCanvas, which meant the Review panel
+/// saw an empty `groups` list even though the user had just drawn on
+/// the canvas. Kept alive for the session so Submit Review / the
+/// review-panel left-pane summary reflect the real annotations;
+/// per-job scoping still comes from `family` + the `JobRef` key. The
+/// `_session` is re-seeded with the saved groups when the notifier is
+/// first attached, so repeated attach/detach cycles are coherent.
+final annotationControllerProvider =
+    NotifierProvider.family<AnnotationController, AnnotationState, JobRef>(
   AnnotationController.new,
 );

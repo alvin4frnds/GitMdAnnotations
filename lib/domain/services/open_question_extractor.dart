@@ -118,7 +118,7 @@ class OpenQuestionExtractor {
     return null;
   }
 
-  /// Bare (Q-prefix-less) fallback — only invoked after every explicit
+  /// Bare (`Q`-prefix-less) fallback — only invoked after every explicit
   /// form has failed. Returns `null` for lines that aren't list items at
   /// all (blank, prose, code block, etc.) so continuation-line handling
   /// still applies. Caller is responsible for synthesising the Q<n> id.

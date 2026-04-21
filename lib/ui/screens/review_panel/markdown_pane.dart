@@ -9,6 +9,7 @@ import '../../../domain/entities/spec_file.dart';
 import '../../../domain/entities/stroke_group.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/ink_overlay/ink_painting.dart';
 
 /// Left pane of the review screen — real spec markdown (loaded through
 /// `specFileProvider`) plus a small annotations summary sourced from the
@@ -55,24 +56,37 @@ class _Body extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(40, 28, 40, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          MarkdownBody(
-            data: spec.contents,
-            shrinkWrap: true,
-            selectable: false,
-            styleSheet: _styleSheet(context),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(40, 28, 40, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              MarkdownBody(
+                data: spec.contents,
+                shrinkWrap: true,
+                selectable: false,
+                styleSheet: _styleSheet(context),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                _annotationSummary(strokeGroups),
+                style: TextStyle(color: t.textMuted, fontSize: 11),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          Text(
-            _annotationSummary(strokeGroups),
-            style: TextStyle(color: t.textMuted, fontSize: 11),
+        ),
+        if (strokeGroups.isNotEmpty)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _ReadOnlyStrokesPainter(groups: strokeGroups),
+              ),
+            ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -132,6 +146,32 @@ class _Body extends StatelessWidget {
           const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     );
   }
+}
+
+/// Read-only painter that replays the committed stroke groups on top of
+/// the review-panel left pane so the user sees what they drew on the
+/// annotation canvas. The strokes are painted in their original logical
+/// coordinates — no pointer interaction, no transform — so they visually
+/// anchor to the same on-screen locations they were drawn at.
+class _ReadOnlyStrokesPainter extends CustomPainter {
+  const _ReadOnlyStrokesPainter({required this.groups});
+
+  final List<StrokeGroup> groups;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    paintStrokeGroups(
+      canvas,
+      groups: groups,
+      activeStrokePoints: const <Offset>[],
+      activeStrokeColor: const Color(0x00000000),
+      activeStrokeWidth: 0,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ReadOnlyStrokesPainter old) =>
+      !identical(old.groups, groups);
 }
 
 class _Mute extends StatelessWidget {

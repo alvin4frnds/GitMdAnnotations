@@ -95,7 +95,7 @@ class AnnotationState {
 /// The raw [AnnotationSession] is deliberately kept private — the controller
 /// is the only mutator. T7 will wire this controller into `AnnotationCanvas`.
 class AnnotationController
-    extends AutoDisposeFamilyNotifier<AnnotationState, JobRef> {
+    extends FamilyNotifier<AnnotationState, JobRef> {
   // Not `final` — Riverpod reuses the notifier instance across rebuilds
   // (e.g. `container.invalidate`), calling [build] again. Assigning here
   // replaces the previous session so invalidation yields a cold state.
