@@ -1,15 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/review_orchestrator.dart';
+import '../../../domain/entities/job_ref.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../annotation_canvas/annotation_canvas_screen.dart';
+import '../review_panel/review_panel_screen.dart';
+import '../submit_confirmation/submit_confirmation_screen.dart';
 
 /// Spec reader — markdown view (UI spike).
 ///
 /// Pure visual fidelity to the PRD mockup. Left nav rail lists the document's
 /// H2/H3 outline, the top chrome hosts the pen-tool bar, and the main pane
 /// renders a stubbed markdown document via styled [Text] widgets.
+///
+/// [jobRef] is accepted for forward compatibility — the real markdown
+/// rendering pipeline (M1d) will load the spec file for this job from
+/// the `SpecRepository`. The current UI spike still shows hardcoded
+/// TOTP rollout copy.
 class SpecReaderMdScreen extends StatelessWidget {
-  const SpecReaderMdScreen({super.key});
+  const SpecReaderMdScreen({this.jobRef, super.key});
+
+  final JobRef? jobRef;
 
   @override
   Widget build(BuildContext context) {
@@ -18,9 +31,9 @@ class SpecReaderMdScreen extends StatelessWidget {
       color: t.surfaceBackground,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: const [
-          _TopChrome(),
-          Expanded(
+        children: [
+          _TopChrome(jobRef: jobRef),
+          const Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -39,12 +52,14 @@ class SpecReaderMdScreen extends StatelessWidget {
 // Top chrome (52px)
 // -----------------------------------------------------------------------------
 
-class _TopChrome extends StatelessWidget {
-  const _TopChrome();
+class _TopChrome extends ConsumerWidget {
+  const _TopChrome({required this.jobRef});
+  final JobRef? jobRef;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
+    final hasJob = jobRef != null;
     return Container(
       height: 52,
       decoration: BoxDecoration(
@@ -60,16 +75,82 @@ class _TopChrome extends StatelessWidget {
           // Middle: pen tool bar
           const _PenToolBar(),
           const SizedBox(width: 12),
-          // Right: review / submit
+          // Annotate → AnnotationCanvasScreen (pen mode).
+          _GhostButton(
+            label: 'Annotate',
+            trailing: Icons.edit_outlined,
+            onPressed: hasJob ? () => _openCanvas(context) : () {},
+          ),
+          const SizedBox(width: 8),
+          // Review panel → typed review questions.
           _GhostButton(
             label: 'Review panel',
             trailing: Icons.chevron_right,
-            onPressed: () {},
+            onPressed: hasJob ? () => _openReviewPanel(context) : () {},
           ),
           const SizedBox(width: 8),
-          _PrimaryButton(label: 'Submit', onPressed: () {}),
+          // Submit → ReviewOrchestrator.prepare then commit.
+          _PrimaryButton(
+            label: 'Submit',
+            onPressed: hasJob ? () => _submit(context, ref) : () {},
+          ),
         ],
       ),
+    );
+  }
+
+  void _openCanvas(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          body: AnnotationCanvasScreen(jobRef: jobRef!),
+        ),
+      ),
+    );
+  }
+
+  void _openReviewPanel(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          body: ReviewPanelScreen(jobRef: jobRef!),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit(BuildContext context, WidgetRef ref) async {
+    final orchestrator = ReviewOrchestrator(ref.read);
+    final outcome = await orchestrator.prepare(jobRef!);
+    if (!context.mounted) return;
+    switch (outcome) {
+      case ReviewOrchestratorSignInRequired():
+        _toast(context, 'Sign in required to submit');
+      case ReviewOrchestratorSpecUnavailable():
+        _toast(context, 'Spec unavailable — reopen the job');
+      case ReviewOrchestratorReady(
+          :final source,
+          :final questions,
+          :final strokeGroups,
+          :final identity,
+        ):
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogCtx) => SubmitConfirmationScreen(
+            jobRef: jobRef!,
+            source: source,
+            questions: questions,
+            strokeGroups: strokeGroups,
+            identity: identity,
+            onCommitted: (_) => Navigator.of(dialogCtx).pop(true),
+          ),
+        );
+    }
+  }
+
+  void _toast(BuildContext context, String message) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
     );
   }
 }

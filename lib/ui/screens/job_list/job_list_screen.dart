@@ -9,6 +9,8 @@ import '../../../domain/entities/repo_ref.dart';
 import '../../../domain/entities/source_kind.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../spec_reader_md/spec_reader_md_screen.dart';
+import '../spec_reader_pdf/spec_reader_pdf_screen.dart';
 
 /// Screen 3 — Job list / pending specs. T12 replaces the inline stub data
 /// with [jobListControllerProvider]; phase/sourceKind colour mapping lives
@@ -517,17 +519,17 @@ class _JobRows extends StatelessWidget {
   }
 }
 
-class _JobRow extends StatelessWidget {
+class _JobRow extends ConsumerWidget {
   final Job job;
   const _JobRow({required this.job});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
     return Material(
       color: t.surfaceBackground,
       child: InkWell(
-        onTap: () {},
+        onTap: () => _openJob(context, ref),
         hoverColor: t.surfaceSunken,
         child: Container(
           decoration: const BoxDecoration(
@@ -573,6 +575,33 @@ class _JobRow extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Push the appropriate SpecReader for this job.
+  ///
+  /// - [SourceKind.markdown] → [SpecReaderMdScreen] (current body is
+  ///   still the UI spike's hardcoded content; the real spec-loading
+  ///   pipeline will arrive with the md-renderer wiring in M1d).
+  /// - [SourceKind.pdf] → [SpecReaderPdfScreen] with the resolved
+  ///   `<workdir>/jobs/pending/<jobId>/spec.pdf`.
+  ///
+  /// Falls back silently if the workdir isn't set — in practice that
+  /// only happens before a repo is picked, in which case no rows render.
+  void _openJob(BuildContext context, WidgetRef ref) {
+    final workdir = ref.read(currentWorkdirProvider);
+    if (workdir == null) return;
+    final screen = switch (job.sourceKind) {
+      SourceKind.markdown => SpecReaderMdScreen(jobRef: job.ref),
+      SourceKind.pdf => SpecReaderPdfScreen(
+          jobRef: job.ref,
+          filePath: '$workdir/jobs/pending/${job.ref.jobId}/spec.pdf',
+        ),
+    };
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(body: screen),
       ),
     );
   }

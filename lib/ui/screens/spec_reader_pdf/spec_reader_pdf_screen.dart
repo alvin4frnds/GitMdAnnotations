@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/review_orchestrator.dart';
 import '../../../app/providers/annotation_providers.dart';
 import '../../../app/providers/pdf_providers.dart';
 import '../../../domain/entities/anchor.dart';
@@ -9,6 +10,8 @@ import '../../../domain/entities/pdf_document_handle.dart';
 import '../../../domain/entities/pointer_sample.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/ink_overlay/ink_overlay.dart';
+import '../review_panel/review_panel_screen.dart';
+import '../submit_confirmation/submit_confirmation_screen.dart';
 import 'spec_reader_pdf_chrome.dart';
 import 'spec_reader_pdf_pane.dart';
 import 'spec_reader_pdf_rail.dart';
@@ -100,6 +103,51 @@ class _SpecReaderPdfScreenState
   void _redo() =>
       ref.read(annotationControllerProvider(widget.jobRef).notifier).redo();
 
+  void _openReviewPanel() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          body: ReviewPanelScreen(jobRef: widget.jobRef),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitReview() async {
+    final orchestrator = ReviewOrchestrator(ref.read);
+    final outcome = await orchestrator.prepare(widget.jobRef);
+    if (!mounted) return;
+    switch (outcome) {
+      case ReviewOrchestratorSignInRequired():
+        _toast('Sign in required to submit');
+      case ReviewOrchestratorSpecUnavailable():
+        _toast('Spec unavailable — reopen the job');
+      case ReviewOrchestratorReady(
+          :final source,
+          :final questions,
+          :final strokeGroups,
+          :final identity,
+        ):
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogCtx) => SubmitConfirmationScreen(
+            jobRef: widget.jobRef,
+            source: source,
+            questions: questions,
+            strokeGroups: strokeGroups,
+            identity: identity,
+            onCommitted: (_) => Navigator.of(dialogCtx).pop(true),
+          ),
+        );
+    }
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
@@ -114,6 +162,8 @@ class _SpecReaderPdfScreenState
             jobId: widget.jobRef.jobId,
             onUndo: _undo,
             onRedo: _redo,
+            onOpenReviewPanel: _openReviewPanel,
+            onSubmit: _submitReview,
           ),
           Container(height: 1, color: t.borderSubtle),
           Expanded(

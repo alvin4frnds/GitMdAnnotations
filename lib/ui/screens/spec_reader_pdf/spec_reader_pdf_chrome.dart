@@ -12,12 +12,16 @@ class SpecReaderPdfChrome extends StatelessWidget {
     required this.jobId,
     required this.onUndo,
     required this.onRedo,
+    required this.onOpenReviewPanel,
+    required this.onSubmit,
     super.key,
   });
 
   final String jobId;
   final VoidCallback onUndo;
   final VoidCallback onRedo;
+  final VoidCallback onOpenReviewPanel;
+  final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +57,7 @@ class SpecReaderPdfChrome extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           TextButton(
-            onPressed: () {},
+            onPressed: onOpenReviewPanel,
             child: Text(
               'Review panel \u2192',
               style: TextStyle(color: t.textPrimary, fontSize: 13),
@@ -61,7 +65,7 @@ class SpecReaderPdfChrome extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           ElevatedButton(
-            onPressed: () {},
+            onPressed: onSubmit,
             child: const Text('Submit Review'),
           ),
         ],
