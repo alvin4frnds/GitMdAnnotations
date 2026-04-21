@@ -99,6 +99,9 @@ void main() {
       branch: 'claude-jobs',
     );
     _advanceOriginJobs(originBare, tmpRoot);
+    // Capture origin's post-advance claude-jobs tip; after the remote-wins
+    // reset, local claude-jobs HEAD must match exactly.
+    final expectedOriginSha = _readOriginBranchSha(originBare, 'claude-jobs');
 
     final service = SyncService(git: adapter);
     final events = await service
@@ -115,7 +118,16 @@ void main() {
     expect(File('$archivePath/local-a.md').existsSync(), isTrue);
     expect(File('$archivePath/local-b.md').existsSync(), isTrue);
     expect(File('${workdir.path}/remote-added.md').existsSync(), isTrue);
+    expect(await adapter.headSha('claude-jobs'), expectedOriginSha);
   });
+
+  // TODO(M1c-T7/follow-up): add PushRejectedAuth coverage. This suite
+  // exercises the happy push and the diverged non-fast-forward conflict,
+  // but not the 401/auth-rejection path. Deferred because the libgit2 +
+  // file:// harness has no built-in way to inject an auth-reject failure
+  // without an HTTPS smart-server fixture or an in-process fake remote.
+  // Revisit alongside the push-error-classification hardening (Issues.md
+  // "Push-error classification is heuristic string-matching").
 }
 
 /// Stages [file] at [path] in [repo]'s index, writes a single commit
@@ -195,6 +207,22 @@ void _bootstrapWorkdirWithJobsBranch(Directory workdir, String remoteUrl) {
     target: git2.Commit.lookup(repo: repo, oid: remoteJobs.target),
   );
   repo.free();
+}
+
+/// Opens the bare repo at [originBare] and returns `refs/heads/<branch>`'s
+/// tip sha. Used to assert local HEAD matches origin after a remote-wins
+/// reset; format matches `GitAdapter.headSha` (`ref.target.sha`).
+String _readOriginBranchSha(Directory originBare, String branch) {
+  final repo = git2.Repository.open(originBare.path);
+  try {
+    final ref = git2.Reference.lookup(
+      repo: repo,
+      name: 'refs/heads/$branch',
+    );
+    return ref.target.sha;
+  } finally {
+    repo.free();
+  }
 }
 
 /// Advances `refs/heads/claude-jobs` on [originBare] by one commit —

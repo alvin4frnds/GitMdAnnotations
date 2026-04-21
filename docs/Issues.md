@@ -39,13 +39,13 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 - **Detail:** `libgit2dart 1.2.2` works today but is marked `discontinued`. No active maintainer. Fixed = migration plan or fork before the library breaks against a future Flutter / Dart SDK.
 - **Proposed fix:** Spike-evaluate `git2dart`, shelling to `git` via `Process`, or forking + vendoring `libgit2dart`. Decide in a dedicated follow-up task.
 
-### Issue: Git integration tests are platform-tagged skeletons
-- **Severity:** Medium
-- **Source:** M1a T10 (2026-04-20)
-- **Screen/area:** `integration_test/infra/git/`, `lib/infra/git/_git_isolate.dart`.
-- **Detail:** Integration tests for GitAdapter compile but are all `skip: 'TODO: ...'`. `cloneOrOpen` hard-codes `https://github.com/<owner>/<name>.git` so no local bare-repo harness can exercise it.
-- **Proposed fix:** Add a `@visibleForTesting` `remoteUrlOverride` on `GitAdapter` (or equivalent seam) so integration tests can point at a `file://` bare repo; unskip the suite once it runs green against the connected tablet.
-- **Status (M1c T6, 2026-04-21):** Partially addressed. `GitAdapter.withRemoteUrlOverride` constructor seam landed and is exercised by `integration_test/sync_conflict_test.dart` (new end-to-end coverage of Sync Up conflict flow). The four skipped tests under `integration_test/infra/git/git_adapter_test.dart` are still skipped — they need per-test setup adjustments (`_bootstrapWorkdirWithJobsBranch`-style pre-open of the workdir) and an on-device green run. Tracking that as a follow-up M1c/M1d task.
+### ~~Issue: Git integration tests are platform-tagged skeletons~~ — Closed in M1c-T6 (`c4bc604`)
+- ~~**Severity:** Medium~~
+- ~~**Source:** M1a T10 (2026-04-20)~~
+- ~~**Screen/area:** `integration_test/infra/git/`, `lib/infra/git/_git_isolate.dart`.~~
+- ~~**Detail:** Integration tests for GitAdapter compile but are all `skip: 'TODO: ...'`. `cloneOrOpen` hard-codes `https://github.com/<owner>/<name>.git` so no local bare-repo harness can exercise it.~~
+- ~~**Proposed fix:** Add a `@visibleForTesting` `remoteUrlOverride` on `GitAdapter` (or equivalent seam) so integration tests can point at a `file://` bare repo; unskip the suite once it runs green against the connected tablet.~~
+- **Closed in M1c-T6 (`c4bc604`):** `GitAdapter.withRemoteUrlOverride` constructor seam landed and is exercised end-to-end by `integration_test/sync_conflict_test.dart` (Sync Up happy + diverged conflict). The four still-skipped tests under `integration_test/infra/git/git_adapter_test.dart` are now tracked as their own follow-ups alongside the `_handleResetHard` + `claude-jobs` bootstrap entries below — the seam gap this issue flagged is closed.
 
 ### Issue: claude-jobs bootstrap from origin/claude-jobs not created by GitAdapter.cloneOrOpen
 - **Severity:** Medium
