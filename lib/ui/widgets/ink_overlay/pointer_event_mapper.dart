@@ -39,6 +39,7 @@ class PointerEventMapper {
       pressure: pressure,
       kind: toKind(event.kind),
       timestamp: now,
+      buttons: event.buttons,
     );
   }
 

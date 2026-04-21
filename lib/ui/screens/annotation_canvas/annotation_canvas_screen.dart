@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -85,6 +86,16 @@ class _AnnotationCanvasScreenState
         ref.read(annotationControllerProvider(widget.jobRef)).drawingEnabled;
     switch (phase) {
       case InkPointerPhase.down:
+        if (sample.kind == PointerKind.stylus &&
+            (sample.buttons & kPrimaryStylusButton) != 0) {
+          // Barrel button held on tap — treat as undo, not a stroke.
+          // Works in both pen and pan modes; the button itself is an
+          // unambiguous stylus signal. `_capturingPointer` stays
+          // false, so any follow-up move/up samples from this pointer
+          // are silently dropped by the guards below.
+          controller.undo();
+          return;
+        }
         if (!drawingEnabled) {
           // Pan mode — user is viewing, not annotating. Drop the event
           // so the underlying content can pan/scroll naturally.

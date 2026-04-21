@@ -29,6 +29,7 @@ class PointerSample {
     required this.pressure,
     required this.kind,
     required this.timestamp,
+    this.buttons = 0,
   }) {
     if (x.isNaN) {
       throw ArgumentError.value(x, 'x', 'must not be NaN');
@@ -51,6 +52,13 @@ class PointerSample {
   final PointerKind kind;
   final DateTime timestamp;
 
+  /// Flutter's `PointerEvent.buttons` bitmask at the moment of the
+  /// sample. Consumed at the UI layer (e.g. `kPrimaryStylusButton` to
+  /// route barrel-button taps to undo); not persisted on committed
+  /// strokes. Defaults to `0` so existing call sites and fixtures
+  /// remain unchanged.
+  final int buttons;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -59,12 +67,14 @@ class PointerSample {
           other.y == y &&
           other.pressure == pressure &&
           other.kind == kind &&
-          other.timestamp == timestamp;
+          other.timestamp == timestamp &&
+          other.buttons == buttons;
 
   @override
-  int get hashCode => Object.hash(x, y, pressure, kind, timestamp);
+  int get hashCode => Object.hash(x, y, pressure, kind, timestamp, buttons);
 
   @override
   String toString() =>
-      'PointerSample($x, $y, p=$pressure, kind=$kind, ts=$timestamp)';
+      'PointerSample($x, $y, p=$pressure, kind=$kind, ts=$timestamp, '
+      'buttons=$buttons)';
 }

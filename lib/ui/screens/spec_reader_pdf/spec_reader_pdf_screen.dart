@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -80,6 +81,15 @@ class _SpecReaderPdfScreenState
         ref.read(annotationControllerProvider(widget.jobRef)).drawingEnabled;
     switch (phase) {
       case InkPointerPhase.down:
+        if (sample.kind == PointerKind.stylus &&
+            (sample.buttons & kPrimaryStylusButton) != 0) {
+          // Barrel button held on tap — undo, not a stroke. Mirrors
+          // the annotation canvas behavior so the gesture works in
+          // both readers. `_capturingStylus` stays false so any
+          // stray move/up samples are dropped by the guards below.
+          ctrl.undo();
+          return;
+        }
         if (!drawingEnabled) return; // Pan mode
         if (sample.kind != PointerKind.stylus) return;
         _capturingStylus = true;
