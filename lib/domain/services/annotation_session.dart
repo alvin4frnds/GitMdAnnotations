@@ -180,11 +180,25 @@ class AnnotationSession {
   StrokePoint _pointFrom(PointerSample s) =>
       StrokePoint(x: s.x, y: s.y, pressure: s.pressure);
 
-  // Tool-specific color mapping was deferred from T3; current design is
-  // tool-agnostic ink with a user-selected palette color. Width is still
-  // pen-fixed; revisit if tool differentiation ships later.
+  // Color is tool-agnostic (user-picked via the palette). Width
+  // differentiates pen (sharp, 2 px) from highlighter (chunky, 16 px)
+  // — matching the mockup's visual language. Full per-tool styling
+  // (semi-transparent highlighter with a distinct SVG opacity attr) is
+  // a deferred M1d item tracked against Stroke's schema.
   String _colorFor(InkTool _) => _color;
-  double _widthFor(InkTool _) => 2.0;
+  double _widthFor(InkTool tool) {
+    switch (tool) {
+      case InkTool.highlighter:
+        return 16.0;
+      case InkTool.pen:
+      case InkTool.line:
+      case InkTool.arrow:
+      case InkTool.rect:
+      case InkTool.circle:
+      case InkTool.eraser:
+        return 2.0;
+    }
+  }
 }
 
 class _ActiveStroke {

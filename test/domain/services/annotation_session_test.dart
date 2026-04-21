@@ -190,10 +190,20 @@ void main() {
       expect(stroke.strokeWidth, 2.0);
     });
 
-    test('non-pen tools degrade to the same freehand color/width in T3',
+    test('highlighter commits a chunky 16px stroke (distinct from pen)',
         () {
+      final s = newSession(tool: InkTool.highlighter);
+      s.beginStroke(stylusSample(0, 0), anchor: markdownAnchor);
+      s.endStroke(stylusSample(1, 1));
+      final stroke = s.snapshot().single.strokes.single;
+      expect(stroke.color, '#111111');
+      expect(stroke.strokeWidth, 16.0);
+    });
+
+    test(
+        'line/arrow/rect/circle/eraser tools still degrade to pen '
+        'color+width (M1d polish deferred their real rendering)', () {
       for (final tool in [
-        InkTool.highlighter,
         InkTool.line,
         InkTool.arrow,
         InkTool.rect,

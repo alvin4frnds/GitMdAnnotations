@@ -87,10 +87,14 @@ class PenToolBar extends ConsumerWidget {
           const SizedBox(width: 6),
           Container(width: 1, height: 20, color: t.borderSubtle),
           const SizedBox(width: 2),
-          const _ToolIcon(
+          // Eraser = "undo last stroke" — M1d-polish implementation.
+          // Full per-stroke hit-test eraser (tap a stroke to delete it)
+          // is a deferred follow-up; tapping undo-style at least gives
+          // users a reversible action from the toolbar.
+          _ToolIcon(
             icon: Icons.backspace_outlined,
             active: false,
-            onTap: null,
+            onTap: controller.undo,
           ),
         ],
       ),

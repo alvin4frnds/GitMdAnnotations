@@ -1,24 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/controllers/review_orchestrator.dart';
+import '../../../app/providers/spec_providers.dart';
 import '../../../domain/entities/job_ref.dart';
+import '../../../domain/entities/spec_file.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../annotation_canvas/annotation_canvas_screen.dart';
 import '../review_panel/review_panel_screen.dart';
 import '../submit_confirmation/submit_confirmation_screen.dart';
 
-/// Spec reader — markdown view (UI spike).
+/// Spec reader — markdown view.
 ///
-/// Pure visual fidelity to the PRD mockup. Left nav rail lists the document's
-/// H2/H3 outline, the top chrome hosts the pen-tool bar, and the main pane
-/// renders a stubbed markdown document via styled [Text] widgets.
+/// Left nav rail lists the document's H1/H2 outline extracted from the
+/// loaded markdown. The top chrome hosts the breadcrumb, pen tool bar,
+/// and Annotate / Review panel / Submit actions. The main pane renders
+/// the real spec markdown via `flutter_markdown`, reading through
+/// `specFileProvider(jobRef)` → `SpecRepository.loadSpec`.
 ///
-/// [jobRef] is accepted for forward compatibility — the real markdown
-/// rendering pipeline (M1d) will load the spec file for this job from
-/// the `SpecRepository`. The current UI spike still shows hardcoded
-/// TOTP rollout copy.
+/// When [jobRef] is null (mockup browser surface) the pane shows a
+/// short "No job selected" placeholder and the outline rail displays
+/// muted placeholders. The real app always passes a [jobRef].
 class SpecReaderMdScreen extends StatelessWidget {
   const SpecReaderMdScreen({this.jobRef, super.key});
 
@@ -33,12 +37,12 @@ class SpecReaderMdScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _TopChrome(jobRef: jobRef),
-          const Expanded(
+          Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _OnThisPageRail(),
-                Expanded(child: _MarkdownPane()),
+                _OnThisPageRail(jobRef: jobRef),
+                Expanded(child: _MarkdownPane(jobRef: jobRef)),
               ],
             ),
           ),
@@ -69,27 +73,22 @@ class _TopChrome extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          // Left: filename + breadcrumb
-          Flexible(child: _FileBreadcrumb()),
+          Flexible(child: _FileBreadcrumb(jobRef: jobRef)),
           const Spacer(),
-          // Middle: pen tool bar
           const _PenToolBar(),
           const SizedBox(width: 12),
-          // Annotate → AnnotationCanvasScreen (pen mode).
           _GhostButton(
             label: 'Annotate',
             trailing: Icons.edit_outlined,
             onPressed: hasJob ? () => _openCanvas(context) : () {},
           ),
           const SizedBox(width: 8),
-          // Review panel → typed review questions.
           _GhostButton(
             label: 'Review panel',
             trailing: Icons.chevron_right,
             onPressed: hasJob ? () => _openReviewPanel(context) : () {},
           ),
           const SizedBox(width: 8),
-          // Submit → ReviewOrchestrator.prepare then commit.
           _PrimaryButton(
             label: 'Submit',
             onPressed: hasJob ? () => _submit(context, ref) : () {},
@@ -155,15 +154,28 @@ class _TopChrome extends ConsumerWidget {
   }
 }
 
-class _FileBreadcrumb extends StatelessWidget {
+class _FileBreadcrumb extends ConsumerWidget {
+  const _FileBreadcrumb({required this.jobRef});
+  final JobRef? jobRef;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
+    final job = jobRef;
+    final filename = job == null
+        ? '02-spec.md'
+        : ref
+                .watch(specFileProvider(job))
+                .value
+                ?.path
+                .split('/')
+                .last ??
+            '02-spec.md';
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          '02-spec.md',
+          filename,
           style: appMono(
             context,
             size: 13,
@@ -178,7 +190,7 @@ class _FileBreadcrumb extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Text(
-          'spec-auth-flow-totp',
+          job?.jobId ?? 'spec-auth-flow-totp',
           style: appMono(context, size: 13, color: t.textMuted),
         ),
       ],
@@ -210,7 +222,6 @@ class _PenToolBar extends StatelessWidget {
           const SizedBox(width: 6),
           Container(width: 1, height: 20, color: t.borderSubtle),
           const SizedBox(width: 8),
-          // Colored dots — disabled while Read tool is selected.
           _ColorDot(color: t.inkRed),
           _ColorDot(color: t.inkBlue),
           _ColorDot(color: t.inkGreen),
@@ -255,7 +266,6 @@ class _ColorDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Disabled look: dim the dot while Read tool is active.
     return Container(
       width: 12,
       height: 12,
@@ -272,7 +282,8 @@ class _GhostButton extends StatelessWidget {
   final String label;
   final IconData? trailing;
   final VoidCallback onPressed;
-  const _GhostButton({required this.label, this.trailing, required this.onPressed});
+  const _GhostButton(
+      {required this.label, this.trailing, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -333,12 +344,26 @@ class _PrimaryButton extends StatelessWidget {
 // Left rail — "On this page"
 // -----------------------------------------------------------------------------
 
-class _OnThisPageRail extends StatelessWidget {
-  const _OnThisPageRail();
+/// Parses the top-level (H1/H2) headings out of the loaded spec file and
+/// renders them as an outline. When no [jobRef] is passed (mockup
+/// surface) or the spec hasn't loaded yet, shows a muted placeholder so
+/// the chrome doesn't reflow.
+class _OnThisPageRail extends ConsumerWidget {
+  const _OnThisPageRail({required this.jobRef});
+  final JobRef? jobRef;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
+    final List<String> headings;
+    if (jobRef == null) {
+      headings = const ['Overview', 'Goals', 'Open questions'];
+    } else {
+      final spec = ref.watch(specFileProvider(jobRef!)).value;
+      headings = spec == null
+          ? const ['Loading...']
+          : _extractHeadings(spec.contents);
+    }
     return Container(
       width: 192,
       decoration: BoxDecoration(
@@ -359,11 +384,14 @@ class _OnThisPageRail extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          const _RailEntry(label: 'Auth flow — TOTP rollout', current: true),
-          const _RailEntry(label: 'Goals'),
-          const _RailEntry(label: 'Non-goals'),
-          const _RailEntry(label: 'Open questions'),
-          const _RailEntry(label: 'Implementation sketch'),
+          if (headings.isEmpty)
+            Text(
+              '(no headings)',
+              style: TextStyle(color: t.textMuted, fontSize: 12),
+            )
+          else
+            for (var i = 0; i < headings.length; i++)
+              _RailEntry(label: headings[i], current: i == 0),
         ],
       ),
     );
@@ -373,10 +401,7 @@ class _OnThisPageRail extends StatelessWidget {
 class _RailEntry extends StatelessWidget {
   final String label;
   final bool current;
-  const _RailEntry({
-    required this.label,
-    this.current = false,
-  });
+  const _RailEntry({required this.label, this.current = false});
 
   @override
   Widget build(BuildContext context) {
@@ -402,268 +427,190 @@ class _RailEntry extends StatelessWidget {
   }
 }
 
+/// Extracts `# ` and `## ` headings from [markdown] in document order,
+/// stripping the hash markers and any surrounding whitespace. Lines
+/// inside fenced code blocks (three backticks) are ignored so a `#`
+/// comment in a shell snippet doesn't leak into the outline.
+List<String> _extractHeadings(String markdown) {
+  final out = <String>[];
+  var inFence = false;
+  for (final line in markdown.split('\n')) {
+    final trimmed = line.trimLeft();
+    if (trimmed.startsWith('```')) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    final m = _headingPattern.firstMatch(line);
+    if (m != null) {
+      final text = m.group(2)?.trim() ?? '';
+      if (text.isNotEmpty) out.add(text);
+    }
+  }
+  return out;
+}
+
+final _headingPattern = RegExp(r'^(#{1,2})\s+(.+?)\s*$');
+
 // -----------------------------------------------------------------------------
-// Main markdown pane (stub — Text + style composition, no real md lib)
+// Main markdown pane — loads real content via specFileProvider + renders
+// through flutter_markdown.
 // -----------------------------------------------------------------------------
 
-class _MarkdownPane extends StatelessWidget {
-  const _MarkdownPane();
+class _MarkdownPane extends ConsumerWidget {
+  const _MarkdownPane({required this.jobRef});
+  final JobRef? jobRef;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (jobRef == null) {
+      return const _MuteMessage(
+        message: 'No job selected.',
+        submessage: 'Pick a job from the JobList to view its spec.',
+      );
+    }
+    final async = ref.watch(specFileProvider(jobRef!));
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => _MuteMessage(
+        message: "Couldn't load the spec.",
+        submessage: e.toString(),
+        isError: true,
+      ),
+      data: (spec) => spec == null
+          ? const _MuteMessage(
+              message: 'No workdir.',
+              submessage: 'Pick a repo from the RepoPicker first.',
+            )
+          : _MarkdownBodyView(spec: spec),
+    );
+  }
+}
+
+class _MarkdownBodyView extends StatelessWidget {
+  const _MarkdownBodyView({required this.spec});
+  final SpecFile spec;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     return ColoredBox(
       color: t.surfaceBackground,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const _MdH1('Auth flow — TOTP rollout'),
-                  const _MdPara(
-                    'Add TOTP as a second factor for the internal admin '
-                    'dashboard. Rollout in two stages: opt-in beta, then '
-                    'required after 30 days.',
-                  ),
-                  const _MdH2('Goals'),
-                  const _MdBullets([
-                    _BulletItem(
-                      'G1. Reduce account takeover risk from password reuse.',
-                    ),
-                    _BulletItem(
-                      'G2. Keep login frictionless for existing sessions.',
-                    ),
-                    _BulletItem(
-                      'G3. Support recovery without a second device.',
-                    ),
-                  ]),
-                  const _MdH2('Non-goals'),
-                  const _MdBullets([
-                    _BulletItem(
-                      'Hardware keys (FIDO2) in this phase.',
-                      strikethrough: true,
-                    ),
-                    _BulletItem('External customer auth — out of scope.'),
-                  ]),
-                  const _MdH2('Open questions'),
-                  const _MdNumberedList([
-                    'Q1. Should the flow support magic-link fallback?',
-                    'Q2. Refresh-token lifetime when TOTP is active?',
-                    'Q3. Recovery code rotation policy?',
-                    'Q4. Do we block legacy sessions on rollout day?',
-                  ]),
-                  const _MdH2('Implementation sketch'),
-                  const _MdCodeBlock(
-                    'POST /api/auth/totp/enroll\n'
-                    'GET  /api/auth/totp/challenge\n'
-                    'POST /api/auth/totp/verify',
-                  ),
-                  const SizedBox(height: 40),
-                ],
-              ),
-            ),
-          ),
-        ),
+      child: Markdown(
+        data: spec.contents,
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 32),
+        shrinkWrap: false,
+        selectable: false,
+        styleSheet: _styleSheet(context),
       ),
     );
   }
-}
 
-class _MdH1 extends StatelessWidget {
-  final String text;
-  const _MdH1(this.text);
-
-  @override
-  Widget build(BuildContext context) {
+  MarkdownStyleSheet _styleSheet(BuildContext context) {
     final t = context.tokens;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: t.textPrimary,
-          fontSize: 28,
-          fontWeight: FontWeight.w700,
-          height: 1.25,
-          letterSpacing: -0.4,
-        ),
+    final base = MarkdownStyleSheet.fromTheme(Theme.of(context));
+    return base.copyWith(
+      h1: TextStyle(
+        color: t.textPrimary,
+        fontFamily: 'Inter',
+        fontSize: 28,
+        fontWeight: FontWeight.w700,
+        height: 1.25,
+        letterSpacing: -0.4,
       ),
-    );
-  }
-}
-
-class _MdH2 extends StatelessWidget {
-  final String text;
-  const _MdH2(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Padding(
-      padding: const EdgeInsets.only(top: 24, bottom: 10),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: t.textPrimary,
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          height: 1.3,
-          letterSpacing: -0.2,
-        ),
+      h1Padding: const EdgeInsets.only(bottom: 12),
+      h2: TextStyle(
+        color: t.textPrimary,
+        fontFamily: 'Inter',
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        height: 1.3,
+        letterSpacing: -0.2,
       ),
-    );
-  }
-}
-
-class _MdPara extends StatelessWidget {
-  final String text;
-  const _MdPara(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: t.textPrimary,
-          fontSize: 14,
-          height: 1.6,
-        ),
+      h2Padding: const EdgeInsets.only(top: 20, bottom: 8),
+      h3: TextStyle(
+        color: t.textPrimary,
+        fontFamily: 'Inter',
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        height: 1.35,
       ),
-    );
-  }
-}
-
-class _BulletItem {
-  final String text;
-  final bool strikethrough;
-  const _BulletItem(this.text, {this.strikethrough = false});
-}
-
-class _MdBullets extends StatelessWidget {
-  final List<_BulletItem> items;
-  const _MdBullets(this.items);
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final item in items)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4, left: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 8, right: 10),
-                  child: Container(
-                    width: 4,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: t.textMuted,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    item.text,
-                    style: TextStyle(
-                      color: item.strikethrough ? t.textMuted : t.textPrimary,
-                      fontSize: 14,
-                      height: 1.55,
-                      decoration: item.strikethrough
-                          ? TextDecoration.lineThrough
-                          : TextDecoration.none,
-                      decorationColor: t.textMuted,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _MdNumberedList extends StatelessWidget {
-  final List<String> items;
-  const _MdNumberedList(this.items);
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < items.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4, left: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 24,
-                  child: Text(
-                    '${i + 1}.',
-                    style: TextStyle(
-                      color: t.textMuted,
-                      fontSize: 14,
-                      height: 1.55,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    items[i],
-                    style: TextStyle(
-                      color: t.textPrimary,
-                      fontSize: 14,
-                      height: 1.55,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _MdCodeBlock extends StatelessWidget {
-  final String code;
-  const _MdCodeBlock(this.code);
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Container(
-      margin: const EdgeInsets.only(top: 4, bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
+      h3Padding: const EdgeInsets.only(top: 16, bottom: 6),
+      p: TextStyle(
+        color: t.textPrimary,
+        fontFamily: 'Inter',
+        fontSize: 14,
+        height: 1.6,
+      ),
+      pPadding: const EdgeInsets.only(bottom: 8),
+      listBullet: TextStyle(color: t.textMuted, fontSize: 14, height: 1.55),
+      code: appMono(context, size: 12.5, color: t.textPrimary)
+          .copyWith(backgroundColor: t.surfaceSunken),
+      codeblockDecoration: BoxDecoration(
         color: t.surfaceSunken,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: t.borderSubtle),
       ),
-      child: Text(
-        code,
-        style: appMono(
-          context,
-          size: 12.5,
-          color: t.textPrimary,
-        ).copyWith(height: 1.55),
+      codeblockPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      blockquote: TextStyle(color: t.textMuted, fontSize: 14, height: 1.55),
+      blockquoteDecoration: BoxDecoration(
+        border: Border(
+          left: BorderSide(color: t.borderSubtle, width: 3),
+        ),
+      ),
+      blockquotePadding: const EdgeInsets.only(left: 12),
+    );
+  }
+}
+
+class _MuteMessage extends StatelessWidget {
+  const _MuteMessage({
+    required this.message,
+    required this.submessage,
+    this.isError = false,
+  });
+  final String message;
+  final String submessage;
+  final bool isError;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final color = isError ? t.statusDanger : t.textMuted;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isError
+                  ? Icons.error_outline_rounded
+                  : Icons.description_outlined,
+              size: 28,
+              color: color,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              style: TextStyle(
+                color: color,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Text(
+                submessage,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: color, fontSize: 12, height: 1.4),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
