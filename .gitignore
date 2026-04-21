@@ -31,6 +31,11 @@ scratch/
 # should not enter source control.
 .claude/
 
+# Worktree used by the claude-jobs skill to stage archive commits on the
+# claude-jobs sidecar branch. Lives inside the repo by design but is never
+# tracked by main.
+.claude-jobs/
+
 # Secrets and local config
 .env
 .env.local
