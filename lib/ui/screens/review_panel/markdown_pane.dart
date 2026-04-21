@@ -5,6 +5,7 @@ import '../../../app/providers/annotation_providers.dart';
 import '../../../domain/entities/job_ref.dart';
 import '../../../domain/entities/stroke_group.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/canonical_page/canonical_page.dart';
 import '../../widgets/ink_overlay/ink_painting.dart';
 import '../annotation_canvas/main_content.dart'
     show kAnnotatedContentPadding, kAnnotatedContentWidth;
@@ -14,12 +15,11 @@ import '../annotation_canvas/markdown_stub.dart';
 /// read-only stroke overlay that replays whatever the user drew on the
 /// AnnotationCanvas.
 ///
-/// The markdown and stroke layer live **inside** a `SingleChildScrollView`
-/// in a shared `Stack`, mirroring the canvas layout exactly
-/// ([kAnnotatedContentWidth], [kAnnotatedContentPadding],
-/// [MarkdownStub]). Strokes stored in content-local coordinates on the
-/// canvas therefore re-paint at the same content-local coordinates here
-/// and scroll with the markdown — no viewport-relative drift.
+/// Shares the canonical [kAnnotatedContentWidth] coordinate space with
+/// the annotation canvas via [CanonicalPage], which is how strokes
+/// stored in canonical content-local coords on the canvas re-paint at
+/// the same canonical coords here regardless of this pane's actual
+/// viewport width (portrait vs landscape, narrow-pane splits, etc.).
 class MarkdownPane extends ConsumerWidget {
   const MarkdownPane({required this.jobRef, super.key});
 
@@ -32,43 +32,40 @@ class MarkdownPane extends ConsumerWidget {
     return Container(
       color: t.surfaceElevated,
       alignment: Alignment.topCenter,
-      child: SizedBox(
-        width: kAnnotatedContentWidth,
-        child: SingleChildScrollView(
-          child: Stack(
-            children: [
-              // `width: double.infinity` mirrors the canvas side
-              // (`annotation_canvas/main_content.dart`). Without it the
-              // Stack's non-positioned child shrinks to the markdown
-              // text width and the stroke painter would clip strokes
-              // drawn in the left/right margins.
-              SizedBox(
-                width: double.infinity,
-                child: Padding(
-                  padding: kAnnotatedContentPadding,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      MarkdownStub(jobRef: jobRef),
-                      const SizedBox(height: 24),
-                      Text(
-                        _annotationSummary(strokeGroups),
-                        style: TextStyle(color: t.textMuted, fontSize: 11),
-                      ),
-                    ],
+      child: CanonicalPage(
+        child: Stack(
+          children: [
+            // `width: double.infinity` mirrors the canvas side
+            // (`annotation_canvas/main_content.dart`). Without it the
+            // Stack's non-positioned child shrinks to the markdown
+            // text width and the stroke painter would clip strokes
+            // drawn in the left/right margins.
+            SizedBox(
+              width: double.infinity,
+              child: Padding(
+                padding: kAnnotatedContentPadding,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    MarkdownStub(jobRef: jobRef),
+                    const SizedBox(height: 24),
+                    Text(
+                      _annotationSummary(strokeGroups),
+                      style: TextStyle(color: t.textMuted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (strokeGroups.isNotEmpty)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: _ReadOnlyStrokesPainter(groups: strokeGroups),
                   ),
                 ),
               ),
-              if (strokeGroups.isNotEmpty)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: CustomPaint(
-                      painter: _ReadOnlyStrokesPainter(groups: strokeGroups),
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          ],
         ),
       ),
     );

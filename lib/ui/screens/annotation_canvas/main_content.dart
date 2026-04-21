@@ -7,28 +7,28 @@ import '../../../domain/entities/pointer_sample.dart';
 import '../../../domain/entities/stroke.dart';
 import '../../../domain/entities/stroke_group.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/canonical_page/canonical_page.dart';
 import '../../widgets/ink_overlay/ink_overlay.dart';
 import 'markdown_stub.dart';
 
-/// Shared content width for both the annotation canvas and the review
-/// panel's left pane. Locking the markdown to a canonical logical width
-/// makes line-wraps identical in both screens so strokes captured in
-/// content-local coordinates on one screen land on the same underlying
-/// text on the other.
+/// Canonical logical width of the annotated page. Strokes are captured
+/// and replayed in a coordinate space this wide, on **every** screen
+/// (annotate / review) and **every** orientation. Narrower viewports
+/// uniformly scale the page down via [CanonicalPage]; wider viewports
+/// render at 1:1 with the extra space showing the page background.
 ///
-/// Upper bound: the **narrower** of the two screens' main panes — the
-/// review panel's left pane, which loses 420 logical px to the typed-
-/// review pane on the right plus a 1-px border. On the OnePlus Pad Go 2
-/// (1400 logical px wide at dpr 2.0), that leaves ~979 logical px for
-/// the left pane, so the shared cap is pinned just below that at 960.
-/// The cap applies to **both** the rendered markdown AND the InkOverlay
-/// hit area, so raising it widens the region where strokes can start /
-/// end (the previous 900-px cap left a visibly unused dark strip on
-/// each side of the canvas, closer to the left rail).
+/// Why 960 specifically: the narrower of the two screens' main panes is
+/// the review panel's left pane, which loses 420 logical px to the
+/// typed-review pane on the right (plus a 1-px border). On the OnePlus
+/// Pad Go 2 in landscape (~1400 logical px wide) that leaves ~979 px,
+/// so 960 fits 1:1 without scaling. In portrait (or any viewport
+/// narrower than 960) [CanonicalPage] scales the 960-wide layout down
+/// uniformly — stored stroke coordinates don't change.
 ///
-/// Bumping this number further would let strokes clip off the right
-/// edge of the review pane — verify on the widest *review pane* the
-/// app will run on before raising.
+/// Changing this number changes the coordinate space: existing
+/// `03-annotations.svg` files captured at the old width would replay at
+/// a visually scaled offset. Treat it as a repo-wide invariant — if it
+/// must change, plan a rewrite pass over existing annotation artifacts.
 ///
 /// Exported so `review_panel/markdown_pane.dart` uses the exact same
 /// number.
@@ -101,51 +101,48 @@ class AnnotationMainContent extends StatelessWidget {
     return Container(
       color: t.surfaceElevated,
       alignment: Alignment.topCenter,
-      child: SizedBox(
-        width: kAnnotatedContentWidth,
-        child: ScrollConfiguration(
-          behavior: _AnnotationScrollBehavior(
-            allowStylusScroll: !drawingEnabled,
-          ),
-          child: SingleChildScrollView(
-            physics: hasActiveStylusStroke
-                ? const NeverScrollableScrollPhysics()
-                : const BouncingScrollPhysics(),
-            child: Stack(
-              children: [
-                // Forcing `width: double.infinity` is deliberate —
-                // without it the Stack's non-positioned child gets
-                // loose constraints and `MarkdownBody(shrinkWrap: true)`
-                // sizes down to its intrinsic *text* width. The Stack
-                // would then shrink to that text box and the
-                // `Positioned.fill` InkOverlay would shrink with it,
-                // making the left/right page margins unreachable to
-                // the stylus — user could only start a stroke on a
-                // line that already had text under it.
-                SizedBox(
-                  width: double.infinity,
-                  child: Padding(
-                    padding: kAnnotatedContentPadding,
-                    child: MarkdownStub(jobRef: jobRef),
+      child: ScrollConfiguration(
+        behavior: _AnnotationScrollBehavior(
+          allowStylusScroll: !drawingEnabled,
+        ),
+        child: CanonicalPage(
+          scrollPhysics: hasActiveStylusStroke
+              ? const NeverScrollableScrollPhysics()
+              : const BouncingScrollPhysics(),
+          child: Stack(
+            children: [
+              // Forcing `width: double.infinity` is deliberate — without
+              // it the Stack's non-positioned child gets loose
+              // constraints and `MarkdownBody(shrinkWrap: true)` sizes
+              // down to its intrinsic *text* width. The Stack would
+              // then shrink to that text box and the `Positioned.fill`
+              // InkOverlay would shrink with it, making the left/right
+              // page margins unreachable to the stylus — user could
+              // only start a stroke on a line that already had text
+              // under it.
+              SizedBox(
+                width: double.infinity,
+                child: Padding(
+                  padding: kAnnotatedContentPadding,
+                  child: MarkdownStub(jobRef: jobRef),
+                ),
+              ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  ignoring: !drawingEnabled,
+                  child: InkOverlay(
+                    groups: groups,
+                    activeStroke: activeStroke,
+                    currentStrokeColor: currentStrokeColor,
+                    currentStrokeWidth: currentStrokeWidth,
+                    currentStrokeOpacity: currentStrokeOpacity,
+                    onSample: onSample,
+                    nowProvider: nowProvider,
+                    hitTestBehavior: HitTestBehavior.opaque,
                   ),
                 ),
-                Positioned.fill(
-                  child: IgnorePointer(
-                    ignoring: !drawingEnabled,
-                    child: InkOverlay(
-                      groups: groups,
-                      activeStroke: activeStroke,
-                      currentStrokeColor: currentStrokeColor,
-                      currentStrokeWidth: currentStrokeWidth,
-                      currentStrokeOpacity: currentStrokeOpacity,
-                      onSample: onSample,
-                      nowProvider: nowProvider,
-                      hitTestBehavior: HitTestBehavior.opaque,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
