@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/ports/git_port.dart';
+import '../../domain/services/conflict_resolver.dart';
 import '../../domain/services/sync_service.dart';
 import '../controllers/sync_controller.dart';
 
@@ -13,10 +14,21 @@ final gitPortProvider = Provider<GitPort>((ref) {
   );
 });
 
-/// Pure-domain sync orchestrator. Recomputed when [gitPortProvider] is
-/// replaced (e.g. when we swap fakes in tests).
+/// Remote-wins archive-and-reset orchestrator used by Sync Up when a push
+/// is rejected non-fast-forward. Recomputed when [gitPortProvider] is
+/// replaced so fakes propagate automatically.
+final conflictResolverProvider = Provider<ConflictResolver>(
+  (ref) => ConflictResolver(git: ref.watch(gitPortProvider)),
+);
+
+/// Pure-domain sync orchestrator. Recomputed when [gitPortProvider] or
+/// [conflictResolverProvider] is replaced (e.g. when we swap fakes in
+/// tests).
 final syncServiceProvider = Provider<SyncService>(
-  (ref) => SyncService(git: ref.watch(gitPortProvider)),
+  (ref) => SyncService(
+    git: ref.watch(gitPortProvider),
+    conflictResolver: ref.watch(conflictResolverProvider),
+  ),
 );
 
 /// UI-facing sync state machine. See [SyncController].

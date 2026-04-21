@@ -181,6 +181,207 @@ void main() {
       expect(seenComplete, isTrue);
     });
   });
+
+  group('SyncService.syncUp', () {
+    test('happy path emits Started -> Pushing -> Complete', () async {
+      final fake = FakeGitPort();
+      await _seedMain(fake);
+      await _seedJobs(fake);
+      final service = SyncService(git: fake);
+
+      final events = await service
+          .syncUp(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
+          .toList();
+
+      expect(
+        events.map((e) => e.runtimeType.toString()).toList(),
+        ['SyncStarted', 'SyncPushing', 'SyncComplete'],
+      );
+    });
+
+    test('Pushing event is emitted exactly once and push is called once',
+        () async {
+      final fake = _RecordingPush();
+      await _seedMain(fake);
+      await _seedJobs(fake);
+      final service = SyncService(git: fake);
+
+      final events = await service
+          .syncUp(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
+          .toList();
+
+      expect(events.whereType<SyncPushing>(), hasLength(1));
+      expect(fake.pushCalls, 1);
+      // Pushing precedes the terminal SyncComplete.
+      final pushingIdx =
+          events.indexWhere((e) => e is SyncPushing);
+      final completeIdx =
+          events.indexWhere((e) => e is SyncComplete);
+      expect(pushingIdx, lessThan(completeIdx));
+    });
+
+    test('on PushSuccess emits SyncComplete as terminal event', () async {
+      final fake = FakeGitPort()
+        ..scriptedPushOutcome = const PushSuccess('abcd1234');
+      await _seedMain(fake);
+      await _seedJobs(fake);
+      final service = SyncService(git: fake);
+
+      final events = await service
+          .syncUp(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
+          .toList();
+
+      expect(events.last, isA<SyncComplete>());
+      expect(events.whereType<SyncFailed>(), isEmpty);
+      expect(events.whereType<SyncConflictArchived>(), isEmpty);
+    });
+
+    test('on PushRejectedAuth emits SyncFailed(PushRejectedAuth())',
+        () async {
+      final fake = FakeGitPort()
+        ..scriptedPushOutcome = const PushRejectedAuth();
+      await _seedMain(fake);
+      await _seedJobs(fake);
+      final service = SyncService(git: fake);
+
+      final events = await service
+          .syncUp(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
+          .toList();
+
+      expect(events.last, isA<SyncFailed>());
+      expect((events.last as SyncFailed).error, isA<PushRejectedAuth>());
+    });
+
+    test('on PushRejectedNonFastForward invokes conflict resolver',
+        () async {
+      final fake = FakeGitPort()
+        ..scriptedPushOutcome = const PushRejectedNonFastForward(
+          remoteSha: 'remote-sha',
+          localSha: 'local-sha',
+        );
+      await _seedMain(fake);
+      await _seedJobs(fake);
+      final service = SyncService(git: fake);
+
+      await service
+          .syncUp(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
+          .toList();
+
+      expect(fake.backups, hasLength(1));
+    });
+
+    test(
+        'conflict flow emits Started -> Pushing -> ConflictArchived -> Complete',
+        () async {
+      final fake = FakeGitPort()
+        ..scriptedPushOutcome = const PushRejectedNonFastForward(
+          remoteSha: 'remote-sha',
+          localSha: 'local-sha',
+        );
+      await _seedMain(fake);
+      await _seedJobs(fake);
+      final service = SyncService(git: fake);
+
+      final events = await service
+          .syncUp(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
+          .toList();
+
+      expect(
+        events.map((e) => e.runtimeType.toString()).toList(),
+        [
+          'SyncStarted',
+          'SyncPushing',
+          'SyncConflictArchived',
+          'SyncComplete',
+        ],
+      );
+    });
+
+    test('ConflictArchived carries the BackupRef returned by the fake',
+        () async {
+      final fake = FakeGitPort()
+        ..scriptedPushOutcome = const PushRejectedNonFastForward(
+          remoteSha: 'remote-sha',
+          localSha: 'local-sha',
+        );
+      await _seedMain(fake);
+      await _seedJobs(fake);
+      final service = SyncService(git: fake);
+
+      final events = await service
+          .syncUp(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
+          .toList();
+
+      final archived =
+          events.whereType<SyncConflictArchived>().single;
+      expect(fake.backups, hasLength(1));
+      expect(archived.backup, equals(fake.backups.first));
+    });
+
+    test(
+        'conflict flow + final-merge GitMergeConflict emits SyncFailed',
+        () async {
+      final fake = FakeGitPort()
+        ..scriptedPushOutcome = const PushRejectedNonFastForward(
+          remoteSha: 'remote-sha',
+          localSha: 'local-sha',
+        )
+        ..scriptNextMergeConflict = const ['README.md'];
+      await _seedMain(fake);
+      await _seedJobs(fake);
+      final service = SyncService(git: fake);
+
+      final events = await service
+          .syncUp(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
+          .toList();
+
+      expect(events.last, isA<SyncFailed>());
+      expect((events.last as SyncFailed).error, isA<GitMergeConflict>());
+      expect(events.whereType<SyncComplete>(), isEmpty);
+    });
+
+    test('stream closes after terminal event (await for terminates)',
+        () async {
+      final fake = FakeGitPort();
+      await _seedMain(fake);
+      await _seedJobs(fake);
+      final service = SyncService(git: fake);
+
+      var seenComplete = false;
+      await for (final p in service.syncUp(
+        _repo,
+        workdir: _workdir,
+        backupRoot: '/tmp/backups',
+      )) {
+        if (p is SyncComplete) seenComplete = true;
+      }
+      expect(seenComplete, isTrue);
+    });
+
+    test('does not fetch (Sync Up only pushes per §4.6)', () async {
+      final fake = FakeGitPort();
+      await _seedMain(fake);
+      await _seedJobs(fake);
+      final service = SyncService(git: fake);
+
+      await service
+          .syncUp(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
+          .toList();
+
+      expect(fake.fetchCount, 0);
+    });
+  });
+}
+
+/// Records push call count; used to assert event ordering relative to
+/// the actual git.push() invocation.
+class _RecordingPush extends FakeGitPort {
+  int pushCalls = 0;
+  @override
+  Future<PushOutcome> push(RepoRef repo, {required String branch}) {
+    pushCalls++;
+    return super.push(repo, branch: branch);
+  }
 }
 
 /// Throws [GitMergeConflict] only on the 2nd mergeInto (main->claude-jobs).

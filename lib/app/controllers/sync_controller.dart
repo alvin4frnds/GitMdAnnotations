@@ -31,11 +31,9 @@ class SyncErrored extends SyncState {
 }
 
 /// Drives the UI through a sync run. Subscribes to
-/// [SyncService.syncDown] and maps each [SyncProgress] event into a
-/// [SyncState]. Terminal progress events flip state to [SyncDone] /
-/// [SyncErrored].
-///
-/// Sync Up is intentionally absent — M1c.
+/// [SyncService.syncDown] / [SyncService.syncUp] and maps each
+/// [SyncProgress] event into a [SyncState]. Terminal progress events flip
+/// state to [SyncDone] / [SyncErrored].
 ///
 /// Follow-up: we use [DateTime.now] directly for the `SyncDone.at`
 /// timestamp. If we add sync telemetry in M1d we'll wire a `Clock` port
@@ -56,6 +54,39 @@ class SyncController extends AsyncNotifier<SyncState> {
     _running = true;
     try {
       await for (final p in _service.syncDown(repo, workdir: workdir)) {
+        if (p is SyncComplete) {
+          state = AsyncValue.data(SyncDone(DateTime.now()));
+        } else if (p is SyncFailed) {
+          state = AsyncValue.data(SyncErrored(p.error));
+        } else {
+          state = AsyncValue.data(SyncInProgress(p));
+        }
+      }
+    } finally {
+      _running = false;
+    }
+  }
+
+  /// Push local `claude-jobs` to origin (§4.6 FR-1.30). Mirrors
+  /// [syncDown]: subscribes to the service stream, maps each progress
+  /// event onto [SyncState], and guards re-entry with [_running].
+  ///
+  /// A [SyncConflictArchived] event flows through [SyncInProgress] — the
+  /// UI inspects `state.latest` to render the "remote won, backup at …"
+  /// banner before the stream reaches its terminal [SyncDone].
+  Future<void> syncUp({
+    required RepoRef repo,
+    required String workdir,
+    required String backupRoot,
+  }) async {
+    if (_running) return;
+    _running = true;
+    try {
+      await for (final p in _service.syncUp(
+        repo,
+        workdir: workdir,
+        backupRoot: backupRoot,
+      )) {
         if (p is SyncComplete) {
           state = AsyncValue.data(SyncDone(DateTime.now()));
         } else if (p is SyncFailed) {

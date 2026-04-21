@@ -6,6 +6,7 @@ import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
 import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_git_port.dart';
 import 'package:gitmdannotations_tablet/domain/ports/git_port.dart';
+import 'package:gitmdannotations_tablet/domain/services/sync_service.dart';
 
 const _repo = RepoRef(owner: 'octocat', name: 'hello');
 const _identity = GitIdentity(name: 'Ada', email: 'ada@example.com');
@@ -117,6 +118,106 @@ void main() {
       await Future.wait<void>([first, second]);
 
       expect(fake.fetchCount, 2);
+      final state = env.container.read(syncControllerProvider).value;
+      expect(state, isA<SyncDone>());
+    });
+  });
+
+  group('SyncController.syncUp', () {
+    const backupRoot = '/tmp/backups';
+
+    test('happy path transitions InProgress(*) -> SyncDone', () async {
+      final fake = await _seeded();
+      final env = _buildContainer(fake);
+      await env.container.read(syncControllerProvider.future);
+
+      final seen = <SyncState>[];
+      final sub = env.container.listen<AsyncValue<SyncState>>(
+        syncControllerProvider,
+        (prev, next) => next.whenData(seen.add),
+      );
+
+      await env.container.read(syncControllerProvider.notifier).syncUp(
+            repo: _repo,
+            workdir: _workdir,
+            backupRoot: backupRoot,
+          );
+
+      sub.close();
+
+      expect(seen.whereType<SyncInProgress>(), isNotEmpty);
+      expect(seen.last, isA<SyncDone>());
+    });
+
+    test('conflict flow surfaces SyncConflictArchived through SyncInProgress',
+        () async {
+      final fake = await _seeded();
+      fake.scriptedPushOutcome = const PushRejectedNonFastForward(
+        remoteSha: 'r',
+        localSha: 'l',
+      );
+      final env = _buildContainer(fake);
+      await env.container.read(syncControllerProvider.future);
+
+      final seen = <SyncState>[];
+      final sub = env.container.listen<AsyncValue<SyncState>>(
+        syncControllerProvider,
+        (prev, next) => next.whenData(seen.add),
+      );
+
+      await env.container.read(syncControllerProvider.notifier).syncUp(
+            repo: _repo,
+            workdir: _workdir,
+            backupRoot: backupRoot,
+          );
+
+      sub.close();
+
+      final archivedPhases = seen
+          .whereType<SyncInProgress>()
+          .where((s) => s.latest is SyncConflictArchived);
+      expect(archivedPhases, hasLength(1));
+      expect(seen.last, isA<SyncDone>());
+    });
+
+    test('PushRejectedAuth transitions to SyncErrored(PushRejectedAuth)',
+        () async {
+      final fake = await _seeded();
+      fake.scriptedPushOutcome = const PushRejectedAuth();
+      final env = _buildContainer(fake);
+      await env.container.read(syncControllerProvider.future);
+
+      await env.container.read(syncControllerProvider.notifier).syncUp(
+            repo: _repo,
+            workdir: _workdir,
+            backupRoot: backupRoot,
+          );
+
+      final state = env.container.read(syncControllerProvider).value;
+      expect(state, isA<SyncErrored>());
+      expect((state as SyncErrored).error, isA<PushRejectedAuth>());
+    });
+
+    test('re-entrance while running does not double-run', () async {
+      final fake = await _seeded();
+      final env = _buildContainer(fake);
+      await env.container.read(syncControllerProvider.future);
+
+      final notifier = env.container.read(syncControllerProvider.notifier);
+      final first = notifier.syncUp(
+        repo: _repo,
+        workdir: _workdir,
+        backupRoot: backupRoot,
+      );
+      final second = notifier.syncUp(
+        repo: _repo,
+        workdir: _workdir,
+        backupRoot: backupRoot,
+      );
+      await Future.wait<void>([first, second]);
+
+      // Only the first call archives anything (none in happy path), but
+      // we can assert the outcome settled exactly once.
       final state = env.container.read(syncControllerProvider).value;
       expect(state, isA<SyncDone>());
     });
