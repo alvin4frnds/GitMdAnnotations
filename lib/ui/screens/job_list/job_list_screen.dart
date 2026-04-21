@@ -9,6 +9,7 @@ import '../../../domain/entities/repo_ref.dart';
 import '../../../domain/entities/source_kind.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../changelog_viewer/changelog_viewer_screen.dart';
 import '../spec_reader_md/spec_reader_md_screen.dart';
 import '../spec_reader_pdf/spec_reader_pdf_screen.dart';
 
@@ -77,7 +78,22 @@ class _LeftRail extends StatelessWidget {
           Divider(height: 1, color: t.borderSubtle),
           const SizedBox(height: 16),
           _NewSpecButton(onPressed: () {}),
+          const SizedBox(height: 8),
+          _ChangelogNavButton(
+            onPressed: () => _openChangelog(context),
+          ),
         ],
+      ),
+    );
+  }
+
+  /// Pushes the cross-job changelog timeline. Entry point wired from the
+  /// left rail per M1d-T1; JobList remains the top-of-stack, so
+  /// Navigator.pop() returns here.
+  void _openChangelog(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(body: ChangelogViewerScreen()),
       ),
     );
   }
@@ -225,6 +241,42 @@ class _NewSpecButton extends StatelessWidget {
               'New spec',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Secondary nav button that pushes the cross-job ChangelogViewer
+/// (M1d-T1). Ghost/outlined style so it doesn't compete with the primary
+/// "New spec" CTA — same visual treatment as the top-chrome ghost
+/// buttons.
+class _ChangelogNavButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _ChangelogNavButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: t.textPrimary,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          side: BorderSide(color: t.borderSubtle),
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.history_rounded, size: 16, color: t.textPrimary),
+            const SizedBox(width: 6),
+            const Text('Changelog'),
           ],
         ),
       ),

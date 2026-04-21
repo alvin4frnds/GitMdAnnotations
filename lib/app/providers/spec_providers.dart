@@ -5,6 +5,7 @@ import '../../domain/entities/repo_ref.dart';
 import '../../domain/entities/spec_file.dart';
 import '../../domain/ports/file_system_port.dart';
 import '../../domain/services/spec_repository.dart';
+import '../controllers/changelog_viewer_controller.dart';
 import '../controllers/job_list_controller.dart';
 
 /// Binds the [FileSystemPort] implementation at composition root. Tests
@@ -40,6 +41,15 @@ final currentRepoProvider = StateProvider<RepoRef?>((ref) => null);
 final jobListControllerProvider =
     AsyncNotifierProvider<JobListController, JobListState>(
   JobListController.new,
+);
+
+/// UI-facing changelog-timeline state machine. See
+/// [ChangelogViewerController]. Scoped off the same `currentRepoProvider` /
+/// `currentWorkdirProvider` pair as [jobListControllerProvider] so a
+/// RepoPicker swap re-aggregates automatically.
+final changelogViewerControllerProvider =
+    AsyncNotifierProvider<ChangelogViewerController, ChangelogViewerState>(
+  ChangelogViewerController.new,
 );
 
 /// Loads the [SpecFile] for a single [JobRef] from the current
