@@ -38,6 +38,13 @@ dependencies:
   url_launcher: ^6.3.1
   flutter_secure_storage: ^9.2.2
   path_provider: ^2.1.5
+  # Markdown rendering for SpecReaderMd (IMPLEMENTATION.md §4.4).
+  # Consumed only from `lib/ui/screens/spec_reader_md/`; domain/app
+  # layers operate on the raw string loaded via SpecRepository.loadSpec.
+  flutter_markdown: ^0.7.4
+  # Storage Access Framework (W5.2 Export backups). Lets the user pick a
+  # SAF destination folder; we then copy the on-device backup tree there.
+  shared_storage: ^0.8.1
   # Local fork that adds Android NDK-built libgit2.so under android/jniLibs/
   # and patches lib/src/util.dart to handle Android's dynamic-loader path.
   # See docs/Issues.md — "libgit2dart has no Android plugin" entry.
