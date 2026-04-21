@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:libgit2dart/libgit2dart.dart' as git2;
 
 import '../../domain/ports/git_port.dart';
@@ -57,39 +58,183 @@ Future<void> copyDirectory(
   }
 }
 
+/// The four buckets [mapPushError] collapses a raw libgit2 push failure
+/// into. Exposed via [classifyPushError] so unit tests don't have to
+/// fabricate a `git2.Remote` to exercise the mapping.
+///
+/// - [nonFastForward]: server refused the ref update because the local
+///   tip is not a descendant of the remote tip. Expected control flow —
+///   drives the conflict UI.
+/// - [auth]: HTTP 401/403 during the smart-http handshake, or libgit2's
+///   own "authentication required" signal. Also expected control flow —
+///   drives the re-auth prompt.
+/// - [network]: transport failure before we ever got a reply — DNS,
+///   connection refused, TLS, timeout, mid-transfer disconnect. Not
+///   mappable to a typed [PushOutcome] per `GitPort` contract
+///   ("transport-level errors still throw"); the helper still classifies
+///   it so callers can log the category cleanly before rethrow.
+/// - [unknown]: anything else. Rethrown unchanged; logs the raw message
+///   in debug builds so we can harden the matcher against real failures.
+enum PushErrorCategory { nonFastForward, auth, network, unknown }
+
+/// Pure classifier over the raw libgit2 error string.
+///
+/// Why this is still substring-based: `libgit2dart 1.2.2`'s
+/// [git2.LibGit2Error] exposes ONLY `toString()`; the underlying
+/// `git_error` struct's `klass` field (which would give us a stable
+/// enum — `GIT_ERROR_NET`, `GIT_ERROR_HTTP`, `GIT_ERROR_REFERENCE`, …)
+/// is held in a private `Pointer<git_error>` field with no public
+/// accessor. Until we migrate off libgit2dart or fork it to expose
+/// `klass`/`code`, matching the message is the only option.
+///
+/// Follow-up (recorded in `docs/Issues.md`, M1a-T10 entry): once a
+/// logger port / structured sink lands, the callers of [mapPushError]
+/// should emit the raw `error.toString()` at the `unknown` branch so
+/// we can harden the patterns against real GitHub failures observed
+/// in the field.
+///
+/// Patterns below are deliberately broad — each bucket lists every
+/// known phrasing libgit2 has emitted across 1.0–1.5 plus the HTTP
+/// layer's own strings. Order matters: non-fast-forward is checked
+/// before auth (the server often sends both a 403 and a
+/// "non-fast-forward" hint in the same response); auth is checked
+/// before network (a 401 looks like a generic HTTP failure to the
+/// network matcher otherwise).
+@visibleForTesting
+PushErrorCategory classifyPushError(Object error) {
+  final msg = error.toString().toLowerCase();
+
+  // --- non-fast-forward ---------------------------------------------------
+  // libgit2 native:      "cannot push non-fastforwardable reference"
+  // libgit2 <=1.4:       "failed to push some refs"
+  // server side-band:    "! [rejected] ...  (non-fast-forward)"
+  // helper message:      "updates were rejected because the tip of your
+  //                       current branch is behind"
+  const nonFastForwardNeedles = <String>[
+    'non-fast-forward',
+    'not fast-forward',
+    'non-fastforwardable',
+    'non fastforwardable',
+    'cannot push non-fastforwardable',
+    '[rejected]',
+    'failed to push some refs',
+    'tip of your current branch is behind',
+    'pushed branch tip is behind',
+  ];
+  if (nonFastForwardNeedles.any(msg.contains)) {
+    return PushErrorCategory.nonFastForward;
+  }
+
+  // --- auth ---------------------------------------------------------------
+  // libgit2 native:        "authentication required but no callback set"
+  //                        "too many redirects or authentication replays"
+  //                        "request failed with status code: 401"
+  //                        "request failed with status code: 403"
+  //                        "unexpected http status code: 401"
+  // GitHub smart-http:     "remote: Invalid username or password."
+  //                        "fatal: Authentication failed"
+  const authNeedles = <String>[
+    '401',
+    '403',
+    'unauthorized',
+    'authentication required',
+    'authentication replays',
+    'authentication failed',
+    'invalid username or password',
+    'bad credentials',
+  ];
+  if (authNeedles.any(msg.contains)) {
+    return PushErrorCategory.auth;
+  }
+
+  // --- network ------------------------------------------------------------
+  // libgit2 native (transport.c / winhttp.c / http.c):
+  //   "failed to connect to <host>"
+  //   "failed to resolve address for <host>"
+  //   "failed to send request: ..."
+  //   "unexpected disconnection from remote"
+  //   "curl error: ... (timeout / could not resolve / …)"
+  //   "ssl error: ..."
+  //   "timed out"
+  //   "connection reset"
+  //   "network is unreachable"
+  const networkNeedles = <String>[
+    'failed to connect',
+    'failed to resolve',
+    'failed to send request',
+    'unexpected disconnection',
+    'curl error',
+    'ssl error',
+    'tls error',
+    'timed out',
+    'timeout',
+    'connection reset',
+    'connection refused',
+    'network is unreachable',
+    'no route to host',
+  ];
+  if (networkNeedles.any(msg.contains)) {
+    return PushErrorCategory.network;
+  }
+
+  return PushErrorCategory.unknown;
+}
+
 /// Best-effort mapping of libgit2 push errors into the sealed
 /// [PushOutcome] types the domain layer understands.
 ///
-/// libgit2's push path only raises `LibGit2Error` with a message string;
-/// the common buckets we care about are:
-///   * "cannot push non-fastforwardable reference" / "non-fast-forward"
-///     -> [PushRejectedNonFastForward]
-///   * HTTP 401 / 403 during the smart-http handshake
-///     -> [PushRejectedAuth]
+/// Returns:
+/// - [PushRejectedNonFastForward] when the server rejected the ref update
+///   because the local tip is not a descendant of the remote tip.
+/// - [PushRejectedAuth] for HTTP 401/403 / libgit2 auth-required failures.
+/// - `null` for transport failures (network / TLS / timeout) AND for
+///   unrecognised errors — `GitPort.push`'s contract says transport
+///   errors throw, so the caller rethrows the original exception in
+///   both cases. The split exists so the caller (or a future structured
+///   logger) can distinguish classified-but-non-outcome errors from
+///   truly unknown ones when hardening the matcher.
 ///
-/// If we can't confidently map, we return `null` so the caller rethrows.
+/// The [remote] parameter is currently informational only; we can't
+/// reliably obtain the remote sha without an extra round-trip, so
+/// [PushRejectedNonFastForward.remoteSha] is always reported as the
+/// empty string. Kept in the signature so a future implementation can
+/// call `remote.ls()` / `remote.fetch()` without a breaking change to
+/// every caller.
 PushOutcome? mapPushError(
   Object error, {
   required git2.Remote remote,
   required String localSha,
 }) {
-  final msg = error.toString().toLowerCase();
-  if (msg.contains('non-fast-forward') ||
-      msg.contains('not fast-forward') ||
-      msg.contains('cannot push non-fastforwardable') ||
-      msg.contains('rejected')) {
-    return PushRejectedNonFastForward(
-      remoteSha: _safeRemoteSha(remote),
-      localSha: localSha,
-    );
+  return pushOutcomeFor(
+    classifyPushError(error),
+    remoteSha: _safeRemoteSha(remote),
+    localSha: localSha,
+  );
+}
+
+/// Pure dispatch from [PushErrorCategory] to the sealed [PushOutcome]
+/// hierarchy. Split out of [mapPushError] so unit tests can exercise
+/// every branch without constructing a live [git2.Remote] — the
+/// `git2.Remote.*` constructors all require a loaded libgit2 FFI lib,
+/// which is not available under `fvm flutter test` on the Windows host.
+@visibleForTesting
+PushOutcome? pushOutcomeFor(
+  PushErrorCategory category, {
+  required String remoteSha,
+  required String localSha,
+}) {
+  switch (category) {
+    case PushErrorCategory.nonFastForward:
+      return PushRejectedNonFastForward(
+        remoteSha: remoteSha,
+        localSha: localSha,
+      );
+    case PushErrorCategory.auth:
+      return const PushRejectedAuth();
+    case PushErrorCategory.network:
+    case PushErrorCategory.unknown:
+      return null;
   }
-  if (msg.contains('401') ||
-      msg.contains('403') ||
-      msg.contains('unauthorized') ||
-      msg.contains('authentication')) {
-    return const PushRejectedAuth();
-  }
-  return null;
 }
 
 String _safeRemoteSha(git2.Remote remote) {
