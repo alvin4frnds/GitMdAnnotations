@@ -13,11 +13,25 @@ import 'markdown_stub.dart';
 /// panel's left pane. Locking the markdown to a canonical logical width
 /// makes line-wraps identical in both screens so strokes captured in
 /// content-local coordinates on one screen land on the same underlying
-/// text on the other (the review panel's left pane is narrower than the
-/// canvas main area because the 420-px typed-review panel eats the right
-/// side). Exported so `review_panel/markdown_pane.dart` uses the exact
-/// same number.
-const double kAnnotatedContentWidth = 900;
+/// text on the other.
+///
+/// Upper bound: the **narrower** of the two screens' main panes — the
+/// review panel's left pane, which loses 420 logical px to the typed-
+/// review pane on the right plus a 1-px border. On the OnePlus Pad Go 2
+/// (1400 logical px wide at dpr 2.0), that leaves ~979 logical px for
+/// the left pane, so the shared cap is pinned just below that at 960.
+/// The cap applies to **both** the rendered markdown AND the InkOverlay
+/// hit area, so raising it widens the region where strokes can start /
+/// end (the previous 900-px cap left a visibly unused dark strip on
+/// each side of the canvas, closer to the left rail).
+///
+/// Bumping this number further would let strokes clip off the right
+/// edge of the review pane — verify on the widest *review pane* the
+/// app will run on before raising.
+///
+/// Exported so `review_panel/markdown_pane.dart` uses the exact same
+/// number.
+const double kAnnotatedContentWidth = 960;
 
 /// Padding wrapped around the markdown inside the ink stack. Exported so
 /// the review pane can mirror it exactly — if the two screens drift on
