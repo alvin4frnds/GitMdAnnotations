@@ -121,7 +121,7 @@ class OpenQuestionExtractor {
   /// Bare (`Q`-prefix-less) fallback — only invoked after every explicit
   /// form has failed. Returns `null` for lines that aren't list items at
   /// all (blank, prose, code block, etc.) so continuation-line handling
-  /// still applies. Caller is responsible for synthesising the Q<n> id.
+  /// still applies. Caller is responsible for synthesising the `Q<n>` id.
   String? _matchBare(String line) {
     final n = _bareNumbered.firstMatch(line);
     if (n != null) return n.group(1)!.trim();
