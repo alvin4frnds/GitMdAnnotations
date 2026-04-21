@@ -159,6 +159,7 @@ class _SpecReaderPdfScreenState
       child: Column(
         children: [
           SpecReaderPdfChrome(
+            jobRef: widget.jobRef,
             jobId: widget.jobRef.jobId,
             onUndo: _undo,
             onRedo: _redo,

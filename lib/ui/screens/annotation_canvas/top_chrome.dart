@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../domain/entities/job_ref.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import 'pen_tool_bar.dart';
@@ -11,12 +12,17 @@ import 'pen_tool_bar.dart';
 /// `annotation_canvas_screen.dart`.
 class AnnotationTopChrome extends StatelessWidget {
   const AnnotationTopChrome({
+    required this.jobRef,
     required this.onUndo,
     required this.onRedo,
     this.onOpenReviewPanel,
     this.onSubmitReview,
     super.key,
   });
+
+  /// Threaded through to [PenToolBar] so tapping a color dot can read
+  /// the per-job [annotationControllerProvider] and dispatch `setColor`.
+  final JobRef jobRef;
 
   /// Tapped when the user taps the undo button. The controller's `undo()`
   /// is a safe no-op on empty stacks (verified in T3 tests) — we keep the
@@ -61,7 +67,7 @@ class AnnotationTopChrome extends StatelessWidget {
           const SizedBox(width: 10),
           const _PhaseTag(label: 'Awaiting review'),
           const Spacer(),
-          const PenToolBar(),
+          PenToolBar(jobRef: jobRef),
           const SizedBox(width: 8),
           IconButton(
             tooltip: 'Undo',

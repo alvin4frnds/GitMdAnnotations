@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../domain/entities/job_ref.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../annotation_canvas/pen_tool_bar.dart';
@@ -9,6 +10,7 @@ import '../annotation_canvas/pen_tool_bar.dart';
 /// readers feel like the same screen with different content panes.
 class SpecReaderPdfChrome extends StatelessWidget {
   const SpecReaderPdfChrome({
+    required this.jobRef,
     required this.jobId,
     required this.onUndo,
     required this.onRedo,
@@ -17,6 +19,7 @@ class SpecReaderPdfChrome extends StatelessWidget {
     super.key,
   });
 
+  final JobRef jobRef;
   final String jobId;
   final VoidCallback onUndo;
   final VoidCallback onRedo;
@@ -41,7 +44,7 @@ class SpecReaderPdfChrome extends StatelessWidget {
           const SizedBox(width: 10),
           const _PhaseTag(label: 'Awaiting review'),
           const Spacer(),
-          const PenToolBar(),
+          PenToolBar(jobRef: jobRef),
           const SizedBox(width: 8),
           IconButton(
             tooltip: 'Undo',

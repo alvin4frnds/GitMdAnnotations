@@ -126,11 +126,26 @@ class AnnotationSession {
     _pushUndo(g);
   }
 
-  // -- Tool + snapshot -------------------------------------------------
+  // -- Tool + color + snapshot ----------------------------------------
 
   void setTool(InkTool t) {
     _tool = t;
   }
+
+  /// Hex string (`#RRGGBB`, 7 chars) used for every new stroke. Defaults
+  /// to the "near-black" pen color to preserve the M1b-T3 behavior. The
+  /// UI palette (PRD §5.4 FR-1.18) dispatches through [setColor].
+  String get color => _color;
+
+  /// Update the active ink color. Hex format (`#RRGGBB`). Silently
+  /// accepts any 7-char `#...` string — the UI enforces the 5-preset
+  /// palette, the domain just stores + echoes it into every subsequent
+  /// [Stroke].
+  void setColor(String hex) {
+    _color = hex;
+  }
+
+  String _color = '#111111';
 
   /// Returns a fresh mutable copy. Callers can mutate the returned list
   /// without affecting the session — rule 7.
@@ -165,9 +180,10 @@ class AnnotationSession {
   StrokePoint _pointFrom(PointerSample s) =>
       StrokePoint(x: s.x, y: s.y, pressure: s.pressure);
 
-  // Rule 3: all tools degrade to pen color/width in T3. T4/T5 will wire
-  // per-tool colors from the 6-preset palette (PRD §5.4 FR-1.18).
-  String _colorFor(InkTool _) => '#111111';
+  // Tool-specific color mapping was deferred from T3; current design is
+  // tool-agnostic ink with a user-selected palette color. Width is still
+  // pen-fixed; revisit if tool differentiation ships later.
+  String _colorFor(InkTool _) => _color;
   double _widthFor(InkTool _) => 2.0;
 }
 

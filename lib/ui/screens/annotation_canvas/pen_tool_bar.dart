@@ -1,17 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/providers/annotation_providers.dart';
+import '../../../domain/entities/job_ref.dart';
 import '../../theme/tokens.dart';
 
-/// Pen tool bar — display-only chrome for the canvas top bar. Shows the
-/// mockup's "red pen selected" visual (pan / pen / highlighter icons + 5
-/// color dots + eraser). Palette wiring is a later task — T7 hardcodes
-/// the active stroke color to `context.tokens.inkRed` in the screen.
-class PenToolBar extends StatelessWidget {
-  const PenToolBar({super.key});
+/// Pen tool bar — interactive palette for the canvas top bar. Shows the
+/// three tool icons (pan / pen / highlighter), a 5-color palette, and
+/// the eraser. Tapping a color dot dispatches `setColor` on the
+/// [annotationControllerProvider] for this [jobRef] — the currently
+/// selected color is read back from the same provider so the UI stays
+/// in sync regardless of which widget mutated it.
+///
+/// Palette matches PRD §5.4 FR-1.18 (5 colors, not the "6-preset"
+/// phrasing used in earlier drafts): red / blue / green / amber / near-
+/// black. Hex values are normalized to `#RRGGBB` so the session stores
+/// a consistent format across themes.
+class PenToolBar extends ConsumerWidget {
+  const PenToolBar({required this.jobRef, super.key});
+
+  final JobRef jobRef;
+
+  static const _paletteHex = <String>[
+    '#DC2626', // red
+    '#2563EB', // blue
+    '#059669', // green
+    '#F59E0B', // amber
+    '#111827', // near-black
+  ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
+    final state = ref.watch(annotationControllerProvider(jobRef));
+    final selected = state.color.toUpperCase();
+    final controller =
+        ref.read(annotationControllerProvider(jobRef).notifier);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
@@ -32,11 +56,12 @@ class PenToolBar extends StatelessWidget {
           const SizedBox(width: 4),
           Container(width: 1, height: 20, color: t.borderSubtle),
           const SizedBox(width: 6),
-          _PenDot(color: t.inkRed, selected: true),
-          _PenDot(color: t.inkBlue),
-          _PenDot(color: t.inkGreen),
-          const _PenDot(color: Color(0xFFF59E0B)),
-          _PenDot(color: t.textPrimary),
+          for (final hex in _paletteHex)
+            _PenDot(
+              hex: hex,
+              selected: hex.toUpperCase() == selected,
+              onTap: () => controller.setColor(hex),
+            ),
           const SizedBox(width: 6),
           Container(width: 1, height: 20, color: t.borderSubtle),
           const SizedBox(width: 2),
@@ -77,32 +102,44 @@ class _ToolIcon extends StatelessWidget {
 }
 
 class _PenDot extends StatelessWidget {
-  final Color color;
+  final String hex;
   final bool selected;
-  const _PenDot({required this.color, this.selected = false});
+  final VoidCallback onTap;
+  const _PenDot({
+    required this.hex,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Container(
-      width: 18,
-      height: 18,
-      margin: const EdgeInsets.symmetric(horizontal: 3),
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: selected
-            ? Border.all(color: t.surfaceElevated, width: 2)
-            : null,
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  color: color,
-                  blurRadius: 0,
-                  spreadRadius: 2,
-                ),
-              ]
-            : null,
+    final color = Color(int.parse('FF${hex.substring(1)}', radix: 16));
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Padding(
+        padding: const EdgeInsets.all(3),
+        child: Container(
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: selected
+                ? Border.all(color: t.surfaceElevated, width: 2)
+                : null,
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: color,
+                      blurRadius: 0,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : null,
+          ),
+        ),
       ),
     );
   }

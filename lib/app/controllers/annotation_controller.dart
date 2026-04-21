@@ -16,26 +16,34 @@ class AnnotationState {
     required this.groups,
     required this.hasActiveStroke,
     required this.tool,
+    required this.color,
   });
 
   const AnnotationState.initial()
       : groups = const <StrokeGroup>[],
         hasActiveStroke = false,
-        tool = InkTool.pen;
+        tool = InkTool.pen,
+        color = '#111111';
 
   final List<StrokeGroup> groups;
   final bool hasActiveStroke;
   final InkTool tool;
 
+  /// Active ink color, `#RRGGBB`. Drives both the next-stroke render and
+  /// the pen-tool-bar's "selected dot" indicator.
+  final String color;
+
   AnnotationState copyWith({
     List<StrokeGroup>? groups,
     bool? hasActiveStroke,
     InkTool? tool,
+    String? color,
   }) =>
       AnnotationState(
         groups: groups ?? this.groups,
         hasActiveStroke: hasActiveStroke ?? this.hasActiveStroke,
         tool: tool ?? this.tool,
+        color: color ?? this.color,
       );
 
   @override
@@ -44,6 +52,7 @@ class AnnotationState {
     if (other is! AnnotationState) return false;
     if (other.hasActiveStroke != hasActiveStroke) return false;
     if (other.tool != tool) return false;
+    if (other.color != color) return false;
     if (other.groups.length != groups.length) return false;
     for (var i = 0; i < groups.length; i++) {
       if (other.groups[i] != groups[i]) return false;
@@ -53,11 +62,12 @@ class AnnotationState {
 
   @override
   int get hashCode =>
-      Object.hash(Object.hashAll(groups), hasActiveStroke, tool);
+      Object.hash(Object.hashAll(groups), hasActiveStroke, tool, color);
 
   @override
   String toString() =>
-      'AnnotationState(groups: ${groups.length}, active: $hasActiveStroke, tool: $tool)';
+      'AnnotationState(groups: ${groups.length}, active: $hasActiveStroke, '
+      'tool: $tool, color: $color)';
 }
 
 /// Per-job Riverpod notifier that owns a single [AnnotationSession] and
@@ -124,6 +134,15 @@ class AnnotationController
   void setTool(InkTool tool) {
     _session.setTool(tool);
     state = state.copyWith(tool: tool);
+  }
+
+  /// Set the active ink color. Accepted format: `#RRGGBB` (7 chars).
+  /// Drives both the next-stroke color and the pen tool bar's "selected
+  /// dot" highlight. No-op if [hex] matches the current color.
+  void setColor(String hex) {
+    if (state.color == hex) return;
+    _session.setColor(hex);
+    state = state.copyWith(color: hex);
   }
 
   // -- Internals -------------------------------------------------------

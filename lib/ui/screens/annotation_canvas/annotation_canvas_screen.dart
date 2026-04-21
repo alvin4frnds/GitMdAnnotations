@@ -166,6 +166,7 @@ class _AnnotationCanvasScreenState
       child: Column(
         children: [
           AnnotationTopChrome(
+            jobRef: widget.jobRef,
             onUndo: _undo,
             onRedo: _redo,
             onOpenReviewPanel: _openReviewPanel,
