@@ -37,18 +37,26 @@ class MarkdownPane extends ConsumerWidget {
         child: SingleChildScrollView(
           child: Stack(
             children: [
-              Padding(
-                padding: kAnnotatedContentPadding,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    MarkdownStub(jobRef: jobRef),
-                    const SizedBox(height: 24),
-                    Text(
-                      _annotationSummary(strokeGroups),
-                      style: TextStyle(color: t.textMuted, fontSize: 11),
-                    ),
-                  ],
+              // `width: double.infinity` mirrors the canvas side
+              // (`annotation_canvas/main_content.dart`). Without it the
+              // Stack's non-positioned child shrinks to the markdown
+              // text width and the stroke painter would clip strokes
+              // drawn in the left/right margins.
+              SizedBox(
+                width: double.infinity,
+                child: Padding(
+                  padding: kAnnotatedContentPadding,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      MarkdownStub(jobRef: jobRef),
+                      const SizedBox(height: 24),
+                      Text(
+                        _annotationSummary(strokeGroups),
+                        style: TextStyle(color: t.textMuted, fontSize: 11),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               if (strokeGroups.isNotEmpty)

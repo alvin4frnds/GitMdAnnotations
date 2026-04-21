@@ -79,9 +79,21 @@ class AnnotationMainContent extends StatelessWidget {
               : const BouncingScrollPhysics(),
           child: Stack(
             children: [
-              Padding(
-                padding: kAnnotatedContentPadding,
-                child: MarkdownStub(jobRef: jobRef),
+              // Forcing `width: double.infinity` is deliberate — without
+              // it the Stack's non-positioned child gets loose
+              // constraints and `MarkdownBody(shrinkWrap: true)` sizes
+              // down to its intrinsic *text* width. The Stack would
+              // then shrink to that text box and the `Positioned.fill`
+              // InkOverlay would shrink with it, making the left/right
+              // page margins unreachable to the stylus — user could
+              // only start a stroke on a line that already had text
+              // under it.
+              SizedBox(
+                width: double.infinity,
+                child: Padding(
+                  padding: kAnnotatedContentPadding,
+                  child: MarkdownStub(jobRef: jobRef),
+                ),
               ),
               Positioned.fill(
                 child: IgnorePointer(
