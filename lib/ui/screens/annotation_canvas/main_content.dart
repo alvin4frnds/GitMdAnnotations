@@ -8,6 +8,7 @@ import '../../../domain/entities/job_ref.dart';
 import '../../../domain/entities/pointer_sample.dart';
 import '../../../domain/entities/stroke.dart';
 import '../../../domain/entities/stroke_group.dart';
+import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/canonical_page/canonical_page.dart';
 import '../../widgets/ink_overlay/ink_overlay.dart';
@@ -175,11 +176,34 @@ class _AnnotationMainContentState extends ConsumerState<AnnotationMainContent> {
               // under it.
               RepaintBoundary(
                 key: _markdownBoundaryKey,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Padding(
-                    padding: kAnnotatedContentPadding,
-                    child: MarkdownStub(jobRef: widget.jobRef),
+                // Markdown subtree always renders on a light
+                // (white) page, regardless of the app's dark/light
+                // theme. Drives two outcomes:
+                //   1. `03-annotations.pdf` embeds the same light
+                //      markdown + strokes whether the user annotated
+                //      in day or night mode — the committed artifact
+                //      is readable either way.
+                //   2. Stroke alignment is theme-invariant:
+                //      MarkdownBody layout already doesn't depend on
+                //      brightness, but pinning the token set
+                //      explicitly makes the raster-for-PDF
+                //      deterministic.
+                // Chrome around the CanonicalPage (nav rail, top bar)
+                // still honors the user's theme. The explicit
+                // `ColoredBox` gives the transparent markdown region
+                // a white underlay so dark-mode surroundings don't
+                // bleed through and muddy the text.
+                child: Theme(
+                  data: AppTheme.build(AppTokens.light),
+                  child: ColoredBox(
+                    color: AppTokens.light.surfaceElevated,
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Padding(
+                        padding: kAnnotatedContentPadding,
+                        child: MarkdownStub(jobRef: widget.jobRef),
+                      ),
+                    ),
                   ),
                 ),
               ),

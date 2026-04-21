@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers/annotation_providers.dart';
 import '../../../domain/entities/job_ref.dart';
 import '../../../domain/entities/stroke_group.dart';
+import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/canonical_page/canonical_page.dart';
 import '../../widgets/ink_overlay/ink_painting.dart';
@@ -40,20 +41,37 @@ class MarkdownPane extends ConsumerWidget {
             // Stack's non-positioned child shrinks to the markdown
             // text width and the stroke painter would clip strokes
             // drawn in the left/right margins.
-            SizedBox(
-              width: double.infinity,
-              child: Padding(
-                padding: kAnnotatedContentPadding,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    MarkdownStub(jobRef: jobRef),
-                    const SizedBox(height: 24),
-                    Text(
-                      _annotationSummary(strokeGroups),
-                      style: TextStyle(color: t.textMuted, fontSize: 11),
+            //
+            // Markdown forced to light tokens, matching the annotate
+            // canvas side. Keeps the review-panel markdown readable in
+            // dark mode AND keeps line-wrap identical to the rasterized
+            // PDF background, so the read-only stroke overlay lines up
+            // with the same underlying text the user drew over.
+            Theme(
+              data: AppTheme.build(AppTokens.light),
+              child: ColoredBox(
+                color: AppTokens.light.surfaceElevated,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Padding(
+                    padding: kAnnotatedContentPadding,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        MarkdownStub(jobRef: jobRef),
+                        const SizedBox(height: 24),
+                        Builder(
+                          builder: (ctx) => Text(
+                            _annotationSummary(strokeGroups),
+                            style: TextStyle(
+                              color: ctx.tokens.textMuted,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
