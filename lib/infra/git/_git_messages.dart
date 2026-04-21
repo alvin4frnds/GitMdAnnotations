@@ -138,6 +138,16 @@ class GitReqHeadSha extends GitRequest {
   final String branch;
 }
 
+class GitReqBootstrapLocalBranch extends GitRequest {
+  const GitReqBootstrapLocalBranch({
+    required super.id,
+    required this.localBranch,
+    required this.remoteBranch,
+  });
+  final String localBranch;
+  final String remoteBranch;
+}
+
 /// Lifecycle-only message — carries no request id because no reply is
 /// expected. The isolate self-terminates on receipt.
 class GitReqShutdown {

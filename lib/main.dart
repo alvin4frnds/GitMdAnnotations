@@ -64,6 +64,9 @@ class _AuthGate extends ConsumerWidget {
     } else {
       screen = const JobListScreen();
     }
-    return SafeArea(child: screen);
+    // Scaffold is required so ScaffoldMessenger.showSnackBar has a
+    // descendant to render into — without it, any sync-result toast
+    // throws `_scaffolds.isNotEmpty` and crashes the listener callback.
+    return Scaffold(body: SafeArea(child: screen));
   }
 }

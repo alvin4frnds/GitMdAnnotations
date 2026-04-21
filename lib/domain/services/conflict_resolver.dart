@@ -50,9 +50,12 @@ class ConflictResolver {
     // by other devices. integration_test/sync_conflict_test.dart surfaces
     // this — the remote-added file is only visible after the fetch.
     await git.fetch(repo, branch: 'claude-jobs');
-    await git.fetch(repo, branch: 'main');
+    await git.fetch(repo, branch: repo.defaultBranch);
     await git.resetHard('origin/claude-jobs');
-    await git.mergeInto('origin/main', target: 'claude-jobs');
+    await git.mergeInto(
+      'origin/${repo.defaultBranch}',
+      target: 'claude-jobs',
+    );
     return backup;
   }
 }

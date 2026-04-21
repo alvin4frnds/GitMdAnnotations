@@ -240,6 +240,19 @@ class GitAdapter implements GitPort {
     return null;
   }
 
+  @override
+  Future<bool> bootstrapLocalBranchFromRemote({
+    required String localBranch,
+    required String remoteBranch,
+  }) async {
+    final resp = await _send((id) => GitReqBootstrapLocalBranch(
+          id: id,
+          localBranch: localBranch,
+          remoteBranch: remoteBranch,
+        ));
+    return _unwrap<bool>(resp);
+  }
+
   /// Shuts the background isolate down. Safe to call multiple times; later
   /// calls become no-ops.
   Future<void> dispose() async {

@@ -125,31 +125,46 @@ class SyncService {
     try {
       out.add(const SyncStarted());
 
+      final defaultBranch = repo.defaultBranch;
       out.add(const SyncFetching());
-      await git.fetch(repo, branch: 'main');
+      await git.fetch(repo, branch: defaultBranch);
       await git.fetch(repo, branch: 'claude-jobs');
 
       out.add(const SyncFastForwardingMain());
       try {
-        await git.mergeInto('origin/main', target: 'main');
+        await git.mergeInto(
+          'origin/$defaultBranch',
+          target: defaultBranch,
+        );
       } on GitMergeConflict catch (e) {
         out.add(SyncFailed(e));
         return;
       }
 
-      // Bootstrap simplification: if local claude-jobs doesn't exist we
-      // can't meaningfully merge into it here. M1c will handle real
-      // "create-from-origin-or-main + push" bootstrap. For M1a we just
-      // complete the sync — Sync Down is still idempotent.
+      // If local claude-jobs doesn't exist yet but the origin has one
+      // (common case: the repo was cloned before the sidecar branch was
+      // pushed, then Sync Down should pull it), create the local branch
+      // pointing at origin/claude-jobs so the merge step below has
+      // something to merge into and checking it out populates the
+      // working tree with jobs/pending/*. Without this the sync
+      // silently "succeeds" but JobList stays empty because HEAD is
+      // still on the default branch.
       final jobsHead = await git.headSha('claude-jobs');
       if (jobsHead == null) {
-        out.add(const SyncComplete());
-        return;
+        final bootstrapped = await git.bootstrapLocalBranchFromRemote(
+          localBranch: 'claude-jobs',
+          remoteBranch: 'origin/claude-jobs',
+        );
+        if (!bootstrapped) {
+          // Origin has no claude-jobs either — nothing to sync down.
+          out.add(const SyncComplete());
+          return;
+        }
       }
 
       out.add(const SyncMergingMainIntoJobs());
       try {
-        await git.mergeInto('main', target: 'claude-jobs');
+        await git.mergeInto(defaultBranch, target: 'claude-jobs');
       } on GitMergeConflict catch (e) {
         out.add(SyncFailed(e));
         return;

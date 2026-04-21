@@ -59,6 +59,17 @@ abstract class GitPort {
   /// Current HEAD sha of [branch]. `null` if the branch does not exist
   /// locally.
   Future<String?> headSha(String branch);
+
+  /// Create [localBranch] pointing at [remoteBranch]'s current tip, with
+  /// upstream tracking set. No-op (returns `false`) when the remote
+  /// branch doesn't exist. Returns `true` when the local branch was
+  /// newly created OR already existed. Used by Sync Down to pull a
+  /// sidecar branch that the origin has but the initial clone didn't
+  /// create locally (e.g. `claude-jobs` pushed after RepoPicker ran).
+  Future<bool> bootstrapLocalBranchFromRemote({
+    required String localBranch,
+    required String remoteBranch,
+  });
 }
 
 /// A single file write that will be staged + committed as part of

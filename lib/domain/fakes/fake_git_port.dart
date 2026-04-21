@@ -225,5 +225,26 @@ class FakeGitPort implements GitPort {
     if (log == null || log.isEmpty) return null;
     return log.first.sha;
   }
+
+  @override
+  Future<bool> bootstrapLocalBranchFromRemote({
+    required String localBranch,
+    required String remoteBranch,
+  }) async {
+    if (branches.containsKey(localBranch)) return true;
+    // FakeGitPort doesn't track remote-only refs as a separate namespace
+    // — branches is the ground truth. Callers that want the bootstrap
+    // path exercised should seed the "remote" content under a branch
+    // name that matches `remoteBranch` (or strip the `origin/` prefix).
+    final key = remoteBranch.startsWith('origin/')
+        ? remoteBranch.substring('origin/'.length)
+        : remoteBranch;
+    final tree = branches[key];
+    if (tree == null) return false;
+    branches[localBranch] = Map<String, String>.of(tree);
+    final remoteLog = _log[key];
+    if (remoteLog != null) _log[localBranch] = List.of(remoteLog);
+    return true;
+  }
 }
 

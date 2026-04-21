@@ -80,6 +80,7 @@ Future<GitResponse> _dispatch(_IsolateState state, GitRequest req) async {
       GitReqReadChangelog() => await _handleReadChangelog(state, req),
       GitReqLocalBranches() => _handleLocalBranches(state, req),
       GitReqHeadSha() => _handleHeadSha(state, req),
+      GitReqBootstrapLocalBranch() => _handleBootstrapLocalBranch(state, req),
     };
   } catch (e) {
     return GitResponseError(id: req.id, error: e);
@@ -381,6 +382,49 @@ GitResponse _handleHeadSha(_IsolateState state, GitReqHeadSha req) {
   } catch (_) {
     return GitResponseOk<String?>(id: req.id, value: null);
   }
+}
+
+/// Create `refs/heads/<localBranch>` pointing at `refs/remotes/<remoteBranch>`'s
+/// current tip, with upstream tracking set. No-op (returns `false`) when
+/// the remote branch doesn't exist locally — callers (Sync Down) then
+/// know to fall back to "nothing to merge". Idempotent: returns `true`
+/// when the local branch already existed.
+///
+/// Mirrors the clone-time bootstrap in `_bootstrapLocalSidecarBranch`;
+/// extracted here so Sync Down can bootstrap a sidecar the origin
+/// acquired *after* RepoPicker ran (common case: user pushes
+/// `claude-jobs` to an existing repo, then opens the app).
+GitResponse _handleBootstrapLocalBranch(
+  _IsolateState state,
+  GitReqBootstrapLocalBranch req,
+) {
+  final repo = _onlyRepo(state);
+  // Already exists locally → idempotent success.
+  try {
+    git2.Branch.lookup(repo: repo, name: req.localBranch);
+    return GitResponseOk<bool>(id: req.id, value: true);
+  } on git2.LibGit2Error {
+    // Not found — fall through to create from remote.
+  }
+  final git2.Branch remote;
+  try {
+    remote = git2.Branch.lookup(
+      repo: repo,
+      name: req.remoteBranch,
+      type: git2.GitBranch.remote,
+    );
+  } on git2.LibGit2Error {
+    // Origin doesn't have this branch either — nothing to bootstrap.
+    return GitResponseOk<bool>(id: req.id, value: false);
+  }
+  final commit = git2.Commit.lookup(repo: repo, oid: remote.target);
+  final local = git2.Branch.create(
+    repo: repo,
+    name: req.localBranch,
+    target: commit,
+  );
+  local.setUpstream(req.remoteBranch);
+  return GitResponseOk<bool>(id: req.id, value: true);
 }
 
 /// Returns the single tracked repository in [state], or throws if zero /
