@@ -60,6 +60,11 @@ class SyncController extends AsyncNotifier<SyncState> {
   }) async {
     if (_running) return;
     _running = true;
+    // Flip to in-flight synchronously so watchers that read state right
+    // after this call (e.g. the JobList chrome after an auto-sync kicked
+    // off from RepoPicker.pick()) see "Syncing…" from their first frame,
+    // not after the first stream event lands a microtask later.
+    state = const AsyncValue.data(SyncInProgress(SyncStarted()));
     try {
       await for (final p in _service.syncDown(repo, workdir: workdir)) {
         if (p is SyncComplete) {
@@ -91,6 +96,9 @@ class SyncController extends AsyncNotifier<SyncState> {
   }) async {
     if (_running) return;
     _running = true;
+    // Same synchronous flip as [syncDown] so the button/chrome reflect
+    // in-flight state on the very next frame.
+    state = const AsyncValue.data(SyncInProgress(SyncStarted()));
     BackupRef? archivedBackup;
     try {
       await for (final p in _service.syncUp(

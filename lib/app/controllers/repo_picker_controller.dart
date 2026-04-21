@@ -172,6 +172,28 @@ class RepoPickerController extends AsyncNotifier<RepoPickerState> {
     final storage = ref.read(secureStorageProvider);
     await saveLastOpenedRepo(storage, repo: repoRef, workdir: workdir);
     await saveLastOpenedJobId(storage, null);
+    // First-open auto-sync: a fresh clone has no local `claude-jobs`
+    // branch yet, which means JobList would render empty until the user
+    // manually hits Sync Down. Kick off a sync in the background so the
+    // list populates on its own — JobList already listens for
+    // `SyncDone` and invalidates itself. Cold-start restores (re-opening
+    // an existing workdir) skip this because `claude-jobs` is already
+    // present locally.
+    //
+    // The `localBranches()` gate is awaited here (rather than inside a
+    // separate unawaited helper) so that `syncDown()` is invoked before
+    // the state flip below. `SyncController.syncDown` flips its state
+    // to `SyncInProgress` synchronously on the first line of its body,
+    // so by the time the UI gate swaps in JobList on the next frame the
+    // "Sync Down" button already reads "Syncing…" — no one-frame flash
+    // of the idle label.
+    final hasLocalJobs = (await ref.read(gitPortProvider).localBranches())
+        .contains('claude-jobs');
+    if (!hasLocalJobs) {
+      unawaited(ref
+          .read(syncControllerProvider.notifier)
+          .syncDown(repo: repoRef, workdir: workdir));
+    }
     // Re-emit the loaded list so the UI can render "picked <name>"
     // feedback before the gate flips to JobList.
     state = AsyncValue.data(RepoPickerLoaded(

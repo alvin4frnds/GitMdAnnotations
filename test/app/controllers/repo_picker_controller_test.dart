@@ -5,7 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gitmdannotations_tablet/app/controllers/auth_controller.dart';
 import 'package:gitmdannotations_tablet/app/controllers/auth_identity_codec.dart';
 import 'package:gitmdannotations_tablet/app/controllers/repo_picker_controller.dart';
+import 'package:gitmdannotations_tablet/app/controllers/sync_controller.dart';
 import 'package:gitmdannotations_tablet/app/last_session.dart';
+import 'package:gitmdannotations_tablet/app/providers/annotation_providers.dart';
 import 'package:gitmdannotations_tablet/app/providers/auth_providers.dart';
 import 'package:gitmdannotations_tablet/app/providers/repo_picker_providers.dart';
 import 'package:gitmdannotations_tablet/app/providers/spec_providers.dart';
@@ -14,6 +16,7 @@ import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
 import 'package:gitmdannotations_tablet/domain/entities/github_repo.dart';
 import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_auth_port.dart';
+import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_git_port.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_github_repos_port.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_secure_storage.dart';
@@ -78,6 +81,7 @@ const _repoB = GitHubRepo(
     authPortProvider.overrideWithValue(FakeAuthPort()),
     secureStorageProvider.overrideWithValue(storage),
     docsDirectoryProvider.overrideWithValue(() async => docs),
+    clockProvider.overrideWithValue(FakeClock(DateTime.utc(2026, 4, 21))),
   ]);
   addTearDown(container.dispose);
   return (
@@ -261,6 +265,63 @@ void main() {
       );
       // Sanity: the fake git port observed a cloneOrOpen call.
       expect(env.git.cloned, isTrue);
+      // Let the fire-and-forget first-open sync-down settle before the
+      // container tears down — otherwise the microtask races teardown.
+      await pumpEventQueue();
+    });
+
+    test(
+        'first-time pick (no local claude-jobs) fires auto-sync-down in '
+        'the background', () async {
+      final repos = FakeGitHubReposPort(seededRepos: [_repoA]);
+      final env = _buildContainer(repos: repos);
+      await _primeAuthSignedIn(env.container);
+      await env.container.read(repoPickerControllerProvider.future);
+
+      expect(env.git.fetchCount, 0, reason: 'no sync before pick');
+
+      await env.container
+          .read(repoPickerControllerProvider.notifier)
+          .pick(_repoA);
+
+      // Synchronously after pick() returns — before we drain the
+      // event queue — syncControllerProvider must already be in
+      // SyncInProgress. This is the regression lock: JobList mounts
+      // on the frame right after pick() flips, and if the state
+      // transition were deferred to the first stream event the button
+      // would briefly flash "Sync Down" before switching to "Syncing…".
+      final syncState =
+          env.container.read(syncControllerProvider).value;
+      expect(syncState, isA<SyncInProgress>(),
+          reason: 'auto-sync must flip state synchronously for the '
+              'JobList button to show "Syncing…" from frame 1');
+
+      // Drain the fire-and-forget sync microtasks.
+      await pumpEventQueue();
+
+      // SyncService.syncDown fetches both `main` and `claude-jobs`, so
+      // 2 is the minimum count a successful run leaves behind.
+      expect(env.git.fetchCount, greaterThanOrEqualTo(2));
+    });
+
+    test(
+        'subsequent pick (local claude-jobs already present) skips '
+        'auto-sync-down', () async {
+      final repos = FakeGitHubReposPort(seededRepos: [_repoA]);
+      final git = FakeGitPort(initial: {
+        'claude-jobs': <String, String>{},
+      });
+      final env = _buildContainer(repos: repos, git: git);
+      await _primeAuthSignedIn(env.container);
+      await env.container.read(repoPickerControllerProvider.future);
+
+      await env.container
+          .read(repoPickerControllerProvider.notifier)
+          .pick(_repoA);
+      await pumpEventQueue();
+
+      expect(env.git.fetchCount, 0,
+          reason: 'local claude-jobs already present — no auto-sync');
     });
   });
 }
