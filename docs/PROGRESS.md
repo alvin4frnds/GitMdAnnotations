@@ -70,7 +70,7 @@ Across the two pushes documented in `docs/implementation-plan2.md`:
 | **W5.2** | Settings screen (ACCOUNT / REPOSITORY / DATA sections) + Export backups via Storage Access Framework (`shared_storage` 0.8.1, recursive SAF copy, sealed `ExportOutcome`); delegated to parallel agent; +9 tests | ✅ |
 | **W5.3** | Recovery flows — `loadLastSession` validates workdir+`.git` existence and clears stale keys on mismatch; `SyncController.syncUp` auto-signs-out on `PushRejectedAuth` so revoked tokens don't persist; +4 tests | ✅ |
 | **W5.4** | Cold-start NFR-2 preload — persist `(repo, workdir, jobId)` via `SecureStoragePort` on every `RepoPickerController.pick()` + JobList row tap; `main()` rehydrates before `runApp` and overrides `currentRepoProvider` / `currentWorkdirProvider` so `_AuthGate` lands on JobList directly; `ColdStartTracker` writes 3 checkpoints to `dart:developer` for `adb logcat | grep gitmdscribe.nfr2`; sign-out clears the keys; delegated to parallel agent; +16 tests | ✅ |
-| **W5.5** | Battery NFR-8 profiling (4h continuous review on OPD2504) | ⏳ (needs device + measurement window) |
+| **W5.5** | Battery NFR-8 profiling (4h continuous review on OPD2504) | ⏭ skipped by owner (2026-04-21) |
 | **W6** | NFR-1 real-stylus p95, NFR-7 TalkBack, NFR-9 storage LRU, NFR-10 on-device sync timing | ⏳ |
 | Hygiene | `SyncController` now uses `ClockPort` (closes the M1a-T11 Low entry in `Issues.md`); push-error classifier enumerates structured categories (closes the M1a-T10 Medium) | ✅ |
 
