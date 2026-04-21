@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/repo_ref.dart';
+import '../../domain/ports/git_port.dart';
 import '../../domain/services/sync_service.dart';
 import '../providers/sync_providers.dart';
 
@@ -21,8 +22,15 @@ class SyncInProgress extends SyncState {
 }
 
 class SyncDone extends SyncState {
-  const SyncDone(this.at);
+  const SyncDone(this.at, {this.backup});
   final DateTime at;
+
+  /// If the run encountered a non-fast-forward push that archived local
+  /// commits before resetting, this is the backup handle — non-null only
+  /// on the archive-and-reset path. Surface in the UI so the "Remote
+  /// won, backup at `<path>`" banner survives the terminal transition
+  /// out of [SyncInProgress] (M1c T5 reviewer finding).
+  final BackupRef? backup;
 }
 
 class SyncErrored extends SyncState {
@@ -73,7 +81,9 @@ class SyncController extends AsyncNotifier<SyncState> {
   ///
   /// A [SyncConflictArchived] event flows through [SyncInProgress] — the
   /// UI inspects `state.latest` to render the "remote won, backup at …"
-  /// banner before the stream reaches its terminal [SyncDone].
+  /// banner before the stream reaches its terminal [SyncDone]. We also
+  /// capture the [BackupRef] into the terminal [SyncDone.backup] so the
+  /// banner survives the final transition (M1c T5 reviewer finding).
   Future<void> syncUp({
     required RepoRef repo,
     required String workdir,
@@ -81,14 +91,20 @@ class SyncController extends AsyncNotifier<SyncState> {
   }) async {
     if (_running) return;
     _running = true;
+    BackupRef? archivedBackup;
     try {
       await for (final p in _service.syncUp(
         repo,
         workdir: workdir,
         backupRoot: backupRoot,
       )) {
-        if (p is SyncComplete) {
-          state = AsyncValue.data(SyncDone(DateTime.now()));
+        if (p is SyncConflictArchived) {
+          archivedBackup = p.backup;
+          state = AsyncValue.data(SyncInProgress(p));
+        } else if (p is SyncComplete) {
+          state = AsyncValue.data(
+            SyncDone(DateTime.now(), backup: archivedBackup),
+          );
         } else if (p is SyncFailed) {
           state = AsyncValue.data(SyncErrored(p.error));
         } else {

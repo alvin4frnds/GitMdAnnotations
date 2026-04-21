@@ -180,6 +180,27 @@ void main() {
       expect(seen.last, isA<SyncDone>());
     });
 
+    test('SyncDone.backup carries the archived BackupRef after conflict flow',
+        () async {
+      final fake = await _seeded();
+      fake.scriptedPushOutcome = const PushRejectedNonFastForward(
+        remoteSha: 'r',
+        localSha: 'l',
+      );
+      final env = _buildContainer(fake);
+      await env.container.read(syncControllerProvider.future);
+
+      await env.container.read(syncControllerProvider.notifier).syncUp(
+            repo: _repo,
+            workdir: _workdir,
+            backupRoot: backupRoot,
+          );
+
+      final state = env.container.read(syncControllerProvider).value;
+      expect(state, isA<SyncDone>());
+      expect((state as SyncDone).backup, isNotNull);
+    });
+
     test('PushRejectedAuth transitions to SyncErrored(PushRejectedAuth)',
         () async {
       final fake = await _seeded();

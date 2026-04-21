@@ -98,14 +98,15 @@ class ConflictArchivedScreen extends ConsumerWidget {
   }
 
   /// Extracts the latest archived [BackupRef] from the sync controller's
-  /// state. Only [SyncInProgress(SyncConflictArchived(...))] carries it —
-  /// the terminal [SyncDone] state currently drops it on the floor (the
-  /// P2 `SyncDone.backup` follow-up is tracked separately).
+  /// state. Both mid-flight [SyncInProgress(SyncConflictArchived(...))]
+  /// and the terminal [SyncDone(backup: ...)] carry it, so the banner
+  /// survives the final transition (M1c T5 reviewer finding).
   BackupRef? _latestBackup(SyncState? state) {
     if (state is SyncInProgress) {
       final p = state.latest;
       if (p is SyncConflictArchived) return p.backup;
     }
+    if (state is SyncDone) return state.backup;
     return null;
   }
 }
