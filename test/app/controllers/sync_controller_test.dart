@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gitmdannotations_tablet/app/controllers/sync_controller.dart';
+import 'package:gitmdannotations_tablet/app/providers/annotation_providers.dart';
 import 'package:gitmdannotations_tablet/app/providers/sync_providers.dart';
 import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
 import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
+import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_git_port.dart';
 import 'package:gitmdannotations_tablet/domain/ports/git_port.dart';
 import 'package:gitmdannotations_tablet/domain/services/sync_service.dart';
@@ -29,11 +31,15 @@ Future<FakeGitPort> _seeded() async {
   return fake;
 }
 
+final _fixedNow = DateTime.utc(2026, 4, 21, 12, 0, 0);
+
 ({ProviderContainer container, FakeGitPort git}) _buildContainer(
-  FakeGitPort git,
-) {
+  FakeGitPort git, {
+  DateTime? at,
+}) {
   final container = ProviderContainer(overrides: [
     gitPortProvider.overrideWithValue(git),
+    clockProvider.overrideWithValue(FakeClock(at ?? _fixedNow)),
   ]);
   addTearDown(container.dispose);
   return (container: container, git: git);

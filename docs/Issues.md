@@ -94,12 +94,16 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 - **Detail:** `libgit2dart` exposes only `toString()` on `LibGit2Error`, so non-fast-forward and 401 failures are detected via substring matches ("non-fast-forward", "rejected", "401", "unauthorized"). Brittle once we observe real-world GitHub failures.
 - **Proposed fix:** Log the raw `toString()` to a structured sink during M1c Sync Up integration, then harden the mapping table against the real messages we see.
 
-### Issue: `SyncController` uses `DateTime.now()` directly; no clock injection
-- **Severity:** Low
-- **Source:** M1a T11 (2026-04-20)
-- **Screen/area:** `lib/app/controllers/sync_controller.dart`.
-- **Detail:** Will matter once we add sync-timing telemetry (M1d or later). Right now it only affects `SyncDone(at)` on the happy path.
-- **Proposed fix:** Introduce a `ClockPort` in `lib/domain/ports/` + a `SystemClock` adapter; override in tests via Riverpod, wire at composition root.
+### ~~Issue: `SyncController` uses `DateTime.now()` directly; no clock injection~~ — Closed 2026-04-21
+- ~~**Severity:** Low~~
+- ~~**Source:** M1a T11 (2026-04-20)~~
+- ~~**Screen/area:** `lib/app/controllers/sync_controller.dart`.~~
+- **Closed:** `SyncController` now reads `Clock` via the existing
+  `clockProvider` (no new `ClockPort` needed — the port and `SystemClock`
+  adapter had already landed for M1b-T5). Both `SyncDone.at` sites
+  switched from `DateTime.now()` to `_clock.now()`; `sync_controller_test`
+  gained a `FakeClock` override and an `_fixedNow` fixture so timestamp
+  assertions are deterministic.
 
 ### Issue: `claude-jobs` bootstrap from origin/main not yet implemented
 - **Severity:** Low

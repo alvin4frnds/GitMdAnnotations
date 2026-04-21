@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/repo_ref.dart';
+import '../../domain/ports/clock_port.dart';
 import '../../domain/ports/git_port.dart';
 import '../../domain/services/sync_service.dart';
+import '../providers/annotation_providers.dart';
 import '../providers/sync_providers.dart';
 
 /// Sealed UI-level sync state. Exhaustive `switch` in widgets.
@@ -42,14 +44,11 @@ class SyncErrored extends SyncState {
 /// [SyncService.syncDown] / [SyncService.syncUp] and maps each
 /// [SyncProgress] event into a [SyncState]. Terminal progress events flip
 /// state to [SyncDone] / [SyncErrored].
-///
-/// Follow-up: we use [DateTime.now] directly for the `SyncDone.at`
-/// timestamp. If we add sync telemetry in M1d we'll wire a `Clock` port
-/// here for determinism.
 class SyncController extends AsyncNotifier<SyncState> {
   bool _running = false;
 
   SyncService get _service => ref.read(syncServiceProvider);
+  Clock get _clock => ref.read(clockProvider);
 
   @override
   Future<SyncState> build() async => const SyncIdle();
@@ -63,7 +62,7 @@ class SyncController extends AsyncNotifier<SyncState> {
     try {
       await for (final p in _service.syncDown(repo, workdir: workdir)) {
         if (p is SyncComplete) {
-          state = AsyncValue.data(SyncDone(DateTime.now()));
+          state = AsyncValue.data(SyncDone(_clock.now()));
         } else if (p is SyncFailed) {
           state = AsyncValue.data(SyncErrored(p.error));
         } else {
@@ -103,7 +102,7 @@ class SyncController extends AsyncNotifier<SyncState> {
           state = AsyncValue.data(SyncInProgress(p));
         } else if (p is SyncComplete) {
           state = AsyncValue.data(
-            SyncDone(DateTime.now(), backup: archivedBackup),
+            SyncDone(_clock.now(), backup: archivedBackup),
           );
         } else if (p is SyncFailed) {
           state = AsyncValue.data(SyncErrored(p.error));
