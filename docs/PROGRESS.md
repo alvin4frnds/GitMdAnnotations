@@ -47,8 +47,35 @@ docs/
 
 ## Current state
 
-**Milestone:** 1c 🟡 (in progress — T1–T6 green, T7 navigation wiring + close-out QA remaining). 1d ⏳ pending. Phase 1 completion plan: [`docs/implementation-plan2.md`](implementation-plan2.md).
-**Last updated:** 2026-04-21.
+**Milestone:** 1c 🟡 — core flow code-complete; **M1c-close QA pending on device**. 1d 🟡 — T1 (ChangelogViewer) done; T2–T5 pending. Phase 1 completion plan: [`docs/implementation-plan2.md`](implementation-plan2.md).
+**Last updated:** 2026-04-21 (late).
+
+### Phase 1 completion snapshot
+
+Across the two pushes documented in `docs/implementation-plan2.md`:
+
+| Wave | Scope | Status |
+|---|---|---|
+| **W1** | Bundle Inter + JetBrains Mono fonts (closes Issues.md:21-26); refresh PROGRESS.md + materialize plan at `docs/implementation-plan2.md`; cross-compile libgit2 for `arm64-v8a` + `armeabi-v7a`; push-error classifier refactor (+42 tests) | ✅ |
+| **W2.1/2.2** | Cross-compile mbedTLS 2.28 LTS (3 ABIs); relink libgit2 with `-DUSE_HTTPS=mbedTLS`; integration test asserts `GitFeature.https` on emulator-5554; `sync_conflict_test.dart` regression-green | ✅ |
+| **W2.3** | Publish fork (`../libgit2dart-fork/`) as git repo, swap `path:` → `git: { url, ref }` | ⏳ (~30 min, needs GitHub auth) |
+| **W2.5** | On-tablet OPD2504 smoke (arm64 `.so` + HTTPS on real hardware) | ⏳ (needs tablet connected) |
+| **W3.1** | RepoPicker — domain entity + port + fake + Dio adapter + controller + screen; `_AuthGate` now routes SignIn → RepoPicker → JobList; +7 controller tests (pick() path has a documented TODO for path_provider override) | ✅ |
+| **W3.2** | Fix `claude-jobs` branch bootstrap from `origin/claude-jobs` in `_handleCloneOrOpen` | ✅ |
+| **W3.3** | Fix `resetHard('origin/claude-jobs')` via RevParse fallback + `_lookupLocalOrRemoteRef` in `_handleMerge` + libgit2 1.5 NFF needle + fetch-before-reset in `ConflictResolver` — all five surfaced by the diverged-conflict integration test, all now green | ✅ |
+| **W4.1/4.2** | Navigation wiring: JobList row → SpecReader (md/pdf by `SourceKind`); SpecReader chrome Annotate / Review panel / Submit buttons wired through the already-landed M1c-T7 orchestrator | ✅ |
+| **W4.3** | Review draft auto-save (5s tick, coalesces keystrokes, pop-save on dispose); delegated to parallel agent; +6 tests | ✅ |
+| **W4.4** | M1c close-out QA round (ADB golden-path on tablet + triage) | ⏳ (interactive; needs credentials + device) |
+| **W5.1** | ChangelogViewer — `ChangelogAggregator` service + controller + timeline UI + JobList left-rail nav entry; delegated to parallel agent; +15 tests | ✅ |
+| **W5.2** | Settings / Export backups via Storage Access Framework | ⏳ |
+| **W5.3** | Recovery flows (corrupted `.git` surfacing + expired-token re-auth polish) | ⏳ |
+| **W5.4** | Cold-start NFR-2 tuning (preload last-opened job metadata) | ⏳ |
+| **W5.5** | Battery NFR-8 profiling (4h continuous review on OPD2504) | ⏳ (needs device + measurement window) |
+| **W6** | NFR-1 real-stylus p95, NFR-7 TalkBack, NFR-9 storage LRU, NFR-10 on-device sync timing | ⏳ |
+| Hygiene | `SyncController` now uses `ClockPort` (closes the M1a-T11 Low entry in `Issues.md`); push-error classifier enumerates structured categories (closes the M1a-T10 Medium) | ✅ |
+
+**Test count:** 668 → **696 passing** (+28 this push). Same 2 pre-existing `sign_in_screen_test.dart` flakes (independent of this work).
+**APK:** ships `libgit2.so` + `libmbedtls.so` + `libmbedx509.so` + `libmbedcrypto.so` under each of `lib/{arm64-v8a,armeabi-v7a,x86_64}/`. Real HTTPS clones/fetches/pushes against `github.com` now possible.
 
 ### Completed before 1a proper (UI spike)
 
