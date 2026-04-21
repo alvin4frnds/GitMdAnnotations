@@ -47,8 +47,8 @@ docs/
 
 ## Current state
 
-**Milestone:** 1c 🟡 — core flow code-complete; **M1c-close QA pending on device**. 1d 🟡 — T1–T4 done; T5 (battery profiling, needs 4-hour device run) pending. Phase 1 completion plan: [`docs/implementation-plan2.md`](implementation-plan2.md).
-**Last updated:** 2026-04-21 (late, after W5.2/5.3/5.4 + spec-reader-md real rendering).
+**Milestone:** Phase 1 ✅ — M1a/M1b/M1c/M1d all code-complete; combined M1c+M1d close-out QA on build `ac754f6` returned **0 Critical / 0 High** (`docs/_m1_phase1_close.md`). 2 Medium (Sync Up badge stale on local commit; changelog viewer the same) + 1 Low (sign-out polish — fixed inline as part of the close-out) deferred to `docs/Issues.md`. Interactive-only items still open: W5.5 battery profiling (needs 4-hour device window), W6 NFR measurement gates (real-stylus p95, TalkBack, storage LRU, sync timing), W2.3 libgit2dart fork publication (needs GitHub auth).
+**Last updated:** 2026-04-21 (Phase-1 close-out QA + X3/X4 doc closure + sign-out wired).
 
 ### Phase 1 completion snapshot
 
@@ -150,8 +150,8 @@ Per IMPLEMENTATION.md §6.3. Status reconstructed from the commit log on 2026-04
 | T4 | `ConflictResolver` remote-wins archival | ✅ | `bde0a08` |
 | T5 | `SyncService.syncUp` + `ConflictResolver` wiring | ✅ | `ef48f92` + follow-up `30799b8` |
 | T6 | Integration test: diverged-branch conflict E2E | ✅ on host | `c4bc604` + `37a3e71`; on-device run pending until the two Issues.md High git bugs below are fixed |
-| T7 | Review panel UI + Submit + Approve + conflict banner + auto-save timer | 🟡 | `5a3fbae` + `b4deb27` + `2f43b04` + `8df5fb8` + `0cc6fb2` landed; **still unbuilt:** JobList→SpecReader→Canvas→ReviewPanel navigation wiring, review-draft auto-save timer |
-| M1c-close | QA + triage + fix | ⏳ | `docs/_m1c_qa_round1/` scaffolding present locally; needs to be run once navigation wiring + two Issues.md High bugs (claude-jobs branch bootstrap, resetHard ref-name) are fixed |
+| T7 | Review panel UI + Submit + Approve + conflict banner + auto-save timer | ✅ | Navigation wiring + auto-save timer landed in W4.1/4.2/4.3; submit/approve flows surface a SnackBar on commit outcome (`766d813` + `91bbabb` + `ac754f6`) |
+| M1c-close | QA + triage + fix | ✅ | Combined M1c+M1d close-out on `ac754f6`: **0 Critical / 0 High**, 2 Medium + 1 Low deferred to Issues.md (`docs/_m1_phase1_close.md`) |
 
 ### Milestone 1d task board — polish + NFRs (pending)
 
@@ -163,8 +163,8 @@ Per IMPLEMENTATION.md §6.4. Will expand as tasks start.
 | T2 | Settings: "Export backups" via Storage Access Framework | ✅ |
 | T3 | Recovery flows: corrupted `.git` surfacing + expired-token re-auth polish | ✅ |
 | T4 | Cold-start NFR-2 tuning (preload last-opened job metadata) | ✅ |
-| T5 | Battery profiling against NFR-8 (4+ hours active review on OPD2504) | ⏳ |
-| M1d-close | QA + triage + NFR measurement gates (NFR-1 real stylus, NFR-7 TalkBack, NFR-9 LRU, NFR-10 sync) | ⏳ |
+| T5 | Battery profiling against NFR-8 (4+ hours active review on OPD2504) | ⏳ | Needs a dedicated 4-hour plugged-in telemetry session — interactive |
+| M1d-close | QA + triage + NFR measurement gates (NFR-1 real stylus, NFR-7 TalkBack, NFR-9 LRU, NFR-10 sync) | 🟡 | Functional QA rolled into combined M1c+M1d close-out on `ac754f6` (`docs/_m1_phase1_close.md`). The four NFR measurement gates remain — each needs a device + instrumentation session, tracked under W6 above |
 
 ### Cross-milestone: latent defects surfaced during emulator verification (2026-04-21)
 

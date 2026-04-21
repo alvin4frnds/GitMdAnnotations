@@ -50,6 +50,12 @@ class SettingsScreen extends ConsumerWidget {
                   value: _authValue(auth),
                   mono: auth is AuthSignedIn,
                 ),
+                if (auth is AuthSignedIn) ...[
+                  const SizedBox(height: 8),
+                  _SignOutRow(
+                    onSignOut: () => _confirmSignOut(context, ref),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 const _SectionHeader('REPOSITORY'),
                 const SizedBox(height: 8),
@@ -83,6 +89,34 @@ class SettingsScreen extends ConsumerWidget {
   static String _repoValue(RepoRef? repo) {
     if (repo == null) return 'No repository selected';
     return '${repo.owner}/${repo.name}';
+  }
+
+  Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text(
+          'Pending drafts and unpushed commits stay on this device. '
+          'You can sign back in later to resume.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await ref.read(authControllerProvider.notifier).signOut();
+    if (context.mounted) {
+      Navigator.of(context).maybePop();
+    }
   }
 }
 
@@ -146,6 +180,55 @@ class _SectionHeader extends StatelessWidget {
         fontSize: 11,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.5,
+      ),
+    );
+  }
+}
+
+/// Row with a single Sign out affordance, styled like an `_InfoRow` so
+/// it blends into the Account section. Tapping fires [onSignOut] —
+/// the SettingsScreen wraps the call in a confirm dialog and pops the
+/// Settings route after a successful sign-out.
+class _SignOutRow extends StatelessWidget {
+  const _SignOutRow({required this.onSignOut});
+  final VoidCallback onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      decoration: BoxDecoration(
+        color: t.surfaceElevated,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: t.borderSubtle),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Icon(Icons.logout_rounded, size: 16, color: t.statusDanger),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Sign out',
+              style: TextStyle(
+                color: t.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: onSignOut,
+            style: TextButton.styleFrom(
+              foregroundColor: t.statusDanger,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ),
+            child: const Text('Sign out'),
+          ),
+        ],
       ),
     );
   }

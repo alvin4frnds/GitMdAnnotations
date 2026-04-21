@@ -219,3 +219,17 @@ Reference: `docs/_m1b_qa_round1.md` + 25 screenshots in `docs/_m1b_qa_round1/`. 
 - **Screen/area:** `integration_test/pen_latency_test.dart`, `docs/pen_latency_measurement.md`.
 - **Detail:** The T11 NFR-1 harness uses `flutter_test`'s `TestGesture` to synthesize `PointerEvent`s directly into the Flutter binding. This bypasses the stylus driver, the digitizer sampling loop, the HAL queue, and any compositor buffering above Flutter's engine. The measured p50/p95/p99 therefore reflect only Flutter's paint pipeline and are a **lower bound** on real-world ink latency. NFR-1 (<25 ms p95) is a user-perceived-latency gate; the real-world delta vs. our synthetic numbers is currently unknown.
 - **Proposed fix:** Post-M1b, add a manual high-speed-camera measurement step to the close-out protocol: record stylus tip + screen at ≥240 fps, count frames from contact to first ink paint, cross-reference against the synthetic p95. If the camera-observed p95 exceeds 25 ms while the synthetic number sits comfortably under, pursue the IMPLEMENTATION.md §8.3 fallback — embed a native Android canvas view via `AndroidView` — since the delta would be sitting below Flutter. Tools: a smartphone high-speed mode (iPhone 240 fps / modern Android equivalents) is sufficient; a dedicated pro camera is overkill for a single-number gate.
+
+### Issue: Sync Up badge does not reflect local unpushed commits
+- **Severity:** Medium
+- **Source:** Phase-1 close-out QA (2026-04-21) — F2 in `docs/_m1_phase1_close.md`.
+- **Screen/area:** `lib/ui/screens/job_list/job_list_screen.dart` (Sync Up chrome), `lib/app/controllers/sync_controller.dart`.
+- **Detail:** After a successful local review commit, the JobList's "Sync Up [N]" pill still reads `0`. Users get no visible indication that commits are queued waiting for a push. The SnackBar "Review committed locally. Push on next Sync Up." promises the pending work is there, but the badge contradicts that — the offline queue is invisible.
+- **Proposed fix:** Surface `git log origin/claude-jobs..claude-jobs --count` as a provider that the JobList chrome watches. Invalidate the provider on every `ReviewSubmitter.submit` / `.approve` success and after every `SyncController.syncUp` so the badge re-queries. Guard against zero-upstream (fresh clone with no origin) by falling back to 0 rather than throwing.
+
+### Issue: Changelog viewer does not show local unpushed commits
+- **Severity:** Low
+- **Source:** Phase-1 close-out QA (2026-04-21) — F3 in `docs/_m1_phase1_close.md`.
+- **Screen/area:** `lib/ui/screens/changelog_viewer/changelog_viewer_screen.dart`, `lib/app/controllers/changelog_viewer_controller.dart`, `lib/domain/services/changelog_aggregator.dart`.
+- **Detail:** After a local review commit that appends a changelog line, the Changelog viewer still reads `0 entries`. Either the aggregator reads from a source that only reflects pushed state, or the viewer's cache isn't invalidated on commit.
+- **Proposed fix:** Share the same invalidation hook as the Sync Up badge fix above — on every local commit completion, `ref.invalidate(changelogViewerControllerProvider)` so the aggregator re-reads the on-disk CHANGELOG files.
