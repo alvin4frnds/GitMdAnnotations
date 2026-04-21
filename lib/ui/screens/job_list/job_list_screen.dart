@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/controllers/job_list_controller.dart';
+import '../../../app/controllers/sync_controller.dart';
 import '../../../app/providers/spec_providers.dart';
+import '../../../app/providers/sync_providers.dart';
 import '../../../domain/entities/job.dart';
 import '../../../domain/entities/phase.dart';
 import '../../../domain/entities/repo_ref.dart';
@@ -305,17 +307,48 @@ class _MainArea extends StatelessWidget {
   }
 }
 
-class _TopChrome extends StatelessWidget {
+class _TopChrome extends ConsumerWidget {
   const _TopChrome({required this.async, required this.repo});
   final AsyncValue<JobListState> async;
   final RepoRef? repo;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
     final state = async.value;
     final hasRepo = state is JobListLoaded;
     final jobCount = state is JobListLoaded ? state.jobs.length : 0;
+    // Watch sync state so the buttons disable mid-flight and the
+    // snackbar + list refresh fire exactly once at terminal states.
+    ref.listen<AsyncValue<SyncState>>(syncControllerProvider, (prev, next) {
+      final prevVal = prev?.value;
+      final nextVal = next.value;
+      if (prevVal == nextVal) return;
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      if (nextVal is SyncDone) {
+        final note = nextVal.backup == null
+            ? 'Sync complete'
+            : 'Sync complete — remote won, backup at '
+                '${nextVal.backup!.path}';
+        messenger?.showSnackBar(SnackBar(
+          content: Text(note),
+          duration: const Duration(seconds: 4),
+        ));
+        // Terminal success — rediscover jobs on disk so JobList picks
+        // up anything that was fetched.
+        ref.invalidate(jobListControllerProvider);
+      } else if (nextVal is SyncErrored) {
+        messenger?.showSnackBar(SnackBar(
+          content: Text('Sync failed: ${nextVal.error}'),
+          backgroundColor: t.statusDanger,
+          duration: const Duration(seconds: 6),
+        ));
+      }
+    });
+    final syncState = ref.watch(syncControllerProvider).value;
+    final syncInFlight = syncState is SyncInProgress;
+    final workdir = ref.watch(currentWorkdirProvider);
+    final canSync = hasRepo && repo != null && workdir != null && !syncInFlight;
     return Container(
       height: 48,
       decoration: BoxDecoration(
@@ -348,12 +381,24 @@ class _TopChrome extends StatelessWidget {
           const Spacer(),
           _GhostButton(
             icon: Icons.arrow_downward_rounded,
-            label: 'Sync Down',
-            onPressed: hasRepo ? () {} : null,
+            label: syncState is SyncInProgress ? 'Syncing…' : 'Sync Down',
+            onPressed: canSync
+                ? () => ref
+                    .read(syncControllerProvider.notifier)
+                    .syncDown(repo: repo!, workdir: workdir)
+                : null,
           ),
           const SizedBox(width: 8),
           _SyncUpButton(
-            onPressed: hasRepo ? () {} : null,
+            onPressed: canSync
+                ? () => ref
+                    .read(syncControllerProvider.notifier)
+                    .syncUp(
+                      repo: repo!,
+                      workdir: workdir,
+                      backupRoot: '$workdir/.gitmdscribe-backups',
+                    )
+                : null,
             badgeCount: hasRepo ? '0' : '—',
           ),
         ],
