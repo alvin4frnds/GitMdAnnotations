@@ -13,17 +13,17 @@ import 'markdown_stub.dart';
 
 /// Canonical logical width of the annotated page. Strokes are captured
 /// and replayed in a coordinate space this wide, on **every** screen
-/// (annotate / review) and **every** orientation. Narrower viewports
-/// uniformly scale the page down via [CanonicalPage]; wider viewports
-/// render at 1:1 with the extra space showing the page background.
+/// (annotate / review) and **every** orientation. [CanonicalPage]
+/// always zoom-scales this canonical box to exactly fill the viewport
+/// width — scales *down* in portrait, scales *up* in landscape. The
+/// canonical width is the only width at which the markdown is ever
+/// laid out, so line wraps are identical in every combo and stored
+/// stroke coordinates always point at the same underlying text.
 ///
-/// Why 960 specifically: the narrower of the two screens' main panes is
-/// the review panel's left pane, which loses 420 logical px to the
-/// typed-review pane on the right (plus a 1-px border). On the OnePlus
-/// Pad Go 2 in landscape (~1400 logical px wide) that leaves ~979 px,
-/// so 960 fits 1:1 without scaling. In portrait (or any viewport
-/// narrower than 960) [CanonicalPage] scales the 960-wide layout down
-/// uniformly — stored stroke coordinates don't change.
+/// Picked 900 rather than matching the narrowest viewport: gives enough
+/// room for spec formatting (headings, code blocks) without bumping
+/// into the review-pane-side landscape cap, and the zoom-to-fill
+/// rendering means we get the same coordinate space regardless.
 ///
 /// Changing this number changes the coordinate space: existing
 /// `03-annotations.svg` files captured at the old width would replay at
@@ -32,7 +32,7 @@ import 'markdown_stub.dart';
 ///
 /// Exported so `review_panel/markdown_pane.dart` uses the exact same
 /// number.
-const double kAnnotatedContentWidth = 960;
+const double kAnnotatedContentWidth = 900;
 
 /// Padding wrapped around the markdown inside the ink stack. Exported so
 /// the review pane can mirror it exactly — if the two screens drift on
