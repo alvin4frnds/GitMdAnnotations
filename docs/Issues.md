@@ -18,12 +18,12 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 - **Detail:** QA pass only covered light mode; dark-mode walkthrough was not captured. Fixed = full 12-screen dark-mode screenshot set reviewed with no regressions against the UI spike.
 - **Proposed fix:** Re-run the automated QA screenshot agent with the theme toggle flipped and triage any new findings.
 
-### Issue: Inter font not bundled; typography falls back to Roboto
-- **Severity:** Medium
-- **Source:** M1a QA (2026-04-20)
-- **Screen/area:** Global (all screens).
-- **Detail:** `appMono` / body text currently resolves to system Roboto because Inter `.ttf` files aren't declared in `pubspec.yaml` assets. Fixed = Inter and the mono variant bundled and surfaced via the theme, matching UI spike.
-- **Proposed fix:** Add Inter Regular/Medium/SemiBold/Bold + Inter Mono (or JetBrains Mono) under `fonts:` in `pubspec.yaml`, wire them into `app_theme.dart` and `appMono()`.
+### ~~Issue: Inter font not bundled; typography falls back to Roboto~~ — Closed in W1 (2026-04-21)
+- ~~**Severity:** Medium~~
+- ~~**Source:** M1a QA (2026-04-20)~~
+- ~~**Screen/area:** Global (all screens).~~
+- ~~**Detail:** `appMono` / body text currently resolves to system Roboto because Inter `.ttf` files aren't declared in `pubspec.yaml` assets. Fixed = Inter and the mono variant bundled and surfaced via the theme, matching UI spike.~~
+- **Closed in W1 (2026-04-21):** Inter (Regular/Medium/SemiBold/Bold) + JetBrains Mono `.ttf` bundled under `assets/fonts/`, declared in `pubspec.yaml` under `flutter.fonts:`, and surfaced via `AppTheme.build` + `appMono()` in `lib/ui/theme/tokens.dart`. Body text and monospace breadcrumbs now render with the designer-intended family on-device instead of system Roboto. Screenshot pass on emulator confirms the yellow squiggly-underline glyphs + `· —` monospace artifacts from the M1a QA are gone.
 
 ### Issue: Real OAuth flow unverified; `_prodClientId` is placeholder
 - **Severity:** Medium
@@ -32,12 +32,12 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 - **Detail:** `APP_MODE=real` can't be exercised because `_prodClientId = 'OVERRIDE_ME'`. Fixed = registered GitHub OAuth App, client id wired in, one end-to-end sign-in verified on-device.
 - **Proposed fix:** Register the OAuth App, replace `_prodClientId`, and add a manual smoke-test checklist entry to `docs/PROGRESS.md`.
 
-### Issue: libgit2dart is discontinued on pub.dev
-- **Severity:** Medium
-- **Source:** M1a T10 (2026-04-20)
-- **Screen/area:** `lib/infra/git/` git adapter chain.
-- **Detail:** `libgit2dart 1.2.2` works today but is marked `discontinued`. No active maintainer. Fixed = migration plan or fork before the library breaks against a future Flutter / Dart SDK.
-- **Proposed fix:** Spike-evaluate `git2dart`, shelling to `git` via `Process`, or forking + vendoring `libgit2dart`. Decide in a dedicated follow-up task.
+### ~~Issue: libgit2dart is discontinued on pub.dev~~ — Closed in W1 (2026-04-21)
+- ~~**Severity:** Medium~~
+- ~~**Source:** M1a T10 (2026-04-20)~~
+- ~~**Screen/area:** `lib/infra/git/` git adapter chain.~~
+- ~~**Detail:** `libgit2dart 1.2.2` works today but is marked `discontinued`. No active maintainer.~~
+- **Closed in W1 (2026-04-21):** we are the maintainer now. The fork at `../libgit2dart-fork/` ships the Android NDK CMake recipe + prebuilt `libgit2.so` + mbedTLS 2.28 for the three Android ABIs (x86_64 / arm64-v8a / armeabi-v7a) and is referenced via `path:` in `pubspec.yaml`. W2.3 will publish it to GitHub so a clean clone of this repo resolves without the sibling directory; until then the `path:` dep keeps the loop self-contained.
 
 ### ~~Issue: Git integration tests are platform-tagged skeletons~~ — Closed in M1c-T6 (`c4bc604`)
 - ~~**Severity:** Medium~~
