@@ -11,21 +11,36 @@ import 'markdown_stub.dart';
 
 /// Shared content width for both the annotation canvas and the review
 /// panel's left pane. Locking the markdown to a canonical logical width
-/// makes line-wraps identical in both screens so stroke coordinates
-/// drawn on one screen land on the same underlying text when rendered
-/// on the other (the review panel's left pane is narrower than the
-/// canvas main area because the 420-px typed-review panel eats the
-/// right side). Exported so `review_panel/markdown_pane.dart` uses the
-/// exact same number.
+/// makes line-wraps identical in both screens so strokes captured in
+/// content-local coordinates on one screen land on the same underlying
+/// text on the other (the review panel's left pane is narrower than the
+/// canvas main area because the 420-px typed-review panel eats the right
+/// side). Exported so `review_panel/markdown_pane.dart` uses the exact
+/// same number.
 const double kAnnotatedContentWidth = 900;
+
+/// Padding wrapped around the markdown inside the ink stack. Exported so
+/// the review pane can mirror it exactly — if the two screens drift on
+/// this number, strokes stored on one re-render at a different offset
+/// on the other.
+const EdgeInsets kAnnotatedContentPadding =
+    EdgeInsets.fromLTRB(48, 32, 48, 32);
 
 /// Main content for the annotation canvas — real spec markdown behind a
 /// live `InkOverlay`, both constrained to [kAnnotatedContentWidth] and
 /// centered so the content has the same layout geometry across screens.
-/// The overlay is `HitTestBehavior.opaque` while drawing is enabled
-/// (edit/highlight tools) so stylus samples hit the overlay first; in
-/// "view" mode the overlay lets gestures fall through so the content
-/// behind can be scrolled.
+///
+/// The ink overlay sits **inside** the scroll view, layered over the
+/// markdown via a `Stack`. Pointer samples are therefore captured in
+/// *content-local* coordinates — scrolling the view shifts both the
+/// markdown and the already-committed strokes in lock-step, and the
+/// review pane can paint the same strokes at the same content-local
+/// positions to keep alignment with the underlying text.
+///
+/// `hitTestBehavior: HitTestBehavior.opaque` paired with an
+/// `IgnorePointer(ignoring: !drawingEnabled)` wrapper lets the overlay
+/// eat pointer events while in pen/highlighter mode and pass them
+/// through to the scroll view in view (Pan) mode.
 class AnnotationMainContent extends StatelessWidget {
   const AnnotationMainContent({
     required this.jobRef,
@@ -58,34 +73,33 @@ class AnnotationMainContent extends StatelessWidget {
       alignment: Alignment.topCenter,
       child: SizedBox(
         width: kAnnotatedContentWidth,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(48, 32, 48, 32),
-              child: SingleChildScrollView(
-                physics: drawingEnabled
-                    ? const NeverScrollableScrollPhysics()
-                    : const BouncingScrollPhysics(),
+        child: SingleChildScrollView(
+          physics: drawingEnabled
+              ? const NeverScrollableScrollPhysics()
+              : const BouncingScrollPhysics(),
+          child: Stack(
+            children: [
+              Padding(
+                padding: kAnnotatedContentPadding,
                 child: MarkdownStub(jobRef: jobRef),
               ),
-            ),
-            Positioned.fill(
-              child: IgnorePointer(
-                ignoring: !drawingEnabled,
-                child: InkOverlay(
-                  groups: groups,
-                  activeStroke: activeStroke,
-                  currentStrokeColor: currentStrokeColor,
-                  currentStrokeWidth: currentStrokeWidth,
-                  currentStrokeOpacity: currentStrokeOpacity,
-                  onSample: onSample,
-                  nowProvider: nowProvider,
-                  hitTestBehavior: HitTestBehavior.opaque,
+              Positioned.fill(
+                child: IgnorePointer(
+                  ignoring: !drawingEnabled,
+                  child: InkOverlay(
+                    groups: groups,
+                    activeStroke: activeStroke,
+                    currentStrokeColor: currentStrokeColor,
+                    currentStrokeWidth: currentStrokeWidth,
+                    currentStrokeOpacity: currentStrokeOpacity,
+                    onSample: onSample,
+                    nowProvider: nowProvider,
+                    hitTestBehavior: HitTestBehavior.opaque,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

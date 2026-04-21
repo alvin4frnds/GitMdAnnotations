@@ -6,20 +6,20 @@ import '../../../domain/entities/job_ref.dart';
 import '../../../domain/entities/stroke_group.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/ink_overlay/ink_painting.dart';
-import '../annotation_canvas/main_content.dart' show kAnnotatedContentWidth;
+import '../annotation_canvas/main_content.dart'
+    show kAnnotatedContentPadding, kAnnotatedContentWidth;
 import '../annotation_canvas/markdown_stub.dart';
 
 /// Left pane of the review screen — real spec markdown plus the
 /// read-only stroke overlay that replays whatever the user drew on the
 /// AnnotationCanvas.
 ///
-/// The markdown renders inside a fixed-width box ([kAnnotatedContentWidth])
-/// that matches the annotation canvas's main content width exactly, and
-/// the stroke painter is laid over that same box only. Because the two
-/// screens use the same widget (`MarkdownStub`), the same styleSheet,
-/// and the same constrained width, line wraps match on both — so a
-/// pen mark stored at local `(x, y)` on the canvas lands over the same
-/// underlying text on the review pane.
+/// The markdown and stroke layer live **inside** a `SingleChildScrollView`
+/// in a shared `Stack`, mirroring the canvas layout exactly
+/// ([kAnnotatedContentWidth], [kAnnotatedContentPadding],
+/// [MarkdownStub]). Strokes stored in content-local coordinates on the
+/// canvas therefore re-paint at the same content-local coordinates here
+/// and scroll with the markdown — no viewport-relative drift.
 class MarkdownPane extends ConsumerWidget {
   const MarkdownPane({required this.jobRef, super.key});
 
@@ -34,12 +34,11 @@ class MarkdownPane extends ConsumerWidget {
       alignment: Alignment.topCenter,
       child: SizedBox(
         width: kAnnotatedContentWidth,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(48, 32, 48, 32),
-              child: SingleChildScrollView(
+        child: SingleChildScrollView(
+          child: Stack(
+            children: [
+              Padding(
+                padding: kAnnotatedContentPadding,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -52,16 +51,16 @@ class MarkdownPane extends ConsumerWidget {
                   ],
                 ),
               ),
-            ),
-            if (strokeGroups.isNotEmpty)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: _ReadOnlyStrokesPainter(groups: strokeGroups),
+              if (strokeGroups.isNotEmpty)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: _ReadOnlyStrokesPainter(groups: strokeGroups),
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -78,9 +77,9 @@ class MarkdownPane extends ConsumerWidget {
 
 /// Read-only painter that replays the committed stroke groups on top of
 /// the review-panel left pane so the user sees what they drew on the
-/// annotation canvas. Paints in the same local coordinate space the
-/// canvas used so strokes stay visually aligned with the underlying
-/// markdown text (see [kAnnotatedContentWidth]).
+/// annotation canvas. Paints in the same content-local coordinate space
+/// the canvas used (see [kAnnotatedContentWidth] +
+/// [kAnnotatedContentPadding]).
 class _ReadOnlyStrokesPainter extends CustomPainter {
   const _ReadOnlyStrokesPainter({required this.groups});
 
