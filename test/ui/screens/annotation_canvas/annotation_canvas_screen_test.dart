@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gitmdannotations_tablet/app/providers/annotation_providers.dart';
+import 'package:gitmdannotations_tablet/app/providers/spec_providers.dart';
 import 'package:gitmdannotations_tablet/domain/entities/job_ref.dart';
 import 'package:gitmdannotations_tablet/domain/entities/pointer_sample.dart';
 import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
+import 'package:gitmdannotations_tablet/domain/fakes/fake_file_system.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_id_generator.dart';
 import 'package:gitmdannotations_tablet/ui/screens/annotation_canvas/annotation_canvas_screen.dart';
 import 'package:gitmdannotations_tablet/ui/theme/app_theme.dart';
@@ -28,6 +30,14 @@ Widget _host({
     overrides: [
       clockProvider.overrideWithValue(FakeClock(_t0)),
       idGeneratorProvider.overrideWithValue(FakeIdGenerator()),
+      // AnnotationLeftRail reads `specFileProvider(jobRef)` to build its
+      // "On this page" outline; without a FileSystem override the
+      // provider chain throws `UnimplementedError` during the rail's
+      // first build. A bare FakeFileSystem + currentWorkdir=null is
+      // enough — the rail degrades to the placeholder state, and none
+      // of the existing canvas-behavior assertions depend on the
+      // outline content.
+      fileSystemProvider.overrideWithValue(FakeFileSystem()),
       if (allowedPointerKinds != null)
         allowedPointerKindsProvider.overrideWithValue(allowedPointerKinds),
     ],

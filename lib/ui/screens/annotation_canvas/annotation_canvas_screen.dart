@@ -226,7 +226,7 @@ class _AnnotationCanvasScreenState
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const AnnotationLeftRail(),
+                AnnotationLeftRail(jobRef: widget.jobRef),
                 Container(width: 1, color: t.borderSubtle),
                 Expanded(
                   child: AnnotationMainContent(
