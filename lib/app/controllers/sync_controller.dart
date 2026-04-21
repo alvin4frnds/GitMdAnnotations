@@ -7,6 +7,7 @@ import '../../domain/ports/clock_port.dart';
 import '../../domain/ports/git_port.dart';
 import '../../domain/services/sync_service.dart';
 import '../providers/annotation_providers.dart';
+import '../providers/auth_providers.dart';
 import '../providers/sync_providers.dart';
 
 /// Sealed UI-level sync state. Exhaustive `switch` in widgets.
@@ -106,6 +107,17 @@ class SyncController extends AsyncNotifier<SyncState> {
           );
         } else if (p is SyncFailed) {
           state = AsyncValue.data(SyncErrored(p.error));
+          // W5.3 recovery: a 401/403 on push means the persisted token
+          // no longer works at github.com. Fire the same intent as an
+          // explicit sign-out so `_AuthGate` routes to SignIn and the
+          // `lastSession` listener clears the stale workdir pointer.
+          // Fire-and-forget — the error banner still renders, and the
+          // sign-out transition happens asynchronously on the next tick.
+          if (p.error is PushRejectedAuth) {
+            unawaited(ref
+                .read(authControllerProvider.notifier)
+                .handleTokenRevoked());
+          }
         } else {
           state = AsyncValue.data(SyncInProgress(p));
         }

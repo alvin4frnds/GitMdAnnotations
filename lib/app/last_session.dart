@@ -1,4 +1,5 @@
 import 'dart:developer' as developer;
+import 'dart:io';
 
 import '../domain/entities/repo_ref.dart';
 import '../domain/ports/secure_storage_port.dart';
@@ -72,15 +73,42 @@ class LastSessionRepoCodec {
       s.replaceAll('%7C', '|').replaceAll('%25', '%');
 }
 
+/// Predicate for "the persisted workdir is still a usable git checkout."
+/// Pure by design so [loadLastSession] can stay testable without a real
+/// filesystem — production uses [defaultWorkdirValidator]; tests inject a
+/// stub. Returning `false` causes [loadLastSession] to clear the stale
+/// session keys and fall through to RepoPicker.
+typedef WorkdirValidator = bool Function(String workdir);
+
+/// Default [WorkdirValidator]: the workdir directory and its `.git`
+/// subdirectory must both exist. Cheap (two `existsSync` calls) and
+/// catches the common recovery paths — user wiped app data, the SD card
+/// reshuffled, a sibling process corrupted the repo. Libgit2-level
+/// corruption (bad object store but `.git` present) still slips through;
+/// that manifests as a `GitCorrupted` on the first op and is handled by
+/// the RepoPicker's clone-failed state.
+bool defaultWorkdirValidator(String workdir) {
+  if (!Directory(workdir).existsSync()) return false;
+  return Directory('$workdir/.git').existsSync();
+}
+
 /// Reads the three `SecureStorageKeys.lastOpened*` keys and returns a
 /// [LastSession] when both repo + workdir are present, else `null`. A
 /// malformed repo blob (shouldn't happen — we wrote it) is treated as
 /// missing so the UI falls back to the RepoPicker rather than crashing.
 ///
+/// If [validateWorkdir] returns `false` for the persisted workdir, the
+/// stale keys are cleared via [clearLastSession] and `null` is returned
+/// — on the next cold start we won't keep pointing `_AuthGate` at a
+/// deleted/corrupt repo (W5.3 recovery).
+///
 /// Called once at bootstrap before `runApp`; must not throw — any storage
 /// failure is logged and `null` is returned so cold-start still proceeds
 /// to the RepoPicker.
-Future<LastSession?> loadLastSession(SecureStoragePort storage) async {
+Future<LastSession?> loadLastSession(
+  SecureStoragePort storage, {
+  WorkdirValidator validateWorkdir = defaultWorkdirValidator,
+}) async {
   try {
     final repoBlob = await storage.readString(SecureStorageKeys.lastOpenedRepo);
     final workdir =
@@ -88,6 +116,15 @@ Future<LastSession?> loadLastSession(SecureStoragePort storage) async {
     if (repoBlob == null || workdir == null) return null;
     final repo = LastSessionRepoCodec.decode(repoBlob);
     if (repo == null) return null;
+    if (!validateWorkdir(workdir)) {
+      developer.log(
+        'loadLastSession: persisted workdir "$workdir" is missing or not a '
+        'git checkout; clearing stale session keys',
+        name: 'gitmdscribe.last_session',
+      );
+      await clearLastSession(storage);
+      return null;
+    }
     final jobId =
         await storage.readString(SecureStorageKeys.lastOpenedJobId);
     return LastSession(repo: repo, workdir: workdir, jobId: jobId);

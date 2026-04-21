@@ -1,13 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gitmdannotations_tablet/app/controllers/auth_controller.dart';
 import 'package:gitmdannotations_tablet/app/controllers/sync_controller.dart';
 import 'package:gitmdannotations_tablet/app/providers/annotation_providers.dart';
+import 'package:gitmdannotations_tablet/app/providers/auth_providers.dart';
 import 'package:gitmdannotations_tablet/app/providers/sync_providers.dart';
+import 'package:gitmdannotations_tablet/domain/entities/auth_session.dart';
 import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
 import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
+import 'package:gitmdannotations_tablet/domain/fakes/fake_auth_port.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_git_port.dart';
+import 'package:gitmdannotations_tablet/domain/fakes/fake_secure_storage.dart';
 import 'package:gitmdannotations_tablet/domain/ports/git_port.dart';
+import 'package:gitmdannotations_tablet/domain/ports/secure_storage_port.dart';
 import 'package:gitmdannotations_tablet/domain/services/sync_service.dart';
 
 const _repo = RepoRef(owner: 'octocat', name: 'hello');
@@ -36,10 +42,16 @@ final _fixedNow = DateTime.utc(2026, 4, 21, 12, 0, 0);
 ({ProviderContainer container, FakeGitPort git}) _buildContainer(
   FakeGitPort git, {
   DateTime? at,
+  FakeAuthPort? auth,
+  FakeSecureStorage? storage,
 }) {
+  final a = auth ?? FakeAuthPort();
+  final s = storage ?? FakeSecureStorage();
   final container = ProviderContainer(overrides: [
     gitPortProvider.overrideWithValue(git),
     clockProvider.overrideWithValue(FakeClock(at ?? _fixedNow)),
+    authPortProvider.overrideWithValue(a),
+    secureStorageProvider.overrideWithValue(s),
   ]);
   addTearDown(container.dispose);
   return (container: container, git: git);
@@ -224,6 +236,59 @@ void main() {
       expect(state, isA<SyncErrored>());
       expect((state as SyncErrored).error, isA<PushRejectedAuth>());
     });
+
+    test(
+      'PushRejectedAuth also invokes AuthController.handleTokenRevoked — '
+      'auth flips to SignedOut and secure storage is cleared (W5.3 recovery)',
+      () async {
+        // Arrange: signed-in auth with a persisted token + identity.
+        const session = AuthSession(
+          token: 'tok-soon-to-be-revoked',
+          identity: _identity,
+        );
+        final auth = FakeAuthPort()..storedSession = session;
+        final storage = FakeSecureStorage();
+        await storage.writeString(
+          SecureStorageKeys.authToken,
+          session.token,
+        );
+        await storage.writeString(
+          SecureStorageKeys.gitIdentity,
+          '{"name":"Ada","email":"ada@example.com"}',
+        );
+        final fake = await _seeded();
+        fake.scriptedPushOutcome = const PushRejectedAuth();
+
+        final env = _buildContainer(fake, auth: auth, storage: storage);
+        // Prime AuthController so it reads its initial SignedIn state.
+        await env.container.read(authControllerProvider.future);
+        await env.container.read(syncControllerProvider.future);
+
+        // Act.
+        await env.container.read(syncControllerProvider.notifier).syncUp(
+              repo: _repo,
+              workdir: _workdir,
+              backupRoot: backupRoot,
+            );
+        // Let the fire-and-forget handleTokenRevoked() finish.
+        await Future<void>.delayed(Duration.zero);
+
+        // Assert: auth is now SignedOut and the auth storage keys are gone.
+        final authState = env.container.read(authControllerProvider).value;
+        expect(authState, isA<AuthSignedOut>());
+        expect(
+          await storage.containsKey(SecureStorageKeys.authToken),
+          isFalse,
+        );
+        expect(
+          await storage.containsKey(SecureStorageKeys.gitIdentity),
+          isFalse,
+        );
+        // Sync state still reflects the error so the UI can render a banner.
+        final syncState = env.container.read(syncControllerProvider).value;
+        expect(syncState, isA<SyncErrored>());
+      },
+    );
 
     test('re-entrance while running does not double-run', () async {
       final fake = await _seeded();

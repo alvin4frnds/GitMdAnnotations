@@ -46,9 +46,16 @@ void main() {
   });
 
   group('loadLastSession / save / clear round-trip', () {
+    // Stub validator that accepts any path — the actual filesystem check
+    // is exercised in the 'workdir validation' group below.
+    bool alwaysValid(String _) => true;
+
     test('missing keys → null', () async {
       final storage = FakeSecureStorage();
-      expect(await loadLastSession(storage), isNull);
+      expect(
+        await loadLastSession(storage, validateWorkdir: alwaysValid),
+        isNull,
+      );
     });
 
     test('repo+workdir present, jobId absent → LastSession with null jobId',
@@ -60,7 +67,8 @@ void main() {
         workdir: '/data/app/repos/octocat/hello-world',
       );
 
-      final restored = await loadLastSession(storage);
+      final restored =
+          await loadLastSession(storage, validateWorkdir: alwaysValid);
       expect(restored, isNotNull);
       expect(restored!.repo, _repo);
       expect(restored.workdir, '/data/app/repos/octocat/hello-world');
@@ -76,7 +84,8 @@ void main() {
       );
       await saveLastOpenedJobId(storage, 'spec-foo-123');
 
-      final restored = await loadLastSession(storage);
+      final restored =
+          await loadLastSession(storage, validateWorkdir: alwaysValid);
       expect(restored, isNotNull);
       expect(restored!.repo, _repo);
       expect(restored.workdir, '/workdir');
@@ -87,7 +96,10 @@ void main() {
         () async {
       final storage = FakeSecureStorage();
       await storage.writeString(SecureStorageKeys.lastOpenedWorkdir, '/wd');
-      expect(await loadLastSession(storage), isNull);
+      expect(
+        await loadLastSession(storage, validateWorkdir: alwaysValid),
+        isNull,
+      );
     });
 
     test('repo present but workdir absent → null (half-state rejected)',
@@ -97,7 +109,10 @@ void main() {
         SecureStorageKeys.lastOpenedRepo,
         LastSessionRepoCodec.encode(_repo),
       );
-      expect(await loadLastSession(storage), isNull);
+      expect(
+        await loadLastSession(storage, validateWorkdir: alwaysValid),
+        isNull,
+      );
     });
 
     test('corrupt repo blob → null (does not throw)', () async {
@@ -107,7 +122,10 @@ void main() {
         'garbage-no-pipes',
       );
       await storage.writeString(SecureStorageKeys.lastOpenedWorkdir, '/wd');
-      expect(await loadLastSession(storage), isNull);
+      expect(
+        await loadLastSession(storage, validateWorkdir: alwaysValid),
+        isNull,
+      );
     });
 
     test('saveLastOpenedJobId(null) deletes the key', () async {
@@ -149,6 +167,51 @@ void main() {
       final storage = FakeSecureStorage();
       await clearLastSession(storage); // should not throw
       expect(storage.snapshot, isEmpty);
+    });
+  });
+
+  group('workdir validation (W5.3 recovery)', () {
+    test('validator rejects workdir → returns null and clears stale keys',
+        () async {
+      final storage = FakeSecureStorage();
+      await saveLastOpenedRepo(storage, repo: _repo, workdir: '/gone');
+      await saveLastOpenedJobId(storage, 'spec-foo-123');
+
+      final restored = await loadLastSession(
+        storage,
+        validateWorkdir: (_) => false,
+      );
+
+      expect(restored, isNull);
+      // All three keys scrubbed so the next cold start doesn't loop on
+      // the broken pointer.
+      expect(storage.snapshot, isEmpty);
+    });
+
+    test('validator accepts workdir → restore succeeds as normal', () async {
+      final storage = FakeSecureStorage();
+      await saveLastOpenedRepo(storage, repo: _repo, workdir: '/wd');
+
+      final restored = await loadLastSession(
+        storage,
+        validateWorkdir: (_) => true,
+      );
+
+      expect(restored, isNotNull);
+      expect(restored!.workdir, '/wd');
+    });
+
+    test('validator receives the persisted workdir string', () async {
+      final storage = FakeSecureStorage();
+      await saveLastOpenedRepo(storage, repo: _repo, workdir: '/observed');
+      String? seen;
+
+      await loadLastSession(storage, validateWorkdir: (w) {
+        seen = w;
+        return true;
+      });
+
+      expect(seen, '/observed');
     });
   });
 
