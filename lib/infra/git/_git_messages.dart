@@ -148,6 +148,21 @@ class GitReqBootstrapLocalBranch extends GitRequest {
   final String remoteBranch;
 }
 
+/// Count of commits [localBranch] is ahead of [remoteBranch]. Returns 0
+/// when either branch is missing — e.g. fresh clone before any fetch, or
+/// a sidecar branch that doesn't exist locally yet. Never throws for
+/// "branch not found"; callers use the count to drive UI badges so a
+/// silent zero is safer than an error surface.
+class GitReqCommitsAhead extends GitRequest {
+  const GitReqCommitsAhead({
+    required super.id,
+    required this.localBranch,
+    required this.remoteBranch,
+  });
+  final String localBranch;
+  final String remoteBranch;
+}
+
 /// Lifecycle-only message — carries no request id because no reply is
 /// expected. The isolate self-terminates on receipt.
 class GitReqShutdown {

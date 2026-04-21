@@ -81,6 +81,7 @@ Future<GitResponse> _dispatch(_IsolateState state, GitRequest req) async {
       GitReqLocalBranches() => _handleLocalBranches(state, req),
       GitReqHeadSha() => _handleHeadSha(state, req),
       GitReqBootstrapLocalBranch() => _handleBootstrapLocalBranch(state, req),
+      GitReqCommitsAhead() => _handleCommitsAhead(state, req),
     };
   } catch (e) {
     return GitResponseError(id: req.id, error: e);
@@ -425,6 +426,51 @@ GitResponse _handleBootstrapLocalBranch(
   );
   local.setUpstream(req.remoteBranch);
   return GitResponseOk<bool>(id: req.id, value: true);
+}
+
+/// Count of commits [localBranch] is ahead of [remoteBranch]. Returns 0
+/// when either branch can't be resolved (fresh clone pre-fetch, sidecar
+/// not yet materialised, etc.) — the caller feeds this into the JobList
+/// "Sync Up [N]" badge, so silently returning 0 keeps the UI honest
+/// without crashing on a perfectly normal setup transition.
+GitResponse _handleCommitsAhead(
+  _IsolateState state,
+  GitReqCommitsAhead req,
+) {
+  final repo = _onlyRepo(state);
+  final localOid = _tryResolveBranchOid(repo, req.localBranch);
+  final remoteOid = _tryResolveBranchOid(repo, req.remoteBranch);
+  if (localOid == null || remoteOid == null) {
+    return GitResponseOk<int>(id: req.id, value: 0);
+  }
+  if (localOid.sha == remoteOid.sha) {
+    return GitResponseOk<int>(id: req.id, value: 0);
+  }
+  try {
+    final counts = repo.aheadBehind(local: localOid, upstream: remoteOid);
+    // aheadBehind → [ahead, behind].
+    return GitResponseOk<int>(id: req.id, value: counts.first);
+  } on git2.LibGit2Error {
+    return GitResponseOk<int>(id: req.id, value: 0);
+  }
+}
+
+/// Resolves a local-or-remote branch name to its tip Oid. Tries
+/// `refs/heads/<name>` first, then `refs/remotes/<name>`. Returns null
+/// when neither exists.
+git2.Oid? _tryResolveBranchOid(git2.Repository repo, String name) {
+  try {
+    final ref = git2.Reference.lookup(repo: repo, name: 'refs/heads/$name');
+    return ref.target;
+  } on git2.LibGit2Error {
+    // Fall through.
+  }
+  try {
+    final ref = git2.Reference.lookup(repo: repo, name: 'refs/remotes/$name');
+    return ref.target;
+  } on git2.LibGit2Error {
+    return null;
+  }
 }
 
 /// Returns the single tracked repository in [state], or throws if zero /

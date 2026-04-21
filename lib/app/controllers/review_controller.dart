@@ -9,6 +9,7 @@ import '../../domain/entities/stroke_group.dart';
 import '../../domain/services/open_question_extractor.dart';
 import '../providers/annotation_providers.dart';
 import '../providers/review_providers.dart';
+import '../providers/sync_providers.dart';
 import 'review_draft_store.dart';
 import 'review_state.dart';
 import 'review_submitter.dart';
@@ -157,6 +158,8 @@ class ReviewController
       _emit(_current().copyWith(
         submission: ReviewSubmissionSuccess(commit),
       ));
+      // JobList's Sync Up badge needs to re-count unpushed commits.
+      ref.invalidate(pendingPushCountProvider);
     } catch (e) {
       _emit(_current().copyWith(submission: ReviewSubmissionFailure(e)));
     }
@@ -181,6 +184,7 @@ class ReviewController
       _emit(_current().copyWith(
         submission: ReviewSubmissionSuccess(commit),
       ));
+      ref.invalidate(pendingPushCountProvider);
     } catch (e) {
       _emit(_current().copyWith(submission: ReviewSubmissionFailure(e)));
     }

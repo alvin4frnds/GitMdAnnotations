@@ -34,3 +34,26 @@ final syncServiceProvider = Provider<SyncService>(
 /// UI-facing sync state machine. See [SyncController].
 final syncControllerProvider =
     AsyncNotifierProvider<SyncController, SyncState>(SyncController.new);
+
+/// Count of local commits on `claude-jobs` that are ahead of
+/// `origin/claude-jobs`. Drives the JobList chrome's "Sync Up [N]"
+/// badge so users can see at a glance how many local submits are
+/// queued up waiting for a push.
+///
+/// Returns 0 when the port throws (e.g. no repo open yet during an
+/// early cold start, a fresh clone before the first fetch). Callers
+/// in the commit path (`ReviewController.submit` / `.approve`) and
+/// the sync path (`SyncController.syncUp`) `ref.invalidate` this
+/// provider on success so the badge re-queries — the value is cheap
+/// (one libgit2 `graph_ahead_behind` call) so a naive recompute is
+/// fine.
+final pendingPushCountProvider = FutureProvider<int>((ref) async {
+  try {
+    return await ref.watch(gitPortProvider).countCommitsAhead(
+          localBranch: 'claude-jobs',
+          remoteBranch: 'origin/claude-jobs',
+        );
+  } catch (_) {
+    return 0;
+  }
+});

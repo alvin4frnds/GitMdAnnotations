@@ -246,5 +246,32 @@ class FakeGitPort implements GitPort {
     if (remoteLog != null) _log[localBranch] = List.of(remoteLog);
     return true;
   }
+
+  @override
+  Future<int> countCommitsAhead({
+    required String localBranch,
+    required String remoteBranch,
+  }) async {
+    // Strip the `origin/` prefix so callers don't have to care about the
+    // namespace — the fake has no remote-tracking concept, `branches` is
+    // the ground truth.
+    final remoteKey = remoteBranch.startsWith('origin/')
+        ? remoteBranch.substring('origin/'.length)
+        : remoteBranch;
+    final localLog = _log[localBranch] ?? const <Commit>[];
+    final remoteLog = _log[remoteKey] ?? const <Commit>[];
+    if (localLog.isEmpty) return 0;
+    final remoteShas = remoteLog.map((c) => c.sha).toSet();
+    // Walk from the tip backwards; count commits until we hit one the
+    // remote also has. The ordering convention in `_log` is newest-first
+    // (see `commit()` above), so this mirrors the `git log` -> `rev-list`
+    // semantics of "commits on local not in remote".
+    var count = 0;
+    for (final c in localLog) {
+      if (remoteShas.contains(c.sha)) break;
+      count++;
+    }
+    return count;
+  }
 }
 

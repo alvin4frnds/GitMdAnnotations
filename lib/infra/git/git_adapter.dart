@@ -253,6 +253,19 @@ class GitAdapter implements GitPort {
     return _unwrap<bool>(resp);
   }
 
+  @override
+  Future<int> countCommitsAhead({
+    required String localBranch,
+    required String remoteBranch,
+  }) async {
+    final resp = await _send((id) => GitReqCommitsAhead(
+          id: id,
+          localBranch: localBranch,
+          remoteBranch: remoteBranch,
+        ));
+    return _unwrap<int>(resp);
+  }
+
   /// Shuts the background isolate down. Safe to call multiple times; later
   /// calls become no-ops.
   Future<void> dispose() async {

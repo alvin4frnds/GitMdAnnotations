@@ -70,6 +70,15 @@ abstract class GitPort {
     required String localBranch,
     required String remoteBranch,
   });
+
+  /// Count of commits [localBranch] is ahead of [remoteBranch]. Returns
+  /// 0 when either branch doesn't exist yet (fresh clone, sidecar not
+  /// yet materialised, etc.). Used by the JobList chrome to drive the
+  /// "Sync Up [N]" badge so users see pending pushes at a glance.
+  Future<int> countCommitsAhead({
+    required String localBranch,
+    required String remoteBranch,
+  });
 }
 
 /// A single file write that will be staged + committed as part of

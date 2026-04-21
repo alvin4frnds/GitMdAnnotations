@@ -386,8 +386,12 @@ class _TopChrome extends ConsumerWidget {
           duration: const Duration(seconds: 4),
         ));
         // Terminal success — rediscover jobs on disk so JobList picks
-        // up anything that was fetched.
+        // up anything that was fetched. Re-query the unpushed-count
+        // badge too; Sync Up success empties the queue to 0, Sync Down
+        // merges remote in and leaves local tip unchanged so the
+        // number only changes when local was already ahead.
         ref.invalidate(jobListControllerProvider);
+        ref.invalidate(pendingPushCountProvider);
       } else if (nextVal is SyncErrored) {
         messenger?.showSnackBar(SnackBar(
           content: Text('Sync failed: ${nextVal.error}'),
@@ -450,7 +454,9 @@ class _TopChrome extends ConsumerWidget {
                       backupRoot: '$workdir/.gitmdscribe-backups',
                     )
                 : null,
-            badgeCount: hasRepo ? '0' : '—',
+            badgeCount: hasRepo
+                ? (ref.watch(pendingPushCountProvider).value ?? 0).toString()
+                : '—',
           ),
         ],
       ),
