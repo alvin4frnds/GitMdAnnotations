@@ -202,11 +202,12 @@ class _AnnotationCanvasScreenState
     final state = ref.watch(annotationControllerProvider(widget.jobRef));
     if (!_defaultInkApplied && state.color == '#111111') {
       _defaultInkApplied = true;
-      final brightness = Theme.of(context).brightness;
-      // Light mode → red (inkRed); dark mode → yellow (statusWarning).
-      final defaultColor =
-          brightness == Brightness.dark ? t.statusWarning : t.inkRed;
-      final hex = _hexFromColor(defaultColor);
+      // Markdown background is now pinned to light tokens in both
+      // annotate and review screens (see main_content.dart), so the
+      // default ink is always red regardless of the app's system
+      // theme. Yellow was picked previously to read on a dark
+      // markdown surface; that surface is gone.
+      final hex = _hexFromColor(AppTokens.light.inkRed);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         final live =
@@ -222,7 +223,10 @@ class _AnnotationCanvasScreenState
     // onto the Stroke on pointer-up, so the in-progress preview looks
     // identical to the committed stroke (no color/width/opacity pop).
     // Kept in sync with `AnnotationSession._widthFor` / `_opacityFor`.
-    final strokeColor = _colorFromHex(state.color) ?? t.inkRed;
+    // Fallback to the light-token red so the preview matches the
+    // light markdown surface (pinned in `main_content.dart`).
+    final strokeColor =
+        _colorFromHex(state.color) ?? AppTokens.light.inkRed;
     final strokeWidth = state.tool == InkTool.highlighter ? 16.0 : 2.0;
     final strokeOpacity = state.tool == InkTool.highlighter
         ? 0.35
