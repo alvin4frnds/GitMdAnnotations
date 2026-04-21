@@ -98,10 +98,26 @@ class CommitPlanner {
     }
   }
 
-  String _changelogTarget(JobRef job, SpecFile source) =>
-      source.sourceKind == SourceKind.pdf
-          ? _p(job, 'CHANGELOG.md')
-          : source.path;
+  String _changelogTarget(JobRef job, SpecFile source) {
+    if (source.sourceKind == SourceKind.pdf) {
+      return _p(job, 'CHANGELOG.md');
+    }
+    // `source.path` is an absolute filesystem path
+    // (`<workdir>/jobs/pending/<jobId>/02-spec.md`) because SpecRepository
+    // builds it by joining `workdir`. Using it verbatim as the commit
+    // target makes git store a file at the full absolute path (minus
+    // leading `/`) INSIDE the repo tree, polluting the branch with
+    // a deep nested dupe of the real spec. Only the last path segment
+    // is meaningful for the commit — the jobs-pending prefix is stable
+    // (see [_p]) and the basename is either `02-spec.md` or
+    // `04-spec-v<N>.md` per IMPLEMENTATION.md §3.2.
+    return _p(job, _basename(source.path));
+  }
+
+  String _basename(String path) {
+    final slash = path.lastIndexOf(RegExp(r'[/\\]'));
+    return slash < 0 ? path : path.substring(slash + 1);
+  }
 
   String _p(JobRef job, String filename) =>
       'jobs/pending/${job.jobId}/$filename';
