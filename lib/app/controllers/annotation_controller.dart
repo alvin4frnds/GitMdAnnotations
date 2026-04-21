@@ -17,13 +17,15 @@ class AnnotationState {
     required this.hasActiveStroke,
     required this.tool,
     required this.color,
+    required this.drawingEnabled,
   });
 
   const AnnotationState.initial()
       : groups = const <StrokeGroup>[],
         hasActiveStroke = false,
         tool = InkTool.pen,
-        color = '#111111';
+        color = '#111111',
+        drawingEnabled = true;
 
   final List<StrokeGroup> groups;
   final bool hasActiveStroke;
@@ -33,17 +35,25 @@ class AnnotationState {
   /// the pen-tool-bar's "selected dot" indicator.
   final String color;
 
+  /// When `false`, pointer events on the canvas are ignored (Pan mode
+  /// in the PRD — users scroll/pan without drawing). The tool icons in
+  /// the pen tool bar flip this as users tap between Pan / Pen /
+  /// Highlighter.
+  final bool drawingEnabled;
+
   AnnotationState copyWith({
     List<StrokeGroup>? groups,
     bool? hasActiveStroke,
     InkTool? tool,
     String? color,
+    bool? drawingEnabled,
   }) =>
       AnnotationState(
         groups: groups ?? this.groups,
         hasActiveStroke: hasActiveStroke ?? this.hasActiveStroke,
         tool: tool ?? this.tool,
         color: color ?? this.color,
+        drawingEnabled: drawingEnabled ?? this.drawingEnabled,
       );
 
   @override
@@ -53,6 +63,7 @@ class AnnotationState {
     if (other.hasActiveStroke != hasActiveStroke) return false;
     if (other.tool != tool) return false;
     if (other.color != color) return false;
+    if (other.drawingEnabled != drawingEnabled) return false;
     if (other.groups.length != groups.length) return false;
     for (var i = 0; i < groups.length; i++) {
       if (other.groups[i] != groups[i]) return false;
@@ -61,13 +72,18 @@ class AnnotationState {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(Object.hashAll(groups), hasActiveStroke, tool, color);
+  int get hashCode => Object.hash(
+        Object.hashAll(groups),
+        hasActiveStroke,
+        tool,
+        color,
+        drawingEnabled,
+      );
 
   @override
   String toString() =>
       'AnnotationState(groups: ${groups.length}, active: $hasActiveStroke, '
-      'tool: $tool, color: $color)';
+      'tool: $tool, color: $color, drawing: $drawingEnabled)';
 }
 
 /// Per-job Riverpod notifier that owns a single [AnnotationSession] and
@@ -143,6 +159,15 @@ class AnnotationController
     if (state.color == hex) return;
     _session.setColor(hex);
     state = state.copyWith(color: hex);
+  }
+
+  /// Flip Pan (drawing disabled) vs Pen/Highlighter (drawing enabled).
+  /// The UI tool bar calls this when the user taps the first icon
+  /// (pan) vs the pen/highlighter icons. Mid-stroke toggles are
+  /// harmless — the canvas only checks this flag at pointer-down.
+  void setDrawingEnabled(bool enabled) {
+    if (state.drawingEnabled == enabled) return;
+    state = state.copyWith(drawingEnabled: enabled);
   }
 
   // -- Internals -------------------------------------------------------

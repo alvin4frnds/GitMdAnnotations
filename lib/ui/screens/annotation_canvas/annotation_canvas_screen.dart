@@ -63,8 +63,15 @@ class _AnnotationCanvasScreenState
     final controller =
         ref.read(annotationControllerProvider(widget.jobRef).notifier);
     final allowed = ref.read(allowedPointerKindsProvider);
+    final drawingEnabled =
+        ref.read(annotationControllerProvider(widget.jobRef)).drawingEnabled;
     switch (phase) {
       case InkPointerPhase.down:
+        if (!drawingEnabled) {
+          // Pan mode — user is viewing, not annotating. Drop the event
+          // so the underlying content can pan/scroll naturally.
+          return;
+        }
         if (!allowed.contains(sample.kind)) {
           // Non-allowed down: controller drops it (palm rejection). We
           // leave the notifier empty and flip no capture flag.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers/annotation_providers.dart';
+import '../../../domain/entities/ink_tool.dart';
 import '../../../domain/entities/job_ref.dart';
 import '../../theme/tokens.dart';
 
@@ -33,9 +34,13 @@ class PenToolBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
     final state = ref.watch(annotationControllerProvider(jobRef));
-    final selected = state.color.toUpperCase();
+    final selectedHex = state.color.toUpperCase();
     final controller =
         ref.read(annotationControllerProvider(jobRef).notifier);
+    final panActive = !state.drawingEnabled;
+    final penActive = state.drawingEnabled && state.tool == InkTool.pen;
+    final hlActive =
+        state.drawingEnabled && state.tool == InkTool.highlighter;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
@@ -46,26 +51,47 @@ class PenToolBar extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const _ToolIcon(icon: Icons.pan_tool_alt_outlined, active: false),
+          _ToolIcon(
+            icon: Icons.pan_tool_alt_outlined,
+            active: panActive,
+            activeColor: t.accentPrimary,
+            onTap: () => controller.setDrawingEnabled(false),
+          ),
           _ToolIcon(
             icon: Icons.edit_outlined,
-            active: true,
+            active: penActive,
             activeColor: t.accentPrimary,
+            onTap: () {
+              controller.setTool(InkTool.pen);
+              controller.setDrawingEnabled(true);
+            },
           ),
-          const _ToolIcon(icon: Icons.highlight_outlined, active: false),
+          _ToolIcon(
+            icon: Icons.highlight_outlined,
+            active: hlActive,
+            activeColor: t.accentPrimary,
+            onTap: () {
+              controller.setTool(InkTool.highlighter);
+              controller.setDrawingEnabled(true);
+            },
+          ),
           const SizedBox(width: 4),
           Container(width: 1, height: 20, color: t.borderSubtle),
           const SizedBox(width: 6),
           for (final hex in _paletteHex)
             _PenDot(
               hex: hex,
-              selected: hex.toUpperCase() == selected,
+              selected: hex.toUpperCase() == selectedHex,
               onTap: () => controller.setColor(hex),
             ),
           const SizedBox(width: 6),
           Container(width: 1, height: 20, color: t.borderSubtle),
           const SizedBox(width: 2),
-          const _ToolIcon(icon: Icons.backspace_outlined, active: false),
+          const _ToolIcon(
+            icon: Icons.backspace_outlined,
+            active: false,
+            onTap: null,
+          ),
         ],
       ),
     );
@@ -76,26 +102,38 @@ class _ToolIcon extends StatelessWidget {
   final IconData icon;
   final bool active;
   final Color? activeColor;
-  const _ToolIcon({required this.icon, required this.active, this.activeColor});
+  final VoidCallback? onTap;
+  const _ToolIcon({
+    required this.icon,
+    required this.active,
+    this.activeColor,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Container(
-      width: 28,
-      height: 28,
-      margin: const EdgeInsets.symmetric(horizontal: 1),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: active
-            ? (activeColor ?? t.accentPrimary).withValues(alpha: 0.14)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Icon(
-        icon,
-        size: 16,
-        color: active ? (activeColor ?? t.accentPrimary) : t.textMuted,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        width: 28,
+        height: 28,
+        margin: const EdgeInsets.symmetric(horizontal: 1),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: active
+              ? (activeColor ?? t.accentPrimary).withValues(alpha: 0.14)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: active
+              ? (activeColor ?? t.accentPrimary)
+              : (onTap == null ? t.textMuted : t.textPrimary),
+        ),
       ),
     );
   }

@@ -71,8 +71,11 @@ class _SpecReaderPdfScreenState
   void _onSample(InkPointerPhase phase, PointerSample sample) {
     final ctrl =
         ref.read(annotationControllerProvider(widget.jobRef).notifier);
+    final drawingEnabled =
+        ref.read(annotationControllerProvider(widget.jobRef)).drawingEnabled;
     switch (phase) {
       case InkPointerPhase.down:
+        if (!drawingEnabled) return; // Pan mode
         if (sample.kind != PointerKind.stylus) return;
         _capturingStylus = true;
         _activeStrokeNotifier.value = [Offset(sample.x, sample.y)];
