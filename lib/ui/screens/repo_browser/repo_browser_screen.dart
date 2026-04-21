@@ -7,9 +7,9 @@ import '../../../app/providers/spec_import_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 
-/// Repo-file browser for the "convert existing .md → spec" flow. Rooted at
-/// the current workdir. The user navigates folders + picks a `.md`; the
-/// screen pops once the importer commits and returns.
+/// Repo-file browser for the "convert existing .md / .pdf → spec" flow.
+/// Rooted at the current workdir. The user navigates folders + picks a
+/// `.md` or `.pdf`; the screen pops once the importer commits and returns.
 ///
 /// Listens to [specImportControllerProvider]: on success, shows a
 /// confirmation SnackBar (the JobList screen handles list invalidation +
@@ -100,7 +100,7 @@ class _TopChrome extends ConsumerWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            'pick a .md to convert',
+            'pick a .md or .pdf to convert',
             style: TextStyle(color: t.textMuted, fontSize: 12),
           ),
         ],
@@ -180,7 +180,9 @@ class _EmptyState extends StatelessWidget {
           Icon(Icons.folder_off_outlined, size: 32, color: t.textMuted),
           const SizedBox(height: 10),
           Text(
-            isRoot ? 'Repo has no markdown files here.' : 'No markdown here.',
+            isRoot
+                ? 'Repo has no markdown or PDF files here.'
+                : 'No markdown or PDF here.',
             style: TextStyle(color: t.textMuted, fontSize: 13),
           ),
         ],

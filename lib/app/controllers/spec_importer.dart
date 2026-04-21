@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/commit.dart';
@@ -13,14 +15,18 @@ import '../providers/spec_providers.dart';
 import '../providers/sync_providers.dart';
 import 'auth_controller.dart';
 
-/// Pure-domain service that copies a markdown file from anywhere in the
-/// repo working tree into a new `jobs/pending/spec-<id>/02-spec.md` and
-/// commits it to the `claude-jobs` sidecar branch.
+/// Pure-domain service that copies a markdown or PDF file from anywhere in
+/// the repo working tree into a new `jobs/pending/spec-<id>/` and commits
+/// it to the `claude-jobs` sidecar branch.
 ///
-/// Provenance (the source repo-relative path + timestamp) is embedded as
-/// HTML comments at the top of the copied `02-spec.md`, which survives in
-/// git, renders invisibly, and leaves [parseChangelog] alone since that
-/// parser only scans after `## Changelog`.
+/// Markdown lands at `02-spec.md` with provenance HTML comments prepended
+/// (source repo-relative path + timestamp). Those survive in git, render
+/// invisibly, and leave [parseChangelog] alone since that parser only
+/// scans after `## Changelog`.
+///
+/// PDFs land at `spec.pdf` as raw bytes (no provenance header — PDFs
+/// can't carry HTML comments without being modified). Provenance is
+/// still captured in the commit message.
 class SpecImporter {
   const SpecImporter({
     required FileSystemPort fs,
@@ -46,9 +52,19 @@ class SpecImporter {
         "That file is already inside jobs/pending — pick a source outside the specs folder.",
       );
     }
-    final String contents;
+
+    final isPdf = _hasPdfExtension(normalized);
+
+    final String? contents;
+    final Uint8List? bytes;
     try {
-      contents = await _fs.readString('$workdir/$normalized');
+      if (isPdf) {
+        contents = null;
+        bytes = Uint8List.fromList(await _fs.readBytes('$workdir/$normalized'));
+      } else {
+        contents = await _fs.readString('$workdir/$normalized');
+        bytes = null;
+      }
     } on FsNotFound {
       return SpecImportFailure('File not found: $normalized');
     } on FsNotAFile {
@@ -60,19 +76,27 @@ class SpecImporter {
     final base = basename(normalized);
     final baseSlug = slugify(base);
     final jobId = await _resolveCollision(baseSlug, workdir);
-    final composed = _composeSpec(
-      sourceRelPath: normalized,
-      contents: contents,
-    );
+
+    final FileWrite write;
+    if (isPdf) {
+      write = FileWrite(
+        path: 'jobs/pending/$jobId/spec.pdf',
+        contents: '',
+        bytes: bytes,
+      );
+    } else {
+      write = FileWrite(
+        path: 'jobs/pending/$jobId/02-spec.md',
+        contents: _composeSpec(
+          sourceRelPath: normalized,
+          contents: contents!,
+        ),
+      );
+    }
 
     try {
       final commit = await _git.commit(
-        files: [
-          FileWrite(
-            path: 'jobs/pending/$jobId/02-spec.md',
-            contents: composed,
-          ),
-        ],
+        files: [write],
         message: 'Import $normalized as $jobId',
         id: identity,
         branch: 'claude-jobs',
@@ -85,6 +109,9 @@ class SpecImporter {
       return SpecImportFailure('Commit failed: $e', cause: e);
     }
   }
+
+  static bool _hasPdfExtension(String path) =>
+      path.toLowerCase().endsWith('.pdf');
 
   String _composeSpec({
     required String sourceRelPath,
@@ -120,7 +147,7 @@ class SpecImporter {
 /// `^spec-[a-z0-9-]+$` (see `JobRef._pattern`).
 String slugify(String filename) {
   final stem = filename.replaceFirst(
-    RegExp(r'\.(md|markdown)$', caseSensitive: false),
+    RegExp(r'\.(md|markdown|pdf)$', caseSensitive: false),
     '',
   );
   final lowered = stem.toLowerCase();

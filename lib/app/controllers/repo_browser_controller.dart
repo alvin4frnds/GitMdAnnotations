@@ -4,7 +4,7 @@ import '../../domain/ports/file_system_port.dart';
 import '../providers/spec_providers.dart';
 
 /// One row in the repo-file browser — either a directory the user can
-/// enter or a `.md` file they can convert to a spec.
+/// enter or a `.md` / `.pdf` file they can convert to a spec.
 class RepoBrowserEntry {
   const RepoBrowserEntry({
     required this.name,
@@ -118,6 +118,8 @@ class RepoBrowserController extends AutoDisposeAsyncNotifier<RepoBrowserState> {
     if (parentRel == 'jobs' && name == 'pending') return false;
     if (e.isDirectory) return true;
     final lower = name.toLowerCase();
-    return lower.endsWith('.md') || lower.endsWith('.markdown');
+    return lower.endsWith('.md') ||
+        lower.endsWith('.markdown') ||
+        lower.endsWith('.pdf');
   }
 }

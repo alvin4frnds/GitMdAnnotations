@@ -74,7 +74,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Browser chrome visible; docs/ folder surfaces at root.
-    expect(find.text('pick a .md to convert'), findsOneWidget);
+    expect(find.text('pick a .md or .pdf to convert'), findsOneWidget);
     expect(find.text('docs'), findsOneWidget);
 
     // Navigate into docs/ and trigger Convert.
@@ -98,7 +98,7 @@ void main() {
     expect(git.commitLog('claude-jobs').single.identity, _identity);
 
     // Browser popped; a success SnackBar fired on the underlying JobList.
-    expect(find.text('pick a .md to convert'), findsNothing);
+    expect(find.text('pick a .md or .pdf to convert'), findsNothing);
     expect(find.text('Imported spec-feature'), findsOneWidget);
   });
 
