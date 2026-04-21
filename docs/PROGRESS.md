@@ -174,8 +174,8 @@ Not on the original M1c/M1d task lists, but blocking real-device sync.
 |---|---|---|---|
 | X1 | `libgit2dart` has no Android plugin — APK shipped no `libgit2.so` for any ABI | 🟡 | Forked locally at `../libgit2dart-fork/` with x86_64 + arm64-v8a + armeabi-v7a NDK builds; integration test `integration_test/libgit2_android_load_test.dart` passes on emulator (`b91a11a`). **Remaining:** OpenSSL cross-compile so HTTPS works against github.com; publish fork as git repo; on-tablet smoke test. See Issues.md "libgit2dart has no Android plugin" entry. |
 | X2 | Inter + JetBrains Mono bundled, replacing system-fallback Roboto on breadcrumbs | ✅ | `assets/fonts/*` + `pubspec.yaml` + `lib/ui/theme/app_theme.dart` — closes Issues.md:21-26 |
-| X3 | `claude-jobs` branch bootstrap from `origin/claude-jobs` missing in `GitAdapter.cloneOrOpen` | ⏳ | Issues.md High; fix planned in `_handleCloneOrOpen` |
-| X4 | `ConflictResolver.archiveAndReset` passes ref-name to SHA-only `resetHard` | ⏳ | Issues.md High; fix planned in `_handleResetHard` (resolve via `Revparse.single`) |
+| X3 | `claude-jobs` branch bootstrap from `origin/claude-jobs` missing in `GitAdapter.cloneOrOpen` | ✅ | `ca94f67` — `_bootstrapLocalSidecarBranch` materialises `refs/heads/claude-jobs` after clone when origin has it |
+| X4 | `ConflictResolver.archiveAndReset` passes ref-name to SHA-only `resetHard` | ✅ | `ca94f67` — `_resolveRefToOid` hex-SHA fast path + `RevParse.single` fallback for ref-names/tags |
 | X5 | RepoPicker UI (deferred since M1a) — blocks real-device JobList | ⏳ | New route between SignIn and JobList. Current `DEV_SEED_ENABLED` dart-define stubs past it for dev-loop work |
 
 ## Change log
