@@ -378,9 +378,11 @@ packages:
   libgit2dart:
     dependency: "direct main"
     description:
-      path: "../libgit2dart-fork"
-      relative: true
-    source: path
+      path: "."
+      ref: f68760e
+      resolved-ref: f68760eb084aaf2488c8d7cf5a46e26d81aa343b
+      url: "git@github.com:alvin4frnds/libgit2dart-fork.git"
+    source: git
     version: "1.2.2"
   lints:
     dependency: transitive

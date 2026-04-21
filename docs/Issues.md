@@ -47,7 +47,7 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 - ~~**Source:** M1a T10 (2026-04-20)~~
 - ~~**Screen/area:** `lib/infra/git/` git adapter chain.~~
 - ~~**Detail:** `libgit2dart 1.2.2` works today but is marked `discontinued`. No active maintainer.~~
-- **Closed in W1 (2026-04-21):** we are the maintainer now. The fork at `../libgit2dart-fork/` ships the Android NDK CMake recipe + prebuilt `libgit2.so` + mbedTLS 2.28 for the three Android ABIs (x86_64 / arm64-v8a / armeabi-v7a) and is referenced via `path:` in `pubspec.yaml`. W2.3 will publish it to GitHub so a clean clone of this repo resolves without the sibling directory; until then the `path:` dep keeps the loop self-contained.
+- **Closed in W1 (2026-04-21):** we are the maintainer now. The fork ships the Android NDK CMake recipe + prebuilt `libgit2.so` + mbedTLS 2.28 for the three Android ABIs (x86_64 / arm64-v8a / armeabi-v7a). **W2.3 follow-up (2026-04-21):** the fork is now published at `git@github.com:alvin4frnds/libgit2dart-fork.git`; `pubspec.yaml` swapped from `path:` to `git: { url, ref: f68760e }` so a clean clone of this repo resolves without the sibling directory. Bump the `ref` when rolling the fork forward.
 
 ### ~~Issue: Git integration tests are platform-tagged skeletons~~ — Closed in M1c-T6 (`c4bc604`)
 - ~~**Severity:** Medium~~
@@ -74,8 +74,9 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 - **What was chosen:** mbedTLS 2.28 LTS (not 3.x) because libgit2 1.5's `streams/mbedtls.c` targets the pre-3.x `ssl_config` struct layout; 3.x rewrite would have needed source patches in the fork. NTLM disabled because libgit2's `deps/ntlmclient/crypt_mbedtls.c` calls `mbedtls_md4_*` which mbedTLS 2.28 doesn't expose by default (MD4 was broken long ago); our auth path is OAuth/PAT so NTLM is unused.
 
 
-### Issue: libgit2dart has no Android plugin — APK ships zero `libgit2.so`; Sync/Submit will crash on device
-- **Severity:** **High** — the entire on-device git path (Sync Down, Sync Up, Submit Review, Approve) will crash with a native-lib load error the first time anyone exercises it on the tablet. Blocks Phase 1 exit.
+### ~~Issue: libgit2dart has no Android plugin — APK ships zero `libgit2.so`; Sync/Submit will crash on device~~ — Closed in W2.3 (2026-04-21)
+- **Closed:** forked `libgit2dart 1.2.2` at `git@github.com:alvin4frnds/libgit2dart-fork.git` (ref `f68760e`). Fork adds `android/` with `ffiPlugin: true` and ships prebuilt `libgit2.so` + `libmbedtls.so` + `libmbedx509.so` + `libmbedcrypto.so` under `android/src/main/jniLibs/{arm64-v8a, armeabi-v7a, x86_64}/`. `pubspec.yaml` now pulls via `git: { url, ref }` so a clean clone resolves without the sibling directory. `integration_test/libgit2_android_load_test.dart` verifies the load path + `GitFeature.https` on `emulator-5554`. On-tablet smoke test (W2.5) is the follow-on acceptance step.
+- ~~**Severity:** **High** — the entire on-device git path (Sync Down, Sync Up, Submit Review, Approve) will crash with a native-lib load error the first time anyone exercises it on the tablet. Blocks Phase 1 exit.~~
 - **Source:** M1d emulator verification (2026-04-21) — surfaced while inspecting the APK during a broader emulator smoke test; confirmed by unpacking `build/app/outputs/flutter-apk/app-debug.apk`.
 - **Screen/area:** `lib/infra/git/` adapter chain, `pubspec.yaml` (`libgit2dart ^1.2.2`), Android Gradle build output.
 - **Detail:**

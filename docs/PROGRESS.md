@@ -58,7 +58,7 @@ Across the two pushes documented in `docs/implementation-plan2.md`:
 |---|---|---|
 | **W1** | Bundle Inter + JetBrains Mono fonts (closes Issues.md:21-26); refresh PROGRESS.md + materialize plan at `docs/implementation-plan2.md`; cross-compile libgit2 for `arm64-v8a` + `armeabi-v7a`; push-error classifier refactor (+42 tests) | ✅ |
 | **W2.1/2.2** | Cross-compile mbedTLS 2.28 LTS (3 ABIs); relink libgit2 with `-DUSE_HTTPS=mbedTLS`; integration test asserts `GitFeature.https` on emulator-5554; `sync_conflict_test.dart` regression-green | ✅ |
-| **W2.3** | Publish fork (`../libgit2dart-fork/`) as git repo, swap `path:` → `git: { url, ref }` | ⏳ (~30 min, needs GitHub auth) |
+| **W2.3** | Publish fork (`../libgit2dart-fork/`) as git repo, swap `path:` → `git: { url, ref }` | ✅ pushed as `alvin4frnds/libgit2dart-fork` (2026-04-21); `pubspec.yaml` pinned to ref `f68760e` |
 | **W2.5** | On-tablet OPD2504 smoke (arm64 `.so` + HTTPS on real hardware) | ⏳ (needs tablet connected) |
 | **W3.1** | RepoPicker — domain entity + port + fake + Dio adapter + controller + screen; `_AuthGate` now routes SignIn → RepoPicker → JobList; +7 controller tests (pick() path has a documented TODO for path_provider override) | ✅ |
 | **W3.2** | Fix `claude-jobs` branch bootstrap from `origin/claude-jobs` in `_handleCloneOrOpen` | ✅ |
