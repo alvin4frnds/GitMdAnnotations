@@ -5,7 +5,6 @@ import 'package:gitmdannotations_tablet/app/controllers/auth_identity_codec.dart
 import 'package:gitmdannotations_tablet/app/controllers/repo_picker_controller.dart';
 import 'package:gitmdannotations_tablet/app/providers/auth_providers.dart';
 import 'package:gitmdannotations_tablet/app/providers/repo_picker_providers.dart';
-import 'package:gitmdannotations_tablet/domain/entities/auth_session.dart';
 import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
 import 'package:gitmdannotations_tablet/domain/entities/github_repo.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_auth_port.dart';
@@ -15,7 +14,6 @@ import 'package:gitmdannotations_tablet/domain/ports/github_repos_port.dart';
 import 'package:gitmdannotations_tablet/domain/ports/secure_storage_port.dart';
 
 const _identity = GitIdentity(name: 'Ada', email: 'ada@example.com');
-const _session = AuthSession(token: 'gho_test', identity: _identity);
 
 const _repoA = GitHubRepo(
   owner: 'octocat',
