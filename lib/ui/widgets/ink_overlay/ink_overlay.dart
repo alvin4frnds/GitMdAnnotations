@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../domain/entities/pointer_sample.dart';
+import '../../../domain/entities/stroke.dart';
 import '../../../domain/entities/stroke_group.dart';
 import 'ink_overlay_painter.dart';
 import 'pointer_event_mapper.dart';
@@ -30,6 +31,7 @@ class InkOverlay extends StatefulWidget {
     required this.onSample,
     required this.nowProvider,
     required this.hitTestBehavior,
+    this.currentStrokeOpacity = Stroke.kDefaultStrokeOpacity,
     super.key,
   });
 
@@ -37,6 +39,12 @@ class InkOverlay extends StatefulWidget {
   final ValueListenable<List<Offset>> activeStroke;
   final Color currentStrokeColor;
   final double currentStrokeWidth;
+
+  /// Alpha applied to the in-progress stroke preview — matches the
+  /// opacity that [AnnotationSession] will stamp onto the [Stroke] on
+  /// commit, so the live preview doesn't shift when the stroke is
+  /// committed (highlighter preview stays 0.35, pen stays 0.9).
+  final double currentStrokeOpacity;
   final void Function(InkPointerPhase phase, PointerSample sample) onSample;
 
   /// Clock seam. T7 wires `ref.read(clockProvider).now`; the widget stays
@@ -78,6 +86,7 @@ class _InkOverlayState extends State<InkOverlay> {
           activeStroke: widget.activeStroke,
           activeStrokeColor: widget.currentStrokeColor,
           activeStrokeWidth: widget.currentStrokeWidth,
+          activeStrokeOpacity: widget.currentStrokeOpacity,
         ),
         size: Size.infinite,
       ),

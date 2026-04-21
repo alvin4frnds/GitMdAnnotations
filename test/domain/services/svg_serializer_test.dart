@@ -254,4 +254,50 @@ void main() {
       expect(a.codeUnits, b.codeUnits);
     });
   });
+
+  group('SvgSerializer — per-stroke opacity', () {
+    test('default 0.9 → emits opacity="0.9" (backwards-compatible)', () {
+      final serializer = const SvgSerializer();
+      final group = StrokeGroup(
+        id: 'stroke-group-A',
+        anchor: MarkdownAnchor(lineNumber: 1, sourceSha: 'abc'),
+        timestamp: DateTime.utc(2026, 4, 21, 12),
+        strokes: [
+          Stroke(
+            points: [StrokePoint(x: 0, y: 0, pressure: 0.5)],
+            color: '#DC2626',
+            strokeWidth: 2,
+          ),
+        ],
+      );
+      final out = serializer.serialize(
+        [group],
+        const SvgSource(sourceFile: 'x', sourceSha: 'y'),
+      );
+      expect(out, contains('opacity="0.9"'));
+    });
+
+    test('highlighter stroke (opacity 0.35) → emits opacity="0.35"', () {
+      final serializer = const SvgSerializer();
+      final group = StrokeGroup(
+        id: 'stroke-group-B',
+        anchor: MarkdownAnchor(lineNumber: 2, sourceSha: 'abc'),
+        timestamp: DateTime.utc(2026, 4, 21, 12),
+        strokes: [
+          Stroke(
+            points: [StrokePoint(x: 0, y: 0, pressure: 0.5)],
+            color: '#F59E0B',
+            strokeWidth: 16,
+            opacity: 0.35,
+          ),
+        ],
+      );
+      final out = serializer.serialize(
+        [group],
+        const SvgSource(sourceFile: 'x', sourceSha: 'y'),
+      );
+      expect(out, contains('opacity="0.35"'));
+      expect(out, isNot(contains('opacity="0.9"')));
+    });
+  });
 }

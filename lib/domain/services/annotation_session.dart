@@ -158,6 +158,7 @@ class AnnotationSession {
       points: List<StrokePoint>.unmodifiable(a.points),
       color: _colorFor(a.tool),
       strokeWidth: _widthFor(a.tool),
+      opacity: _opacityFor(a.tool),
     );
     final group = StrokeGroup(
       id: _ids.next(),
@@ -181,10 +182,10 @@ class AnnotationSession {
       StrokePoint(x: s.x, y: s.y, pressure: s.pressure);
 
   // Color is tool-agnostic (user-picked via the palette). Width
-  // differentiates pen (sharp, 2 px) from highlighter (chunky, 16 px)
-  // — matching the mockup's visual language. Full per-tool styling
-  // (semi-transparent highlighter with a distinct SVG opacity attr) is
-  // a deferred M1d item tracked against Stroke's schema.
+  // differentiates pen (sharp, 2 px) from highlighter (chunky, 16 px);
+  // opacity differentiates pen (near-opaque 0.9) from highlighter
+  // (semi-transparent 0.35 so text underneath stays readable) —
+  // matching the mockup's visual language.
   String _colorFor(InkTool _) => _color;
   double _widthFor(InkTool tool) {
     switch (tool) {
@@ -197,6 +198,20 @@ class AnnotationSession {
       case InkTool.circle:
       case InkTool.eraser:
         return 2.0;
+    }
+  }
+
+  double _opacityFor(InkTool tool) {
+    switch (tool) {
+      case InkTool.highlighter:
+        return 0.35;
+      case InkTool.pen:
+      case InkTool.line:
+      case InkTool.arrow:
+      case InkTool.rect:
+      case InkTool.circle:
+      case InkTool.eraser:
+        return Stroke.kDefaultStrokeOpacity;
     }
   }
 }

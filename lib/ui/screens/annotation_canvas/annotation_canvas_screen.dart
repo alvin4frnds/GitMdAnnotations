@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/controllers/review_orchestrator.dart';
 import '../../../app/providers/annotation_providers.dart';
 import '../../../domain/entities/anchor.dart';
+import '../../../domain/entities/ink_tool.dart';
 import '../../../domain/entities/job_ref.dart';
 import '../../../domain/entities/pointer_sample.dart';
+import '../../../domain/entities/stroke.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/ink_overlay/ink_overlay.dart';
 import '../review_panel/review_panel_screen.dart';
@@ -163,11 +165,15 @@ class _AnnotationCanvasScreenState
   Widget build(BuildContext context) {
     final t = context.tokens;
     final state = ref.watch(annotationControllerProvider(widget.jobRef));
-    // Stroke color/width hardcoded for T7 to match the mockup's "red pen
-    // selected" visual. Palette wiring is a later task — widen the state
-    // first, then thread the active tool through the controller.
-    final strokeColor = t.inkRed;
-    const strokeWidth = 2.0;
+    // Preview styling mirrors what AnnotationSession._commit will stamp
+    // onto the Stroke on pointer-up, so the in-progress preview looks
+    // identical to the committed stroke (no color/width/opacity pop).
+    // Kept in sync with `AnnotationSession._widthFor` / `_opacityFor`.
+    final strokeColor = _colorFromHex(state.color) ?? t.inkRed;
+    final strokeWidth = state.tool == InkTool.highlighter ? 16.0 : 2.0;
+    final strokeOpacity = state.tool == InkTool.highlighter
+        ? 0.35
+        : Stroke.kDefaultStrokeOpacity;
     return Container(
       color: t.surfaceBackground,
       child: Column(
@@ -192,6 +198,7 @@ class _AnnotationCanvasScreenState
                     activeStroke: _activeStrokeNotifier,
                     currentStrokeColor: strokeColor,
                     currentStrokeWidth: strokeWidth,
+                    currentStrokeOpacity: strokeOpacity,
                     onSample: _onSample,
                     nowProvider: ref.read(clockProvider).now,
                   ),
@@ -203,4 +210,15 @@ class _AnnotationCanvasScreenState
       ),
     );
   }
+}
+
+/// Parses the `#RRGGBB` hex stored in `AnnotationState.color` into an
+/// opaque [Color]. Returns `null` on malformed input so the caller can
+/// fall back to a safe theme default (shouldn't happen — the palette
+/// widgets only dispatch valid 7-char hex).
+Color? _colorFromHex(String hex) {
+  if (hex.length != 7 || !hex.startsWith('#')) return null;
+  final v = int.tryParse(hex.substring(1), radix: 16);
+  if (v == null) return null;
+  return Color(0xFF000000 | v);
 }

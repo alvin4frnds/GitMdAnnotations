@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../../domain/entities/stroke.dart';
 import '../../../domain/entities/stroke_group.dart';
 import 'ink_painting.dart';
 
@@ -18,12 +19,14 @@ class InkOverlayPainter extends CustomPainter {
     required this.activeStroke,
     required this.activeStrokeColor,
     required this.activeStrokeWidth,
+    this.activeStrokeOpacity = Stroke.kDefaultStrokeOpacity,
   }) : super(repaint: activeStroke);
 
   final List<StrokeGroup> groups;
   final ValueListenable<List<Offset>> activeStroke;
   final Color activeStrokeColor;
   final double activeStrokeWidth;
+  final double activeStrokeOpacity;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -33,6 +36,7 @@ class InkOverlayPainter extends CustomPainter {
       activeStrokePoints: activeStroke.value,
       activeStrokeColor: activeStrokeColor,
       activeStrokeWidth: activeStrokeWidth,
+      activeStrokeOpacity: activeStrokeOpacity,
     );
   }
 
@@ -41,6 +45,7 @@ class InkOverlayPainter extends CustomPainter {
     if (old.groups.length != groups.length) return true;
     if (old.activeStrokeColor != activeStrokeColor) return true;
     if (old.activeStrokeWidth != activeStrokeWidth) return true;
+    if (old.activeStrokeOpacity != activeStrokeOpacity) return true;
     return false;
   }
 }

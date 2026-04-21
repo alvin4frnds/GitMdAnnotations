@@ -3,15 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../domain/entities/stroke.dart';
 import '../../../domain/entities/stroke_group.dart';
 
-/// SVG fidelity constant — canonical stroke opacity (IMPLEMENTATION.md §3.4,
-/// `opacity="0.9"`). Shared by [InkOverlayPainter] and the infra
-/// `PngFlattenerAdapter` so on-screen ink and the committed PNG render
-/// byte-identical visuals.
-const double kStrokeOpacity = 0.9;
-
-/// Paints the committed [groups] followed by the in-progress [activeStroke]
-/// onto [canvas] with the app's canonical stroke style (0.9 opacity, round
-/// caps/joins, stroke-only paint).
+/// Paints the committed [groups] followed by the in-progress active stroke
+/// onto [canvas]. Each committed stroke carries its own `opacity` (so the
+/// highlighter tool can blend semi-transparently over text while the pen
+/// stays near-opaque, per IMPLEMENTATION.md §3.4); the in-progress stroke
+/// opacity is supplied by the caller via [activeStrokeOpacity].
 ///
 /// This function is the single source of truth for ink rendering. It is
 /// called both by the on-screen `InkOverlayPainter` and by the offscreen
@@ -27,6 +23,7 @@ void paintStrokeGroups(
   required List<Offset> activeStrokePoints,
   required Color activeStrokeColor,
   required double activeStrokeWidth,
+  double activeStrokeOpacity = Stroke.kDefaultStrokeOpacity,
 }) {
   for (final group in groups) {
     for (final stroke in group.strokes) {
@@ -38,6 +35,7 @@ void paintStrokeGroups(
     points: activeStrokePoints,
     color: activeStrokeColor,
     width: activeStrokeWidth,
+    opacity: activeStrokeOpacity,
   );
 }
 
@@ -48,6 +46,7 @@ void _paintStroke(Canvas canvas, Stroke stroke) {
   final paint = _buildPaint(
     color: _parseHex(stroke.color),
     width: stroke.strokeWidth,
+    opacity: stroke.opacity,
   );
   if (stroke.points.length == 1) {
     final p = stroke.points.first;
@@ -70,11 +69,12 @@ void _paintActiveStroke(
   required List<Offset> points,
   required Color color,
   required double width,
+  required double opacity,
 }) {
   if (points.isEmpty) {
     return;
   }
-  final paint = _buildPaint(color: color, width: width);
+  final paint = _buildPaint(color: color, width: width, opacity: opacity);
   if (points.length == 1) {
     canvas.drawCircle(
       points.first,
@@ -90,9 +90,13 @@ void _paintActiveStroke(
   canvas.drawPath(path, paint);
 }
 
-Paint _buildPaint({required Color color, required double width}) {
+Paint _buildPaint({
+  required Color color,
+  required double width,
+  required double opacity,
+}) {
   return Paint()
-    ..color = color.withValues(alpha: kStrokeOpacity)
+    ..color = color.withValues(alpha: opacity)
     ..strokeWidth = width
     ..strokeCap = StrokeCap.round
     ..strokeJoin = StrokeJoin.round

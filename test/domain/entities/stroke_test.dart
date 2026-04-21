@@ -100,6 +100,79 @@ void main() {
       expect(str, contains('#DC2626'));
       expect(str, contains('2'));
     });
+
+    test('opacity defaults to kDefaultStrokeOpacity (0.9)', () {
+      final s = Stroke(
+        points: [p1],
+        color: '#DC2626',
+        strokeWidth: 2,
+      );
+      expect(s.opacity, Stroke.kDefaultStrokeOpacity);
+      expect(s.opacity, 0.9);
+    });
+
+    test('accepts explicit opacity in [0, 1]', () {
+      final s = Stroke(
+        points: [p1],
+        color: '#DC2626',
+        strokeWidth: 16,
+        opacity: 0.35,
+      );
+      expect(s.opacity, 0.35);
+    });
+
+    test('strokes that differ only in opacity are unequal', () {
+      final a = Stroke(
+        points: [p1],
+        color: '#DC2626',
+        strokeWidth: 2,
+        opacity: 0.9,
+      );
+      final b = Stroke(
+        points: [p1],
+        color: '#DC2626',
+        strokeWidth: 2,
+        opacity: 0.35,
+      );
+      expect(a, isNot(equals(b)));
+      expect(a.hashCode, isNot(equals(b.hashCode)));
+    });
+
+    test('rejects opacity < 0, > 1, or NaN', () {
+      for (final bad in [-0.01, 1.01, double.nan]) {
+        expect(
+          () => Stroke(
+            points: [p1],
+            color: '#DC2626',
+            strokeWidth: 2,
+            opacity: bad,
+          ),
+          throwsA(isA<ArgumentError>()),
+          reason: 'opacity=$bad should be rejected',
+        );
+      }
+    });
+
+    test('accepts boundary values 0.0 and 1.0', () {
+      expect(
+        () => Stroke(
+          points: [p1],
+          color: '#DC2626',
+          strokeWidth: 2,
+          opacity: 0.0,
+        ),
+        returnsNormally,
+      );
+      expect(
+        () => Stroke(
+          points: [p1],
+          color: '#DC2626',
+          strokeWidth: 2,
+          opacity: 1.0,
+        ),
+        returnsNormally,
+      );
+    });
   });
 
   group('StrokePoint', () {

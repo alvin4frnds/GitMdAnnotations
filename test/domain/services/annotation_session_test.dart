@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gitmdannotations_tablet/domain/entities/anchor.dart';
 import 'package:gitmdannotations_tablet/domain/entities/ink_tool.dart';
 import 'package:gitmdannotations_tablet/domain/entities/pointer_sample.dart';
+import 'package:gitmdannotations_tablet/domain/entities/stroke.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_id_generator.dart';
 import 'package:gitmdannotations_tablet/domain/services/annotation_session.dart';
@@ -181,28 +182,31 @@ void main() {
 
   // Rule 3 — Tool color + width defaults --------------------------------
   group('Rule 3 — Tool color/width defaults', () {
-    test('pen produces color #111111 at stroke-width 2.0', () {
+    test('pen produces color #111111 at stroke-width 2.0 opacity 0.9', () {
       final s = newSession(tool: InkTool.pen);
       s.beginStroke(stylusSample(0, 0), anchor: markdownAnchor);
       s.endStroke(stylusSample(1, 1));
       final stroke = s.snapshot().single.strokes.single;
       expect(stroke.color, '#111111');
       expect(stroke.strokeWidth, 2.0);
+      expect(stroke.opacity, Stroke.kDefaultStrokeOpacity);
     });
 
-    test('highlighter commits a chunky 16px stroke (distinct from pen)',
-        () {
+    test(
+        'highlighter commits a chunky 16px semi-transparent stroke (opacity '
+        '0.35 so text underneath stays readable)', () {
       final s = newSession(tool: InkTool.highlighter);
       s.beginStroke(stylusSample(0, 0), anchor: markdownAnchor);
       s.endStroke(stylusSample(1, 1));
       final stroke = s.snapshot().single.strokes.single;
       expect(stroke.color, '#111111');
       expect(stroke.strokeWidth, 16.0);
+      expect(stroke.opacity, 0.35);
     });
 
     test(
         'line/arrow/rect/circle/eraser tools still degrade to pen '
-        'color+width (M1d polish deferred their real rendering)', () {
+        'color+width+opacity (M1d polish deferred their real rendering)', () {
       for (final tool in [
         InkTool.line,
         InkTool.arrow,
@@ -216,6 +220,11 @@ void main() {
         final stroke = s.snapshot().single.strokes.single;
         expect(stroke.color, '#111111', reason: 'tool: $tool');
         expect(stroke.strokeWidth, 2.0, reason: 'tool: $tool');
+        expect(
+          stroke.opacity,
+          Stroke.kDefaultStrokeOpacity,
+          reason: 'tool: $tool',
+        );
       }
     });
 

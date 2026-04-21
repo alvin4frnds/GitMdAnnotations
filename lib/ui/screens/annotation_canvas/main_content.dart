@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../domain/entities/pointer_sample.dart';
+import '../../../domain/entities/stroke.dart';
 import '../../../domain/entities/stroke_group.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/ink_overlay/ink_overlay.dart';
@@ -19,6 +20,7 @@ class AnnotationMainContent extends StatelessWidget {
     required this.currentStrokeWidth,
     required this.onSample,
     required this.nowProvider,
+    this.currentStrokeOpacity = Stroke.kDefaultStrokeOpacity,
     super.key,
   });
 
@@ -26,6 +28,7 @@ class AnnotationMainContent extends StatelessWidget {
   final ValueListenable<List<Offset>> activeStroke;
   final Color currentStrokeColor;
   final double currentStrokeWidth;
+  final double currentStrokeOpacity;
   final void Function(InkPointerPhase phase, PointerSample sample) onSample;
   final DateTime Function() nowProvider;
 
@@ -53,6 +56,7 @@ class AnnotationMainContent extends StatelessWidget {
               activeStroke: activeStroke,
               currentStrokeColor: currentStrokeColor,
               currentStrokeWidth: currentStrokeWidth,
+              currentStrokeOpacity: currentStrokeOpacity,
               onSample: onSample,
               nowProvider: nowProvider,
               hitTestBehavior: HitTestBehavior.opaque,

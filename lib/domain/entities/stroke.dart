@@ -48,11 +48,17 @@ class StrokePoint {
 /// One polyline captured between pointer-down and pointer-up. `color` is the
 /// canonical light-mode hex stored in SVG (IMPLEMENTATION.md §3.4); dark-mode
 /// rendering is handled by `InkColorAdapter` at display time, never persisted.
+///
+/// [opacity] is per-stroke so the highlighter tool can commit a semi-transparent
+/// line while the pen stays near-opaque. `AnnotationSession._commit` sets it
+/// via `_opacityFor(tool)`; the SVG serializer emits it as the `opacity="…"`
+/// attribute; the paint layer mixes it into the final `Color.withValues`.
 class Stroke {
   Stroke({
     required this.points,
     required this.color,
     required this.strokeWidth,
+    this.opacity = kDefaultStrokeOpacity,
   }) {
     if (!_colorPattern.hasMatch(color)) {
       throw ArgumentError.value(
@@ -61,11 +67,27 @@ class Stroke {
         'must match ${_colorPattern.pattern} (canonical light-mode hex)',
       );
     }
+    if (opacity.isNaN || opacity < 0.0 || opacity > 1.0) {
+      throw ArgumentError.value(
+        opacity,
+        'opacity',
+        'must be a normalized value in [0, 1]',
+      );
+    }
   }
+
+  /// Default opacity matches the pen tool and the legacy global paint value
+  /// (IMPLEMENTATION.md §3.4 `opacity="0.9"`). Highlighter overrides to a
+  /// lower value at `AnnotationSession._commit` time.
+  static const double kDefaultStrokeOpacity = 0.9;
 
   final List<StrokePoint> points;
   final String color;
   final double strokeWidth;
+
+  /// Normalized alpha in `[0, 1]`. Emitted into the SVG `opacity` attribute
+  /// verbatim and applied as `Color.withValues(alpha: opacity)` at paint time.
+  final double opacity;
 
   static final RegExp _colorPattern = RegExp(r'^#[0-9A-F]{6}$', caseSensitive: false);
 
@@ -75,6 +97,7 @@ class Stroke {
     if (other is! Stroke) return false;
     if (other.color != color) return false;
     if (other.strokeWidth != strokeWidth) return false;
+    if (other.opacity != opacity) return false;
     if (other.points.length != points.length) return false;
     for (var i = 0; i < points.length; i++) {
       if (other.points[i] != points[i]) return false;
@@ -84,9 +107,10 @@ class Stroke {
 
   @override
   int get hashCode =>
-      Object.hash(color, strokeWidth, Object.hashAll(points));
+      Object.hash(color, strokeWidth, opacity, Object.hashAll(points));
 
   @override
   String toString() =>
-      'Stroke(color: $color, width: $strokeWidth, points: ${points.length})';
+      'Stroke(color: $color, width: $strokeWidth, opacity: $opacity, '
+      'points: ${points.length})';
 }

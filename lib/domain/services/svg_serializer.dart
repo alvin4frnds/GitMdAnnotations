@@ -57,9 +57,10 @@ class SvgSerializer {
     final d = _pathData(s.points);
     final stroke = s.color.toUpperCase();
     final width = _formatNumber(s.strokeWidth);
+    final opacity = _formatNumber(s.opacity);
     buf.write(
       '    <path d="$d" stroke="$stroke"'
-      ' stroke-width="$width" opacity="0.9"/>\n',
+      ' stroke-width="$width" opacity="$opacity"/>\n',
     );
   }
 
