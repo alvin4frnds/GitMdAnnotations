@@ -87,11 +87,23 @@ class ReviewSubmitter {
       final svgSource =
           SvgSource(sourceFile: source.path, sourceSha: source.sha);
       final svg = const SvgSerializer().serialize(strokeGroups, svgSource);
+      // Rasterize first: its canonical dims also size the PNG flatten
+      // so strokes at large canonical y (anywhere below the top 1024
+      // canonical px, which is most of a real spec) stay on-canvas.
+      final raster = await _markdownRasterizer.rasterize();
+      // Clamp each axis at the GPU max texture for Picture.toImage
+      // (used by PngFlattenerAdapter). For the PNG we care about
+      // on-canvas strokes, not sampling density, so a gentle cap is
+      // fine. Matches the rasterizer's [_kGpuMaxTexture] behavior.
+      const double kGpuMaxTexture = 16384;
+      final pngCanvas = CanvasSize(
+        width: raster.canonicalWidth.clamp(1, kGpuMaxTexture),
+        height: raster.canonicalHeight.clamp(1, kGpuMaxTexture),
+      );
       final png = await _pngFlattener.flatten(
         groups: strokeGroups,
-        canvas: CanvasSize(width: 1024, height: 1024),
+        canvas: pngCanvas,
       );
-      final raster = await _markdownRasterizer.rasterize();
       final pdf = await const AnnotationPdfComposer().compose(
         backgroundPng: raster.pngBytes,
         canonicalWidth: raster.canonicalWidth,

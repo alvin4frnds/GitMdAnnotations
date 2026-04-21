@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -5,6 +6,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../domain/ports/markdown_rasterizer_port.dart';
+
+/// GPU max texture size on the devices this app targets. When
+/// `scene.toImage` is asked for a larger output, Flutter/Skia silently
+/// produces a *cropped* image (content in the first 16384 px, rest
+/// dropped) — `ro.size` continues to report the full render-box size,
+/// so downstream code has no idea the raster was truncated. Drifts
+/// strokes relative to the markdown in the composite PDF.
+///
+/// 16384 is the common lower bound across OpenGL ES 3.x and Vulkan
+/// drivers on mobile tablets; higher-end GPUs allow more but we clamp
+/// conservatively to guarantee no surprise truncation in the field.
+const double _kGpuMaxTexture = 16384;
 
 /// Signature for "give me the currently-mounted RepaintBoundary key".
 /// Usually reads a Riverpod `StateProvider<GlobalKey?>` that the
@@ -63,9 +76,17 @@ class MarkdownRasterizerAdapter implements MarkdownRasterizerPort {
       );
     }
     final size = ro.size;
+    // Clamp `pixelRatio` so neither image dimension exceeds the GPU
+    // max texture. See [_kGpuMaxTexture] doc — raising this at caller
+    // request and letting the engine truncate silently drifts strokes
+    // relative to the raster in the downstream composite PDF.
+    final longest = math.max(size.width, size.height);
+    final safeRatio = longest <= 0
+        ? pixelRatio
+        : math.min(pixelRatio, _kGpuMaxTexture / longest);
     final ui.Image image;
     try {
-      image = await ro.toImage(pixelRatio: pixelRatio);
+      image = await ro.toImage(pixelRatio: safeRatio);
     } on Object catch (e) {
       throw MarkdownRasterizeRenderError('RepaintBoundary.toImage failed: $e');
     }
