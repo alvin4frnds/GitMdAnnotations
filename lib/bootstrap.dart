@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/providers/annotation_providers.dart';
 import 'app/providers/auth_providers.dart';
 import 'app/providers/pdf_providers.dart';
+import 'app/providers/review_providers.dart';
 import 'app/providers/spec_providers.dart';
 import 'app/providers/sync_providers.dart';
 import 'domain/ports/secure_storage_port.dart';
@@ -13,6 +14,7 @@ import 'infra/fs/fs_adapter.dart';
 import 'infra/git/git_adapter.dart';
 import 'infra/id/system_id_generator.dart';
 import 'infra/pdf/pdfx_adapter.dart';
+import 'infra/png/png_flattener_adapter.dart';
 import 'infra/storage/keystore_adapter.dart';
 
 /// GitHub OAuth App client id for Device Flow. Public by design — ships
@@ -38,6 +40,7 @@ ProviderScope buildAppScope({required Widget child}) {
       clockProvider.overrideWithValue(SystemClock()),
       idGeneratorProvider.overrideWithValue(SystemIdGenerator()),
       pdfRasterPortProvider.overrideWithValue(PdfxAdapter()),
+      pngFlattenerProvider.overrideWithValue(PngFlattenerAdapter()),
       gitPortProvider.overrideWith((ref) {
         // Capture `ref` so the credentials loader stays lazy; resolving
         // storage at provider-define time would require a container which
