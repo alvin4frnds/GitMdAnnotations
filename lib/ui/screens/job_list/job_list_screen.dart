@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/controllers/job_list_controller.dart';
 import '../../../app/controllers/sync_controller.dart';
+import '../../../app/last_session.dart';
+import '../../../app/providers/auth_providers.dart';
 import '../../../app/providers/spec_providers.dart';
 import '../../../app/providers/sync_providers.dart';
 import '../../../domain/entities/job.dart';
@@ -689,6 +691,10 @@ class _JobRow extends ConsumerWidget {
   void _openJob(BuildContext context, WidgetRef ref) {
     final workdir = ref.read(currentWorkdirProvider);
     if (workdir == null) return;
+    // Persist the jobId so the next cold start can restore where the
+    // user left off (NFR-2). Fire-and-forget — a failure here mustn't
+    // block navigation.
+    saveLastOpenedJobId(ref.read(secureStorageProvider), job.ref.jobId);
     final screen = switch (job.sourceKind) {
       SourceKind.markdown => SpecReaderMdScreen(jobRef: job.ref),
       SourceKind.pdf => SpecReaderPdfScreen(

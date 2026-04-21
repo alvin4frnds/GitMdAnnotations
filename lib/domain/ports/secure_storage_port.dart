@@ -32,6 +32,24 @@ class SecureStorageKeys {
 
   /// JSON-serialized [GitIdentity] (`name`, `email`).
   static const gitIdentity = 'auth.git_identity.v1';
+
+  // -- last-session / NFR-2 cold-start preload --
+
+  /// Encoded [RepoRef] of the most-recently picked repo. Format is
+  /// `"<owner>|<name>|<defaultBranch>"` (pipes escaped) — see
+  /// `lib/app/last_session.dart`. Restored at bootstrap so RepoPicker
+  /// doesn't block the first frame on a `GET /user/repos`.
+  static const lastOpenedRepo = 'session.last_repo.v1';
+
+  /// Absolute local workdir path that [lastOpenedRepo] was cloned into.
+  /// Paired with [lastOpenedRepo] — rehydrating one without the other is
+  /// a no-op.
+  static const lastOpenedWorkdir = 'session.last_workdir.v1';
+
+  /// `Job.jobId` (e.g. `spec-foo-123`) of the job the user was last
+  /// viewing. Optional — the cold-start flow still works when this is
+  /// absent; the M1d "resume where you left off" push uses it when set.
+  static const lastOpenedJobId = 'session.last_job_id.v1';
 }
 
 /// Typed error raised by [SecureStoragePort] adapters when the underlying

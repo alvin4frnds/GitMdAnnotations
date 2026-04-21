@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/dev_seed.dart';
+import 'app/last_session.dart';
 import 'app/providers/annotation_providers.dart';
 import 'app/providers/auth_providers.dart';
 import 'app/providers/pdf_providers.dart';
@@ -49,9 +50,22 @@ const Set<PointerKind> _kDevPointerKinds = {
 /// has something to show before the real RepoPicker ships. Only set by
 /// [prepareDevSeed] when `--dart-define=DEV_SEED_ENABLED=true`.
 ///
+/// When [lastSession] is non-null (restored by [loadLastSession] before
+/// `runApp`), overrides [currentWorkdirProvider] + [currentRepoProvider]
+/// with the persisted values so the `_AuthGate` lands on JobList
+/// directly, skipping the RepoPicker's `GET /user/repos` round-trip.
+/// This is the NFR-2 cold-start preload path (IMPLEMENTATION.md §7 —
+/// 2 s online / 3 s offline budget). [devSeed] wins when both are
+/// provided — dev-seed is an explicit opt-in and shouldn't be silently
+/// overridden by a stale persisted session.
+///
 /// Test code doesn't call this — tests build their own [ProviderContainer]
 /// or [ProviderScope] with per-test overrides.
-ProviderScope buildAppScope({required Widget child, DevSeed? devSeed}) {
+ProviderScope buildAppScope({
+  required Widget child,
+  DevSeed? devSeed,
+  LastSession? lastSession,
+}) {
   final storage = KeystoreAdapter();
   final fs = FsAdapter();
   return ProviderScope(
@@ -80,9 +94,13 @@ ProviderScope buildAppScope({required Widget child, DevSeed? devSeed}) {
         );
       }),
       // RepoPicker (M1c) sets currentWorkdirProvider + currentRepoProvider.
+      // Precedence: devSeed > lastSession > default (null).
       if (devSeed != null) ...[
         currentWorkdirProvider.overrideWith((ref) => devSeed.workdir),
         currentRepoProvider.overrideWith((ref) => devSeed.repo),
+      ] else if (lastSession != null) ...[
+        currentWorkdirProvider.overrideWith((ref) => lastSession.workdir),
+        currentRepoProvider.overrideWith((ref) => lastSession.repo),
       ],
       if (_kAllowMouseAnnotation)
         allowedPointerKindsProvider.overrideWithValue(_kDevPointerKinds),

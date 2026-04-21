@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -6,11 +7,24 @@ import 'package:path_provider/path_provider.dart';
 import '../../domain/entities/github_repo.dart';
 import '../../domain/entities/repo_ref.dart';
 import '../../domain/ports/github_repos_port.dart';
+import '../last_session.dart';
 import '../providers/auth_providers.dart';
 import '../providers/repo_picker_providers.dart';
 import '../providers/spec_providers.dart';
 import '../providers/sync_providers.dart';
 import 'auth_controller.dart';
+
+/// Test seam for the app's documents directory. Production uses
+/// `path_provider` which throws `MissingPluginException` under
+/// `fvm flutter test` on the host VM — the test override swaps in a
+/// temp directory so `pick()` can run end-to-end in unit tests.
+///
+/// Kept as a provider (rather than a ctor arg on the notifier) so the
+/// existing `AsyncNotifierProvider.new` factory in
+/// `repo_picker_providers.dart` doesn't have to grow a new parameter.
+final docsDirectoryProvider = Provider<Future<Directory> Function()>(
+  (ref) => getApplicationDocumentsDirectory,
+);
 
 /// UI-facing state for the RepoPicker screen. See the three concrete
 /// subclasses — the picker sits between sign-in and job-list in the
@@ -124,7 +138,7 @@ class RepoPickerController extends AsyncNotifier<RepoPickerState> {
         ? previous.repos
         : const <GitHubRepo>[];
     state = AsyncValue.data(RepoPickerOpening(repo));
-    final docs = await getApplicationDocumentsDirectory();
+    final docs = await ref.read(docsDirectoryProvider)();
     final workdir = '${docs.path}/repos/${repo.owner}/${repo.name}';
     final repoRef = RepoRef(
       owner: repo.owner,
@@ -150,6 +164,14 @@ class RepoPickerController extends AsyncNotifier<RepoPickerState> {
     }
     ref.read(currentWorkdirProvider.notifier).state = workdir;
     ref.read(currentRepoProvider.notifier).state = repoRef;
+    // NFR-2 cold-start preload: persist the picked repo+workdir via
+    // SecureStoragePort so the next cold launch skips RepoPicker and
+    // lands directly on JobList. Clear any stale `lastOpenedJobId` —
+    // picking a new repo invalidates whatever job the user was
+    // previously viewing.
+    final storage = ref.read(secureStorageProvider);
+    await saveLastOpenedRepo(storage, repo: repoRef, workdir: workdir);
+    await saveLastOpenedJobId(storage, null);
     // Re-emit the loaded list so the UI can render "picked <name>"
     // feedback before the gate flips to JobList.
     state = AsyncValue.data(RepoPickerLoaded(
