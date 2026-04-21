@@ -89,6 +89,7 @@ class AnnotationController
       tool: InkTool.pen,
       clock: clock,
       idGenerator: ids,
+      allowedPointerKinds: ref.read(allowedPointerKindsProvider),
     );
     return const AnnotationState.initial();
   }

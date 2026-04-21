@@ -41,10 +41,11 @@ class _AnnotationCanvasScreenState
   /// critical for the NFR-1 <25 ms ink latency budget (§2.4).
   final _activeStrokeNotifier = ValueNotifier<List<Offset>>(const []);
 
-  /// Tracks whether the current pointer-down started as a stylus so
-  /// subsequent move/up samples can be routed correctly even if the
-  /// controller's palm rejection would already drop non-stylus samples.
-  bool _capturingStylus = false;
+  /// Tracks whether the current pointer-down was accepted (kind belongs
+  /// to [allowedPointerKindsProvider]) so subsequent move/up samples can
+  /// be routed correctly even if the controller's palm rejection would
+  /// already drop non-allowed samples.
+  bool _capturingPointer = false;
 
   // TODO(markdown-anchor): derive real line+sourceSha from tap Offset once
   // MarkdownRenderer is wired (IMPLEMENTATION.md §4.4). For T7 we use the
@@ -61,18 +62,19 @@ class _AnnotationCanvasScreenState
   void _onSample(InkPointerPhase phase, PointerSample sample) {
     final controller =
         ref.read(annotationControllerProvider(widget.jobRef).notifier);
+    final allowed = ref.read(allowedPointerKindsProvider);
     switch (phase) {
       case InkPointerPhase.down:
-        if (sample.kind != PointerKind.stylus) {
-          // Non-stylus down: controller drops it (palm rejection). We
+        if (!allowed.contains(sample.kind)) {
+          // Non-allowed down: controller drops it (palm rejection). We
           // leave the notifier empty and flip no capture flag.
           return;
         }
-        _capturingStylus = true;
+        _capturingPointer = true;
         _activeStrokeNotifier.value = [Offset(sample.x, sample.y)];
         controller.beginStroke(sample, anchor: _placeholderAnchor());
       case InkPointerPhase.move:
-        if (!_capturingStylus || sample.kind != PointerKind.stylus) {
+        if (!_capturingPointer || !allowed.contains(sample.kind)) {
           return;
         }
         _activeStrokeNotifier.value = [
@@ -81,19 +83,19 @@ class _AnnotationCanvasScreenState
         ];
         controller.extendStroke(sample);
       case InkPointerPhase.up:
-        if (!_capturingStylus || sample.kind != PointerKind.stylus) {
+        if (!_capturingPointer || !allowed.contains(sample.kind)) {
           return;
         }
-        _capturingStylus = false;
+        _capturingPointer = false;
         controller.endStroke(sample);
         // Committed stroke now renders from state.groups; drop the
         // in-progress sample list.
         _activeStrokeNotifier.value = const [];
       case InkPointerPhase.cancel:
-        if (!_capturingStylus) {
+        if (!_capturingPointer) {
           return;
         }
-        _capturingStylus = false;
+        _capturingPointer = false;
         controller.endStroke(sample);
         _activeStrokeNotifier.value = const [];
     }

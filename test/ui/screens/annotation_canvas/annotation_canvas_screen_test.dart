@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gitmdannotations_tablet/app/providers/annotation_providers.dart';
 import 'package:gitmdannotations_tablet/domain/entities/job_ref.dart';
+import 'package:gitmdannotations_tablet/domain/entities/pointer_sample.dart';
 import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
 import 'package:gitmdannotations_tablet/domain/fakes/fake_id_generator.dart';
@@ -19,11 +20,16 @@ final _jobRef = JobRef(
 
 final _t0 = DateTime.utc(2026, 4, 20, 9, 14, 22);
 
-Widget _host({required JobRef jobRef}) {
+Widget _host({
+  required JobRef jobRef,
+  Set<PointerKind>? allowedPointerKinds,
+}) {
   return ProviderScope(
     overrides: [
       clockProvider.overrideWithValue(FakeClock(_t0)),
       idGeneratorProvider.overrideWithValue(FakeIdGenerator()),
+      if (allowedPointerKinds != null)
+        allowedPointerKindsProvider.overrideWithValue(allowedPointerKinds),
     ],
     child: MaterialApp(
       theme: AppTheme.build(AppTokens.light),
@@ -112,6 +118,62 @@ void main() {
     final container = _containerFor(tester);
     final state = container.read(annotationControllerProvider(_jobRef));
     expect(state.groups, isEmpty);
+  });
+
+  testWidgets('mouse down/move/up does NOT commit with default '
+      'allowedPointerKinds (stylus-only — tablet release behavior)',
+      (tester) async {
+    await _setLandscapeSurface(tester);
+    await tester.pumpWidget(_host(jobRef: _jobRef));
+    await tester.pump();
+
+    final center = tester.getCenter(find.byType(InkOverlay));
+    final gesture = await tester.startGesture(center,
+        kind: PointerDeviceKind.mouse);
+    await tester.pump();
+    await gesture.moveBy(const Offset(10, 10));
+    await tester.pump();
+    await gesture.up();
+    await tester.pump();
+
+    final container = _containerFor(tester);
+    final state = container.read(annotationControllerProvider(_jobRef));
+    expect(state.groups, isEmpty);
+  });
+
+  // -----------------------------------------------------------------------
+  // Dev-loop: widened allowedPointerKinds (mirrors the composition-root
+  // override bootstrap.dart installs when `--dart-define=
+  // ALLOW_MOUSE_ANNOTATION=true`). Proves the flag reaches the widget
+  // tree and lets mouse events drive strokes on desktop / emulator.
+  // -----------------------------------------------------------------------
+  testWidgets('mouse down/move/up commits a StrokeGroup when '
+      'allowedPointerKinds includes mouse (dev-loop build)',
+      (tester) async {
+    await _setLandscapeSurface(tester);
+    await tester.pumpWidget(_host(
+      jobRef: _jobRef,
+      allowedPointerKinds: const {
+        PointerKind.stylus,
+        PointerKind.mouse,
+        PointerKind.touch,
+      },
+    ));
+    await tester.pump();
+
+    final center = tester.getCenter(find.byType(InkOverlay));
+    final gesture = await tester.startGesture(center,
+        kind: PointerDeviceKind.mouse);
+    await tester.pump();
+    await gesture.moveBy(const Offset(10, 10));
+    await tester.pump();
+    await gesture.up();
+    await tester.pump();
+
+    final container = _containerFor(tester);
+    final state = container.read(annotationControllerProvider(_jobRef));
+    expect(state.groups, hasLength(1));
+    expect(state.hasActiveStroke, isFalse);
   });
 
   // -----------------------------------------------------------------------

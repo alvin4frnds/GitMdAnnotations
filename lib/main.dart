@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/controllers/auth_controller.dart';
+import 'app/dev_seed.dart';
 import 'app/providers/auth_providers.dart';
 import 'bootstrap.dart';
 import 'ui/screens/job_list/job_list_screen.dart';
@@ -16,7 +17,8 @@ Future<void> main() async {
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ]);
-  runApp(buildAppScope(child: const _App()));
+  final devSeed = await prepareDevSeed();
+  runApp(buildAppScope(devSeed: devSeed, child: const _App()));
 }
 
 class _App extends StatelessWidget {
