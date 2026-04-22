@@ -30,6 +30,14 @@ class SyncMergingMainIntoJobs extends SyncProgress {
   const SyncMergingMainIntoJobs();
 }
 
+/// Emitted by [SyncService.syncDown] on a repo where origin has no
+/// `claude-jobs` branch yet. The service seeds a local `claude-jobs` from
+/// `origin/<default>` and pushes it to origin so the repo becomes usable
+/// on its first pull instead of silently terminating with an empty list.
+class SyncInitializingSidecar extends SyncProgress {
+  const SyncInitializingSidecar();
+}
+
 class SyncPushing extends SyncProgress {
   const SyncPushing();
 }
@@ -151,14 +159,47 @@ class SyncService {
       // still on the default branch.
       final jobsHead = await git.headSha('claude-jobs');
       if (jobsHead == null) {
-        final bootstrapped = await git.bootstrapLocalBranchFromRemote(
+        var bootstrapped = await git.bootstrapLocalBranchFromRemote(
           localBranch: 'claude-jobs',
           remoteBranch: 'origin/claude-jobs',
         );
         if (!bootstrapped) {
-          // Origin has no claude-jobs either — nothing to sync down.
-          out.add(const SyncComplete());
-          return;
+          // Origin has no claude-jobs yet — seed one from the default
+          // branch so a freshly-picked repo becomes usable on its first
+          // pull. Without this, every repo except pre-bootstrapped ones
+          // (like the test `surri` fixture) terminates with a silent
+          // "Sync complete" and an empty JobList.
+          out.add(const SyncInitializingSidecar());
+          bootstrapped = await git.bootstrapLocalBranchFromRemote(
+            localBranch: 'claude-jobs',
+            remoteBranch: 'origin/$defaultBranch',
+          );
+          if (!bootstrapped) {
+            // Origin has no default branch either — the repo is empty.
+            // Surface the real reason instead of a silent no-op.
+            out.add(SyncFailed(
+              StateError(
+                'Repo has no commits on origin/$defaultBranch — '
+                'push an initial commit before syncing.',
+              ),
+            ));
+            return;
+          }
+          final pushOutcome = await git.push(repo, branch: 'claude-jobs');
+          switch (pushOutcome) {
+            case PushSuccess():
+              break;
+            case PushRejectedAuth():
+              out.add(const SyncFailed(PushRejectedAuth()));
+              return;
+            case PushRejectedNonFastForward():
+              // Another device seeded origin/claude-jobs between our
+              // fetch and our push — rare race. Surface the outcome so
+              // the user can re-tap; the next pull hits the
+              // bootstrap-from-origin/claude-jobs path normally.
+              out.add(SyncFailed(pushOutcome));
+              return;
+          }
         }
       }
 

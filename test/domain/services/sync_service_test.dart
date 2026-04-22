@@ -154,18 +154,66 @@ void main() {
       expect(events.whereType<SyncComplete>(), isEmpty);
     });
 
-    test('bootstrap: claude-jobs missing locally still completes', () async {
-      final fake = FakeGitPort();
+    test(
+        'bootstrap: origin has no claude-jobs seeds from default branch and '
+        'pushes', () async {
+      final fake = _RecordingPush();
       await _seedMain(fake);
-      // Deliberately NOT seeding claude-jobs.
+      // Deliberately NOT seeding claude-jobs — origin has none.
       final service = SyncService(git: fake);
 
       final events = await service
           .syncDown(_repo, workdir: _workdir)
           .toList();
 
+      // The sidecar-init progress event fires before the merge step.
+      expect(events.whereType<SyncInitializingSidecar>(), hasLength(1));
       expect(events.last, isA<SyncComplete>());
+      // Local claude-jobs was seeded from main.
+      expect(fake.branches.containsKey('claude-jobs'), isTrue);
+      expect(fake.branches['claude-jobs']!['README.md'], '# hi');
+      // And pushed to origin exactly once.
+      expect(fake.pushCalls, 1);
     });
+
+    test(
+        'bootstrap-init: push rejected with auth surfaces '
+        'SyncFailed(PushRejectedAuth)', () async {
+      final fake = FakeGitPort()
+        ..scriptedPushOutcome = const PushRejectedAuth();
+      await _seedMain(fake);
+      final service = SyncService(git: fake);
+
+      final events = await service
+          .syncDown(_repo, workdir: _workdir)
+          .toList();
+
+      expect(events.whereType<SyncInitializingSidecar>(), hasLength(1));
+      expect(events.last, isA<SyncFailed>());
+      expect((events.last as SyncFailed).error, isA<PushRejectedAuth>());
+      expect(events.whereType<SyncComplete>(), isEmpty);
+    });
+
+    test(
+        'bootstrap-init: push rejected NFF surfaces '
+        'SyncFailed(PushRejectedNonFastForward)', () async {
+      final fake = FakeGitPort()
+        ..scriptedPushOutcome = const PushRejectedNonFastForward(
+          remoteSha: 'remote',
+          localSha: 'local',
+        );
+      await _seedMain(fake);
+      final service = SyncService(git: fake);
+
+      final events = await service
+          .syncDown(_repo, workdir: _workdir)
+          .toList();
+
+      expect(events.last, isA<SyncFailed>());
+      expect(
+          (events.last as SyncFailed).error, isA<PushRejectedNonFastForward>());
+    });
+
 
     test('stream completes after SyncComplete (await for terminates)',
         () async {
