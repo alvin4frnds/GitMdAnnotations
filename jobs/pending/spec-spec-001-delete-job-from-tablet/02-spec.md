@@ -123,3 +123,7 @@ Add a **Delete job** action, accessed by **long-pressing a job row** in the JobL
 2. Unit tests green (including the new `job_deleter_test.dart`).
 3. Manual run on the tablet: long-press → confirm → row gone → Sync Up → branch diff on GitHub shows the folder removed.
 4. Regression: re-run the existing Submit Review happy-path test; `commit(removals: [])` default must match the old behavior byte-for-byte.
+
+## Changelog
+
+- 2026-04-22 12:08 tablet: Submitted review of 02-spec.md.
