@@ -1,6 +1,6 @@
 # Spec 001 — Delete job from tablet
 
-**Status**: Draft — awaiting review
+**Status**: Approved — ready to implement (reviewed 2026-04-22)
 **Authored**: 2026-04-22
 **Touches**: `lib/domain/ports/git_port.dart`, `lib/infra/git/`, `lib/app/controllers/`, `lib/ui/screens/job_list/job_list_screen.dart`
 **Capacitor**: no regressions — tablet-only feature
