@@ -101,6 +101,15 @@ class ReviewPanelScreen extends ConsumerWidget {
         );
         if (!context.mounted || outcome == null) return;
         _announceSubmission(context, outcome);
+        if (outcome is ReviewSubmissionSuccess) {
+          // Full refresh of the home list so the freshly-committed
+          // review drops out of the pending bucket on the next frame.
+          // Invalidating before popping is safe — Riverpod providers
+          // are global, and JobList's `ref.watch` picks up the refreshed
+          // value when it becomes visible again.
+          ref.invalidate(jobListControllerProvider);
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
     }
   }
 
