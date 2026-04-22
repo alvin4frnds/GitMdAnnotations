@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/auth_controller.dart';
+import '../../../app/controllers/job_deleter.dart';
 import '../../../app/controllers/job_list_controller.dart';
 import '../../../app/controllers/spec_importer.dart';
 import '../../../app/controllers/sync_controller.dart';
 import '../../../app/last_session.dart';
 import '../../../app/providers/auth_providers.dart';
+import '../../../app/providers/job_deleter_providers.dart';
 import '../../../app/providers/spec_import_providers.dart';
 import '../../../app/providers/spec_providers.dart';
 import '../../../app/providers/sync_providers.dart';
@@ -830,6 +833,7 @@ class _JobRow extends ConsumerWidget {
       color: t.surfaceBackground,
       child: InkWell(
         onTap: () => _openJob(context, ref),
+        onLongPress: () => _confirmDelete(context, ref),
         hoverColor: t.surfaceSunken,
         child: Container(
           decoration: const BoxDecoration(
@@ -906,6 +910,158 @@ class _JobRow extends ConsumerWidget {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => Scaffold(body: screen),
+      ),
+    );
+  }
+
+  /// Long-press → destructive bottom sheet. The sheet drives the actual
+  /// delete via [_deleteJob]; this method only owns the sheet lifecycle
+  /// so the caller's `BuildContext` doesn't get captured across an
+  /// async gap.
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      isDismissible: true,
+      builder: (sheetCtx) => _DeleteJobSheet(jobId: job.ref.jobId),
+    );
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+    await _deleteJob(context, ref);
+  }
+
+  Future<void> _deleteJob(BuildContext context, WidgetRef ref) async {
+    final workdir = ref.read(currentWorkdirProvider);
+    if (workdir == null) return;
+    final authState = ref.read(authControllerProvider).value;
+    if (authState is! AuthSignedIn) {
+      _toast(context, 'Sign in to delete jobs');
+      return;
+    }
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final progress = messenger?.showSnackBar(
+      const SnackBar(
+        content: Text('Deleting…'),
+        duration: Duration(seconds: 30),
+      ),
+    );
+    try {
+      final outcome = await ref.read(jobDeleterProvider).delete(
+            job: job.ref,
+            workdir: workdir,
+            id: authState.session.identity,
+          );
+      progress?.close();
+      ref.invalidate(jobListControllerProvider);
+      ref.invalidate(pendingPushCountProvider);
+      if (!context.mounted) return;
+      final msg = switch (outcome) {
+        JobDeleteCommitted() => 'Deleted ${job.ref.jobId}',
+        JobDeleteNoop() => 'Nothing to delete',
+      };
+      _toast(context, msg);
+    } catch (e) {
+      progress?.close();
+      if (!context.mounted) return;
+      _toast(context, 'Delete failed: $e');
+    }
+  }
+
+  void _toast(BuildContext context, String message) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
+    );
+  }
+}
+
+/// Bottom-sheet body for the destructive "Delete job" confirmation. Pops
+/// `true` when the user confirms, `false`/null otherwise. Signed-out
+/// users see the Delete button disabled with a hint — the parent
+/// [_JobRow._deleteJob] also re-checks auth before committing.
+class _DeleteJobSheet extends ConsumerWidget {
+  const _DeleteJobSheet({required this.jobId});
+
+  final String jobId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.tokens;
+    final signedIn = ref.watch(authControllerProvider).value is AuthSignedIn;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.delete_forever_rounded,
+                    size: 20, color: t.statusDanger),
+                const SizedBox(width: 10),
+                Text(
+                  'Delete job',
+                  style: TextStyle(
+                    color: t.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              jobId,
+              style: appMono(context, size: 13, weight: FontWeight.w500),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Removes 02-spec.md, review, and annotation files. Commits '
+              'to claude-jobs. Next Sync Up pushes the deletion.',
+              style: TextStyle(
+                color: t.textMuted,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+            if (!signedIn) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Sign in first — the commit needs a GitHub identity.',
+                style: TextStyle(
+                  color: t.statusDanger,
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: signedIn
+                        ? () => Navigator.of(context).pop(true)
+                        : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: t.statusDanger,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Delete'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
