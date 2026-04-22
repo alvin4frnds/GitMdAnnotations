@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/ports/backup_export_port.dart';
+import '../last_session.dart';
+import '../providers/auth_providers.dart';
 import '../providers/settings_providers.dart';
 import '../providers/spec_providers.dart';
 
@@ -48,9 +50,35 @@ class SettingsExportFailed extends SettingsState {
   final String message;
 }
 
+/// A "clear all local copies" wipe is in flight. UI disables the row
+/// and shows a spinner until a terminal state lands.
+class SettingsClearing extends SettingsState {
+  const SettingsClearing();
+}
+
+/// Terminal success for the clear-all action. Cloned workdirs and
+/// drafts have been removed; the in-memory repo/workdir providers and
+/// the `lastOpened*` secure-storage keys were also reset so the UI
+/// falls back to RepoPicker on the next frame.
+class SettingsClearDone extends SettingsState {
+  const SettingsClearDone();
+}
+
+/// Terminal failure for the clear-all action. Partial progress (e.g.
+/// `repos/` removed but `drafts/` failed) is possible — we keep the
+/// repo/workdir pointer intact so the user can retry without losing
+/// their selection.
+class SettingsClearFailed extends SettingsState {
+  const SettingsClearFailed(this.message);
+  final String message;
+}
+
 /// Wires [BackupExportPort] into a Riverpod `AsyncNotifier`. Intents:
 ///   * [exportBackups] — kicks off the SAF export flow against
 ///     `$workdir/.gitmdscribe-backups`.
+///   * [clearAllLocal] — wipes every cloned repo + review draft under
+///     the app's docs directory and drops the persisted last-session
+///     pointer. The user stays signed in.
 class SettingsController extends AsyncNotifier<SettingsState> {
   BackupExportPort get _port => ref.read(backupExportPortProvider);
 
@@ -89,6 +117,32 @@ class SettingsController extends AsyncNotifier<SettingsState> {
       // the UI navigable by surfacing a failure state rather than
       // bouncing into AsyncValue.error.
       state = AsyncValue.data(SettingsExportFailed(e.toString()));
+    }
+  }
+
+  /// Deletes `<appDocs>/repos` and `<appDocs>/drafts` recursively,
+  /// clears the `lastOpened*` secure-storage keys, and resets the
+  /// in-memory repo/workdir providers so `_AuthGate` routes back to
+  /// RepoPicker on the next frame. Auth state is intentionally
+  /// untouched — use sign-out for that.
+  ///
+  /// Double-tap safe: a second call while [SettingsClearing] is in
+  /// flight is a no-op.
+  Future<void> clearAllLocal() async {
+    if (state.value is SettingsClearing) return;
+    state = const AsyncValue.data(SettingsClearing());
+    try {
+      final fs = ref.read(fileSystemProvider);
+      final reposRoot = await fs.appDocsPath('repos');
+      final draftsRoot = await fs.appDocsPath('drafts');
+      await fs.remove(reposRoot);
+      await fs.remove(draftsRoot);
+      await clearLastSession(ref.read(secureStorageProvider));
+      ref.read(currentRepoProvider.notifier).state = null;
+      ref.read(currentWorkdirProvider.notifier).state = null;
+      state = const AsyncValue.data(SettingsClearDone());
+    } on Object catch (e) {
+      state = AsyncValue.data(SettingsClearFailed(e.toString()));
     }
   }
 }

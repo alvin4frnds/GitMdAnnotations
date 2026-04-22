@@ -75,6 +75,11 @@ class SettingsScreen extends ConsumerWidget {
                 const _SectionHeader('DATA'),
                 const SizedBox(height: 8),
                 _ExportBackupsRow(async: settings),
+                const SizedBox(height: 8),
+                _ClearAllRow(
+                  async: settings,
+                  onTap: () => _confirmClearAll(context, ref),
+                ),
               ],
             ),
           ),
@@ -130,6 +135,32 @@ class SettingsScreen extends ConsumerWidget {
     if (context.mounted) {
       Navigator.of(context).maybePop();
     }
+  }
+
+  Future<void> _confirmClearAll(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Clear all local copies?'),
+        content: const Text(
+          'This removes every cloned repository and draft stored on this '
+          'device. You stay signed in. Anything not pushed to GitHub '
+          'will be lost.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Clear everything'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await ref.read(settingsControllerProvider.notifier).clearAllLocal();
   }
 
   Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
@@ -461,6 +492,12 @@ class _ExportBackupsRow extends ConsumerWidget {
             'No repository selected; pick one first.',
         },
       SettingsExportFailed(:final message) => 'Failed: $message',
+      // Clear-all states are owned by the clear row; keep the export
+      // row's own default blurb here.
+      SettingsClearing() ||
+      SettingsClearDone() ||
+      SettingsClearFailed() =>
+        'Copy archived local snapshots to a folder you pick.',
     };
   }
 }
@@ -501,6 +538,17 @@ class _TrailingChip extends StatelessWidget {
           bg: _softStatus(t.statusDanger),
           fg: t.statusDanger,
         ),
+      // Clear-all states share the row chrome with the export row but
+      // sit idle behind the clear-row's own chip, so render a neutral
+      // placeholder here. `_ClearAllRow` owns its own `_ClearChip`.
+      SettingsClearing() ||
+      SettingsClearDone() ||
+      SettingsClearFailed() =>
+        _Chip(
+          label: 'Export',
+          bg: t.accentSoftBg,
+          fg: t.accentPrimary,
+        ),
     };
   }
 
@@ -508,6 +556,127 @@ class _TrailingChip extends StatelessWidget {
   /// already provides [AppTokens.accentSoftBg] for primary, but tokens
   /// don't include soft variants for success/danger — derive by alpha.
   static Color _softStatus(Color strong) => strong.withValues(alpha: 0.12);
+}
+
+// ---------------------------------------------------------------------------
+// Clear-all-local row
+// ---------------------------------------------------------------------------
+
+/// Destructive DATA-section row: wipes `<appDocs>/repos` + `<appDocs>/drafts`
+/// via [SettingsController.clearAllLocal]. Styled in `statusDanger` to
+/// match the Sign-out affordance. Disabled while a clear is in flight.
+class _ClearAllRow extends StatelessWidget {
+  const _ClearAllRow({required this.async, required this.onTap});
+
+  final AsyncValue<SettingsState> async;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final state = async.value ?? const SettingsIdle();
+    final disabled = state is SettingsClearing;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: t.surfaceElevated,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: t.borderSubtle),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: disabled ? null : onTap,
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.delete_forever_rounded,
+                  size: 18,
+                  color: t.statusDanger,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Clear all local copies',
+                        style: TextStyle(
+                          color: t.textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _subtitleFor(state),
+                        style: TextStyle(
+                          color: t.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _ClearChip(state: state),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _subtitleFor(SettingsState state) {
+    return switch (state) {
+      SettingsClearing() => 'Removing local files…',
+      SettingsClearDone() => 'Done. Pick a repo to start fresh.',
+      SettingsClearFailed(:final message) => 'Failed: $message',
+      // All export-side and idle states share the default blurb —
+      // the clear-all row's affordance is independent of export state.
+      _ => 'Delete every cloned repo and draft on this device.',
+    };
+  }
+}
+
+class _ClearChip extends StatelessWidget {
+  const _ClearChip({required this.state});
+  final SettingsState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final softDanger = t.statusDanger.withValues(alpha: 0.12);
+    final softSuccess = t.statusSuccess.withValues(alpha: 0.12);
+    return switch (state) {
+      SettingsClearing() => SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(t.statusDanger),
+          ),
+        ),
+      SettingsClearDone() => _Chip(
+          label: 'Cleared',
+          bg: softSuccess,
+          fg: t.statusSuccess,
+        ),
+      SettingsClearFailed() => _Chip(
+          label: 'Error',
+          bg: softDanger,
+          fg: t.statusDanger,
+        ),
+      // Any non-clear state (export in progress, idle, etc.) just shows
+      // the idle affordance.
+      _ => _Chip(label: 'Clear', bg: softDanger, fg: t.statusDanger),
+    };
+  }
 }
 
 class _Chip extends StatelessWidget {
