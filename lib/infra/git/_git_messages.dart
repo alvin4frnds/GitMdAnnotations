@@ -87,12 +87,18 @@ class GitReqCommit extends GitRequest {
     required this.authorName,
     required this.authorEmail,
     required this.branch,
+    this.removals = const <String>[],
   });
   final List<SerializedFileWrite> files;
   final String message;
   final String authorName;
   final String authorEmail;
   final String branch;
+
+  /// Paths (repo-relative) to unlink from the workdir and drop from the
+  /// index in the same commit. Empty by default so existing
+  /// Submit/Approve messages serialize unchanged.
+  final List<String> removals;
 }
 
 class GitReqPush extends GitRequest {

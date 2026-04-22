@@ -167,6 +167,7 @@ class GitAdapter implements GitPort {
     required String message,
     required GitIdentity id,
     required String branch,
+    List<String> removals = const <String>[],
   }) async {
     final resp = await _send(
       (reqId) => GitReqCommit(
@@ -182,6 +183,7 @@ class GitAdapter implements GitPort {
         authorName: id.name,
         authorEmail: id.email,
         branch: branch,
+        removals: removals,
       ),
     );
     return _unwrap<Commit>(resp);

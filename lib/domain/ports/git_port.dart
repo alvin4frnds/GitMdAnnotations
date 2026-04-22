@@ -21,13 +21,21 @@ abstract class GitPort {
   /// Throws [GitMergeConflict] if a non-trivial merge is required.
   Future<void> mergeInto(String sourceBranch, {required String target});
 
-  /// Atomic commit: writes every [files] entry and creates exactly one
+  /// Atomic commit: writes every [files] entry, removes every path in
+  /// [removals] (each relative to the workdir), and creates exactly one
   /// commit with [message] authored by [id] on [branch].
+  ///
+  /// [removals] defaults to empty, so existing Submit/Approve callers
+  /// are unchanged. Missing removal paths are tolerated (no-op) to keep
+  /// the op idempotent — running a delete twice produces one commit
+  /// then an empty tree change, which the caller (e.g. [JobDeleter])
+  /// guards against before invoking.
   Future<Commit> commit({
     required List<FileWrite> files,
     required String message,
     required GitIdentity id,
     required String branch,
+    List<String> removals = const <String>[],
   });
 
   /// Push [branch] to origin. Returns a typed outcome (success or typed

@@ -31,6 +31,12 @@ class FakeGitPort implements GitPort {
   final Map<String, Map<String, Map<String, String>>> _snapshots = {};
   final DateTime Function() _clock;
 
+  /// Per-commit list of paths that were removed, keyed by commit SHA.
+  /// Populated by [commit] whenever its `removals` list is non-empty so
+  /// tests can assert "the right files were dropped in the right commit"
+  /// without having to diff the branch snapshot.
+  final Map<String, List<String>> _removalsBySha = {};
+
   /// Flipped true by [cloneOrOpen]; assertable by tests.
   bool cloned = false;
 
@@ -63,6 +69,11 @@ class FakeGitPort implements GitPort {
   /// Commit chain for [branch], most recent first. Test-only helper.
   List<Commit> commitLog(String branch) =>
       List.unmodifiable(_log[branch] ?? const []);
+
+  /// Paths recorded as `removals` on the commit with [sha], or an empty
+  /// list when that commit was a pure write. Test-only helper.
+  List<String> removalsOf(String sha) =>
+      List.unmodifiable(_removalsBySha[sha] ?? const []);
 
   /// Capture the current working tree of [branch] under [sha] so that a
   /// later [resetHard] targeting that sha can restore it verbatim.
@@ -104,6 +115,7 @@ class FakeGitPort implements GitPort {
     required String message,
     required GitIdentity id,
     required String branch,
+    List<String> removals = const <String>[],
   }) async {
     final tree = branches.putIfAbsent(branch, () => <String, String>{});
     final binTree =
@@ -119,6 +131,10 @@ class FakeGitPort implements GitPort {
         binTree.remove(f.path);
       }
     }
+    for (final path in removals) {
+      tree.remove(path);
+      binTree.remove(path);
+    }
     final existing = _log[branch] ?? <Commit>[];
     final parents = existing.isEmpty ? <String>[] : [existing.first.sha];
     final commit = Commit(
@@ -129,6 +145,9 @@ class FakeGitPort implements GitPort {
       parents: parents,
     );
     _log[branch] = [commit, ...existing];
+    if (removals.isNotEmpty) {
+      _removalsBySha[commit.sha] = List<String>.unmodifiable(removals);
+    }
     return commit;
   }
 

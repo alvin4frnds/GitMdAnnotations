@@ -241,6 +241,21 @@ GitResponse _handleCommit(_IsolateState state, GitReqCommit req) {
   }
   final index = repo.index;
   index.addAll(req.files.map((f) => f.path).toList());
+  // Unlink any removal targets from the workdir and drop them from the
+  // index. Missing files are tolerated so re-running a delete is a
+  // no-op at the index level (the caller still guards against an empty
+  // tree change before committing).
+  for (final path in req.removals) {
+    final f = File('$workdir$path');
+    if (f.existsSync()) {
+      f.deleteSync();
+    }
+    try {
+      index.remove(path);
+    } on git2.LibGit2Error {
+      // Path wasn't in the index — tolerate and continue.
+    }
+  }
   index.write();
   final treeOid = index.writeTree();
   final tree = git2.Tree.lookup(repo: repo, oid: treeOid);
