@@ -4,27 +4,27 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/controllers/review_controller.dart';
-import 'package:gitmdannotations_tablet/app/providers/annotation_providers.dart';
-import 'package:gitmdannotations_tablet/app/providers/review_providers.dart';
-import 'package:gitmdannotations_tablet/app/providers/spec_providers.dart';
-import 'package:gitmdannotations_tablet/app/providers/sync_providers.dart';
-import 'package:gitmdannotations_tablet/domain/entities/anchor.dart';
-import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
-import 'package:gitmdannotations_tablet/domain/entities/job_ref.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/entities/source_kind.dart';
-import 'package:gitmdannotations_tablet/domain/entities/spec_file.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke_group.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_file_system.dart';
-import 'package:gitmdannotations_tablet/domain/ports/file_system_port.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_git_port.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_id_generator.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_markdown_rasterizer.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_png_flattener.dart';
-import 'package:gitmdannotations_tablet/domain/services/open_question_extractor.dart';
+import 'package:gitmdscribe/app/controllers/review_controller.dart';
+import 'package:gitmdscribe/app/providers/annotation_providers.dart';
+import 'package:gitmdscribe/app/providers/review_providers.dart';
+import 'package:gitmdscribe/app/providers/spec_providers.dart';
+import 'package:gitmdscribe/app/providers/sync_providers.dart';
+import 'package:gitmdscribe/domain/entities/anchor.dart';
+import 'package:gitmdscribe/domain/entities/git_identity.dart';
+import 'package:gitmdscribe/domain/entities/job_ref.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/entities/source_kind.dart';
+import 'package:gitmdscribe/domain/entities/spec_file.dart';
+import 'package:gitmdscribe/domain/entities/stroke.dart';
+import 'package:gitmdscribe/domain/entities/stroke_group.dart';
+import 'package:gitmdscribe/domain/fakes/fake_clock.dart';
+import 'package:gitmdscribe/domain/fakes/fake_file_system.dart';
+import 'package:gitmdscribe/domain/ports/file_system_port.dart';
+import 'package:gitmdscribe/domain/fakes/fake_git_port.dart';
+import 'package:gitmdscribe/domain/fakes/fake_id_generator.dart';
+import 'package:gitmdscribe/domain/fakes/fake_markdown_rasterizer.dart';
+import 'package:gitmdscribe/domain/fakes/fake_png_flattener.dart';
+import 'package:gitmdscribe/domain/services/open_question_extractor.dart';
 
 /// Manual periodic-timer driver used by the auto-save tests. Captures the
 /// callback that [ReviewController.build] registers so tests can call

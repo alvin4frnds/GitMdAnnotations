@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/canvas_size.dart';
+import 'package:gitmdscribe/domain/entities/canvas_size.dart';
 
 /// Domain-level value object [CanvasSize]. `Size` from `dart:ui` is a Flutter
 /// import and therefore forbidden in `lib/domain/**` (IMPLEMENTATION.md §2.6);

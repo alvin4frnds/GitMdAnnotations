@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/auth_session.dart';
-import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
+import 'package:gitmdscribe/domain/entities/auth_session.dart';
+import 'package:gitmdscribe/domain/entities/git_identity.dart';
 
 void main() {
   group('AuthSession', () {

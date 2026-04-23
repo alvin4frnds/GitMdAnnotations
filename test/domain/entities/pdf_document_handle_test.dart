@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/pdf_document_handle.dart';
+import 'package:gitmdscribe/domain/entities/pdf_document_handle.dart';
 
 /// Unit tests for [PdfDocumentHandle]. The handle is a pure-Dart value
 /// object: any two handles with the same [PdfDocumentHandle.id] compare

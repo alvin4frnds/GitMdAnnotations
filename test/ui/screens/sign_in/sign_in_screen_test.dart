@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/controllers/auth_controller.dart';
-import 'package:gitmdannotations_tablet/app/providers/auth_providers.dart';
-import 'package:gitmdannotations_tablet/domain/entities/auth_session.dart';
-import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_auth_port.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_secure_storage.dart';
-import 'package:gitmdannotations_tablet/domain/ports/auth_port.dart';
-import 'package:gitmdannotations_tablet/ui/screens/sign_in/sign_in_screen.dart';
-import 'package:gitmdannotations_tablet/ui/theme/app_theme.dart';
-import 'package:gitmdannotations_tablet/ui/theme/tokens.dart';
+import 'package:gitmdscribe/app/controllers/auth_controller.dart';
+import 'package:gitmdscribe/app/providers/auth_providers.dart';
+import 'package:gitmdscribe/domain/entities/auth_session.dart';
+import 'package:gitmdscribe/domain/entities/git_identity.dart';
+import 'package:gitmdscribe/domain/fakes/fake_auth_port.dart';
+import 'package:gitmdscribe/domain/fakes/fake_secure_storage.dart';
+import 'package:gitmdscribe/domain/ports/auth_port.dart';
+import 'package:gitmdscribe/ui/screens/sign_in/sign_in_screen.dart';
+import 'package:gitmdscribe/ui/theme/app_theme.dart';
+import 'package:gitmdscribe/ui/theme/tokens.dart';
 
 /// Short poll interval: we want the AwaitingUser state to surface (the
 /// fake emits the initial challenge synchronously via a microtask) but we

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/ui/theme/app_theme.dart';
-import 'package:gitmdannotations_tablet/ui/theme/tokens.dart';
+import 'package:gitmdscribe/ui/theme/app_theme.dart';
+import 'package:gitmdscribe/ui/theme/tokens.dart';
 
 /// Pins the bundled-font resolution introduced when Issues.md:21-26 closed.
 /// Body text resolves to Inter; monospace call-sites resolve to

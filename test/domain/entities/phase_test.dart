@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/phase.dart';
+import 'package:gitmdscribe/domain/entities/phase.dart';
 
 void main() {
   group('Phase', () {

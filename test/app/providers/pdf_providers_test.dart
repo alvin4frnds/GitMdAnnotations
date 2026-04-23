@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/providers/pdf_providers.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_pdf_raster_port.dart';
-import 'package:gitmdannotations_tablet/domain/ports/pdf_raster_port.dart';
-import 'package:gitmdannotations_tablet/domain/services/pdf_page_cache.dart';
+import 'package:gitmdscribe/app/providers/pdf_providers.dart';
+import 'package:gitmdscribe/domain/fakes/fake_pdf_raster_port.dart';
+import 'package:gitmdscribe/domain/ports/pdf_raster_port.dart';
+import 'package:gitmdscribe/domain/services/pdf_page_cache.dart';
 
 void main() {
   group('pdfRasterPortProvider', () {

@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_git_port.dart';
-import 'package:gitmdannotations_tablet/domain/ports/git_port.dart';
+import 'package:gitmdscribe/domain/entities/git_identity.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/fakes/fake_git_port.dart';
+import 'package:gitmdscribe/domain/ports/git_port.dart';
 
 void main() {
   const identity = GitIdentity(name: 'Ada', email: 'ada@example.com');

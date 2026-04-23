@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/controllers/spec_importer.dart';
-import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_file_system.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_git_port.dart';
-import 'package:gitmdannotations_tablet/domain/ports/clock_port.dart';
+import 'package:gitmdscribe/app/controllers/spec_importer.dart';
+import 'package:gitmdscribe/domain/entities/git_identity.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/fakes/fake_file_system.dart';
+import 'package:gitmdscribe/domain/fakes/fake_git_port.dart';
+import 'package:gitmdscribe/domain/ports/clock_port.dart';
 
 const _repo = RepoRef(owner: 'demo', name: 'payments-api');
 const _identity = GitIdentity(name: 'Alice', email: 'alice@example.com');

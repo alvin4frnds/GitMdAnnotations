@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/controllers/job_deleter.dart';
-import 'package:gitmdannotations_tablet/app/controllers/review_draft_store.dart';
-import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
-import 'package:gitmdannotations_tablet/domain/entities/job_ref.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_file_system.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_git_port.dart';
+import 'package:gitmdscribe/app/controllers/job_deleter.dart';
+import 'package:gitmdscribe/app/controllers/review_draft_store.dart';
+import 'package:gitmdscribe/domain/entities/git_identity.dart';
+import 'package:gitmdscribe/domain/entities/job_ref.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/fakes/fake_file_system.dart';
+import 'package:gitmdscribe/domain/fakes/fake_git_port.dart';
 
 const _repo = RepoRef(owner: 'acme', name: 'widgets');
 final _job = JobRef(repo: _repo, jobId: 'spec-abc');

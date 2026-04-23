@@ -2,10 +2,10 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/anchor.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke_group.dart';
-import 'package:gitmdannotations_tablet/ui/widgets/ink_overlay/ink_overlay_painter.dart';
+import 'package:gitmdscribe/domain/entities/anchor.dart';
+import 'package:gitmdscribe/domain/entities/stroke.dart';
+import 'package:gitmdscribe/domain/entities/stroke_group.dart';
+import 'package:gitmdscribe/ui/widgets/ink_overlay/ink_overlay_painter.dart';
 
 MarkdownAnchor _anchor() =>
     MarkdownAnchor(lineNumber: 47, sourceSha: 'a3f91c');

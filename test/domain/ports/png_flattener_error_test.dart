@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/ports/png_flattener_port.dart';
+import 'package:gitmdscribe/domain/ports/png_flattener_port.dart';
 
 /// Contract test for the sealed [PngFlattenError] hierarchy that the T10
 /// infra adapter throws. The domain fake never throws, but downstream

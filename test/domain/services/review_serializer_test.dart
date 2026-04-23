@@ -1,17 +1,17 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/anchor.dart';
-import 'package:gitmdannotations_tablet/domain/entities/job_ref.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/entities/source_kind.dart';
-import 'package:gitmdannotations_tablet/domain/entities/spec_file.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke_group.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
-import 'package:gitmdannotations_tablet/domain/ports/clock_port.dart';
-import 'package:gitmdannotations_tablet/domain/services/open_question_extractor.dart';
-import 'package:gitmdannotations_tablet/domain/services/review_serializer.dart';
+import 'package:gitmdscribe/domain/entities/anchor.dart';
+import 'package:gitmdscribe/domain/entities/job_ref.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/entities/source_kind.dart';
+import 'package:gitmdscribe/domain/entities/spec_file.dart';
+import 'package:gitmdscribe/domain/entities/stroke.dart';
+import 'package:gitmdscribe/domain/entities/stroke_group.dart';
+import 'package:gitmdscribe/domain/fakes/fake_clock.dart';
+import 'package:gitmdscribe/domain/ports/clock_port.dart';
+import 'package:gitmdscribe/domain/services/open_question_extractor.dart';
+import 'package:gitmdscribe/domain/services/review_serializer.dart';
 
 String _readGolden(String name) =>
     File('test/golden/$name').readAsStringSync();

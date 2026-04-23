@@ -1,4 +1,4 @@
-package com.praveen.gitmdannotations_tablet
+package `in`.xuresolutions.gitmdscribe
 
 import io.flutter.embedding.android.FlutterActivity
 

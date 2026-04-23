@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/changelog_entry.dart';
-import 'package:gitmdannotations_tablet/domain/services/changelog_writer.dart';
+import 'package:gitmdscribe/domain/entities/changelog_entry.dart';
+import 'package:gitmdscribe/domain/services/changelog_writer.dart';
 
 void main() {
   const writer = ChangelogWriter();

@@ -1,7 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/pointer_sample.dart';
-import 'package:gitmdannotations_tablet/ui/widgets/ink_overlay/pointer_event_mapper.dart';
+import 'package:gitmdscribe/domain/entities/pointer_sample.dart';
+import 'package:gitmdscribe/ui/widgets/ink_overlay/pointer_event_mapper.dart';
 
 /// Helper to construct a stylus down event with a given position + pressure.
 /// `PointerDownEvent.localPosition` defaults to `position` when no transform

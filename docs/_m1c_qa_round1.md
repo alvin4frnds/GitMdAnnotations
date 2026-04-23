@@ -49,10 +49,10 @@ E flutter : [ERROR:flutter/runtime/dart_vm_initializer.cc(40)]
 E flutter : Error: SocketException: Failed host lookup: 'github.com'
           (OS Error: No address associated with hostname, errno = 7)))
 E flutter : #0  GithubOAuthAdapter.startDeviceFlow
-          (package:gitmdannotations_tablet/infra/auth/github_oauth_adapter.dart:81)
+          (package:gitmdscribe/infra/auth/github_oauth_adapter.dart:81)
 E flutter : <asynchronous suspension>
 E flutter : #1  AuthController._runDeviceFlow.<anonymous closure>
-          (package:gitmdannotations_tablet/app/controllers/auth_controller.dart:64)
+          (package:gitmdscribe/app/controllers/auth_controller.dart:64)
 E flutter : <asynchronous suspension>
 ```
 

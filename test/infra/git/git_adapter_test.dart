@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/ports/git_port.dart';
-import 'package:gitmdannotations_tablet/infra/git/git_adapter.dart';
+import 'package:gitmdscribe/domain/ports/git_port.dart';
+import 'package:gitmdscribe/infra/git/git_adapter.dart';
 
 /// Shell unit test for [GitAdapter]. Heavy libgit2 round-trips belong in
 /// `integration_test/infra/git/git_adapter_test.dart` — this file only

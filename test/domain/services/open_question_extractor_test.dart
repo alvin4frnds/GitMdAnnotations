@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/services/open_question_extractor.dart';
+import 'package:gitmdscribe/domain/services/open_question_extractor.dart';
 
 void main() {
   final extractor = OpenQuestionExtractor();

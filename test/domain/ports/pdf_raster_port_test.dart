@@ -1,9 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/canvas_size.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_pdf_raster_port.dart';
-import 'package:gitmdannotations_tablet/domain/ports/pdf_raster_port.dart';
+import 'package:gitmdscribe/domain/entities/canvas_size.dart';
+import 'package:gitmdscribe/domain/fakes/fake_pdf_raster_port.dart';
+import 'package:gitmdscribe/domain/ports/pdf_raster_port.dart';
 
 /// Contract tests for [PdfRasterPort] + [FakePdfRasterPort]. The real
 /// `pdfx` adapter is exercised only by the integration test at

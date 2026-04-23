@@ -3,10 +3,10 @@ import 'dart:io' show ZLibCodec;
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/anchor.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke_group.dart';
-import 'package:gitmdannotations_tablet/domain/services/annotation_pdf_composer.dart';
+import 'package:gitmdscribe/domain/entities/anchor.dart';
+import 'package:gitmdscribe/domain/entities/stroke.dart';
+import 'package:gitmdscribe/domain/entities/stroke_group.dart';
+import 'package:gitmdscribe/domain/services/annotation_pdf_composer.dart';
 
 /// 68-byte fully-valid 1×1 transparent grayscale+alpha PNG. Small
 /// enough to embed in tests, valid enough for `pw.MemoryImage` to parse.

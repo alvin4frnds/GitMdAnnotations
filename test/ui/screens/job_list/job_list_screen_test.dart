@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/providers/spec_providers.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_file_system.dart';
-import 'package:gitmdannotations_tablet/ui/screens/job_list/job_list_screen.dart';
-import 'package:gitmdannotations_tablet/ui/theme/app_theme.dart';
-import 'package:gitmdannotations_tablet/ui/theme/tokens.dart';
+import 'package:gitmdscribe/app/providers/spec_providers.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/fakes/fake_file_system.dart';
+import 'package:gitmdscribe/ui/screens/job_list/job_list_screen.dart';
+import 'package:gitmdscribe/ui/theme/app_theme.dart';
+import 'package:gitmdscribe/ui/theme/tokens.dart';
 
 const _repo = RepoRef(owner: 'demo', name: 'payments-api');
 

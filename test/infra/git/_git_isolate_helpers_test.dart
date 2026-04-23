@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/ports/git_port.dart';
-import 'package:gitmdannotations_tablet/infra/git/_git_isolate_helpers.dart';
+import 'package:gitmdscribe/domain/ports/git_port.dart';
+import 'package:gitmdscribe/infra/git/_git_isolate_helpers.dart';
 
 /// Unit tests for the push-error classifier in `_git_isolate_helpers.dart`.
 ///

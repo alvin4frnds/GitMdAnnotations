@@ -4,10 +4,10 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/ports/git_port.dart';
-import 'package:gitmdannotations_tablet/infra/git/git_adapter.dart';
+import 'package:gitmdscribe/domain/entities/git_identity.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/ports/git_port.dart';
+import 'package:gitmdscribe/infra/git/git_adapter.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:libgit2dart/libgit2dart.dart' as git2;
 

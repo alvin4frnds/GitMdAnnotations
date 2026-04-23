@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/ports/secure_storage_port.dart';
-import 'package:gitmdannotations_tablet/infra/storage/keystore_adapter.dart';
+import 'package:gitmdscribe/domain/ports/secure_storage_port.dart';
+import 'package:gitmdscribe/infra/storage/keystore_adapter.dart';
 
 /// Scripted in-memory [SecureBackend] used only by these unit tests. It
 /// mirrors the subset of `FlutterSecureStorage` the adapter calls, plus a

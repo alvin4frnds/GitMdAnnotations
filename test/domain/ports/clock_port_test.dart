@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
+import 'package:gitmdscribe/domain/fakes/fake_clock.dart';
 
 /// Contract test for the [Clock] port implemented by [FakeClock].
 /// See IMPLEMENTATION.md §4.5. A real `SystemClock` wrapping `DateTime.now`

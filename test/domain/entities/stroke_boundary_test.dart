@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke.dart';
+import 'package:gitmdscribe/domain/entities/stroke.dart';
 
 /// Invariant and boundary coverage for [Stroke] and [StrokePoint].
 ///

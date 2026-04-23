@@ -2,16 +2,16 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/controllers/settings_controller.dart';
-import 'package:gitmdannotations_tablet/app/providers/auth_providers.dart';
-import 'package:gitmdannotations_tablet/app/providers/settings_providers.dart';
-import 'package:gitmdannotations_tablet/app/providers/spec_providers.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_file_system.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_secure_storage.dart';
-import 'package:gitmdannotations_tablet/domain/ports/backup_export_port.dart';
-import 'package:gitmdannotations_tablet/domain/ports/file_system_port.dart';
-import 'package:gitmdannotations_tablet/domain/ports/secure_storage_port.dart';
+import 'package:gitmdscribe/app/controllers/settings_controller.dart';
+import 'package:gitmdscribe/app/providers/auth_providers.dart';
+import 'package:gitmdscribe/app/providers/settings_providers.dart';
+import 'package:gitmdscribe/app/providers/spec_providers.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/fakes/fake_file_system.dart';
+import 'package:gitmdscribe/domain/fakes/fake_secure_storage.dart';
+import 'package:gitmdscribe/domain/ports/backup_export_port.dart';
+import 'package:gitmdscribe/domain/ports/file_system_port.dart';
+import 'package:gitmdscribe/domain/ports/secure_storage_port.dart';
 
 import '../../domain/fakes/fake_backup_export_port.dart';
 

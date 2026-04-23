@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/controllers/changelog_viewer_controller.dart';
-import 'package:gitmdannotations_tablet/app/providers/spec_providers.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_file_system.dart';
+import 'package:gitmdscribe/app/controllers/changelog_viewer_controller.dart';
+import 'package:gitmdscribe/app/providers/spec_providers.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/fakes/fake_file_system.dart';
 
 const _repo = RepoRef(owner: 'demo', name: 'payments-api');
 

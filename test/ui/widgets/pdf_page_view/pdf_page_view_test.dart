@@ -3,11 +3,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/providers/pdf_providers.dart';
-import 'package:gitmdannotations_tablet/domain/entities/pdf_document_handle.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_pdf_raster_port.dart';
-import 'package:gitmdannotations_tablet/ui/widgets/pdf_page_view/pdf_page_tile.dart';
-import 'package:gitmdannotations_tablet/ui/widgets/pdf_page_view/pdf_page_view.dart';
+import 'package:gitmdscribe/app/providers/pdf_providers.dart';
+import 'package:gitmdscribe/domain/entities/pdf_document_handle.dart';
+import 'package:gitmdscribe/domain/fakes/fake_pdf_raster_port.dart';
+import 'package:gitmdscribe/ui/widgets/pdf_page_view/pdf_page_tile.dart';
+import 'package:gitmdscribe/ui/widgets/pdf_page_view/pdf_page_view.dart';
 
 /// A distinct PNG signature per page so `findsNWidgets` checks on
 /// `Image.memory` can tell pages apart. Any 8-byte buffer works — the

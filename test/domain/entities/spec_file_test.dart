@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/source_kind.dart';
-import 'package:gitmdannotations_tablet/domain/entities/spec_file.dart';
+import 'package:gitmdscribe/domain/entities/source_kind.dart';
+import 'package:gitmdscribe/domain/entities/spec_file.dart';
 
 void main() {
   group('SpecFile', () {

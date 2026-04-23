@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/controllers/auth_identity_codec.dart';
-import 'package:gitmdannotations_tablet/app/providers/auth_providers.dart';
-import 'package:gitmdannotations_tablet/app/providers/settings_providers.dart';
-import 'package:gitmdannotations_tablet/app/providers/spec_providers.dart';
-import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_auth_port.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_secure_storage.dart';
-import 'package:gitmdannotations_tablet/domain/ports/backup_export_port.dart';
-import 'package:gitmdannotations_tablet/domain/ports/secure_storage_port.dart';
-import 'package:gitmdannotations_tablet/ui/screens/settings/settings_screen.dart';
-import 'package:gitmdannotations_tablet/ui/theme/app_theme.dart';
-import 'package:gitmdannotations_tablet/ui/theme/tokens.dart';
+import 'package:gitmdscribe/app/controllers/auth_identity_codec.dart';
+import 'package:gitmdscribe/app/providers/auth_providers.dart';
+import 'package:gitmdscribe/app/providers/settings_providers.dart';
+import 'package:gitmdscribe/app/providers/spec_providers.dart';
+import 'package:gitmdscribe/domain/entities/git_identity.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/fakes/fake_auth_port.dart';
+import 'package:gitmdscribe/domain/fakes/fake_secure_storage.dart';
+import 'package:gitmdscribe/domain/ports/backup_export_port.dart';
+import 'package:gitmdscribe/domain/ports/secure_storage_port.dart';
+import 'package:gitmdscribe/ui/screens/settings/settings_screen.dart';
+import 'package:gitmdscribe/ui/theme/app_theme.dart';
+import 'package:gitmdscribe/ui/theme/tokens.dart';
 
 import '../../../domain/fakes/fake_backup_export_port.dart';
 

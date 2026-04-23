@@ -5,8 +5,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/canvas_size.dart';
-import 'package:gitmdannotations_tablet/infra/pdf/pdfx_adapter.dart';
+import 'package:gitmdscribe/domain/entities/canvas_size.dart';
+import 'package:gitmdscribe/infra/pdf/pdfx_adapter.dart';
 import 'package:integration_test/integration_test.dart';
 
 /// Integration tests for [PdfxAdapter] against a real `pdfx` engine.

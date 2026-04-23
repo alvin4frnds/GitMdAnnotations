@@ -1,13 +1,13 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/job.dart';
-import 'package:gitmdannotations_tablet/domain/entities/job_ref.dart';
-import 'package:gitmdannotations_tablet/domain/entities/phase.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/entities/source_kind.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_file_system.dart';
-import 'package:gitmdannotations_tablet/domain/services/spec_repository.dart';
+import 'package:gitmdscribe/domain/entities/job.dart';
+import 'package:gitmdscribe/domain/entities/job_ref.dart';
+import 'package:gitmdscribe/domain/entities/phase.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/entities/source_kind.dart';
+import 'package:gitmdscribe/domain/fakes/fake_file_system.dart';
+import 'package:gitmdscribe/domain/services/spec_repository.dart';
 
 void main() {
   const repo = RepoRef(owner: 'octocat', name: 'hello-world');

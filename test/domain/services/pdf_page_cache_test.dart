@@ -1,9 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/canvas_size.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_pdf_raster_port.dart';
-import 'package:gitmdannotations_tablet/domain/services/pdf_page_cache.dart';
+import 'package:gitmdscribe/domain/entities/canvas_size.dart';
+import 'package:gitmdscribe/domain/fakes/fake_pdf_raster_port.dart';
+import 'package:gitmdscribe/domain/services/pdf_page_cache.dart';
 
 /// Tests for [PdfPageCache]. The cache wraps any [PdfRasterPort], keying
 /// on `(handleId, pageNumber, targetSize)`, promoting on access, and

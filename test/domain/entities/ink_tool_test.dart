@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/ink_tool.dart';
+import 'package:gitmdscribe/domain/entities/ink_tool.dart';
 
 /// [InkTool] is the set of stroke primitives from PRD §5.4 FR-1.14. In
 /// Milestone 1b T3 only `pen` has distinct behavior — the other values

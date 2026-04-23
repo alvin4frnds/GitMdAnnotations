@@ -5,12 +5,12 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/providers/annotation_providers.dart';
-import 'package:gitmdannotations_tablet/domain/entities/job_ref.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/infra/clock/system_clock.dart';
-import 'package:gitmdannotations_tablet/infra/id/system_id_generator.dart';
-import 'package:gitmdannotations_tablet/ui/screens/annotation_canvas/annotation_canvas_screen.dart';
+import 'package:gitmdscribe/app/providers/annotation_providers.dart';
+import 'package:gitmdscribe/domain/entities/job_ref.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/infra/clock/system_clock.dart';
+import 'package:gitmdscribe/infra/id/system_id_generator.dart';
+import 'package:gitmdscribe/ui/screens/annotation_canvas/annotation_canvas_screen.dart';
 import 'package:integration_test/integration_test.dart';
 
 /// NFR-1 gate: pen latency must stay under **25 ms p95** on the OPD2504

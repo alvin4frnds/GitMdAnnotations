@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/ports/clock_port.dart';
-import 'package:gitmdannotations_tablet/infra/clock/system_clock.dart';
+import 'package:gitmdscribe/domain/ports/clock_port.dart';
+import 'package:gitmdscribe/infra/clock/system_clock.dart';
 
 void main() {
   group('SystemClock', () {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/ui/theme/tokens.dart';
+import 'package:gitmdscribe/ui/theme/tokens.dart';
 
 void main() {
   group('AppTokens.light — PRD §5.11.1 hex values', () {

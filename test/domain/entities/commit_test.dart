@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/commit.dart';
-import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
+import 'package:gitmdscribe/domain/entities/commit.dart';
+import 'package:gitmdscribe/domain/entities/git_identity.dart';
 
 void main() {
   const id = GitIdentity(name: 'A', email: 'a@x');

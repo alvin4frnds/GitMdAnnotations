@@ -1,4 +1,4 @@
-name: gitmdannotations_tablet
+name: gitmdscribe
 description: "Pen-driven spec review, synced to git."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.

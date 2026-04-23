@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_id_generator.dart';
+import 'package:gitmdscribe/domain/fakes/fake_id_generator.dart';
 
 /// Contract test for [IdGenerator] implemented by [FakeIdGenerator].
 /// See IMPLEMENTATION.md §4.5 — stroke-group ids are domain-allocated and

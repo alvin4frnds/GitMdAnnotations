@@ -1,9 +1,9 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/pointer_sample.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke_group.dart';
-import 'package:gitmdannotations_tablet/ui/widgets/ink_overlay/ink_overlay.dart';
+import 'package:gitmdscribe/domain/entities/pointer_sample.dart';
+import 'package:gitmdscribe/domain/entities/stroke_group.dart';
+import 'package:gitmdscribe/ui/widgets/ink_overlay/ink_overlay.dart';
 
 typedef _Reported = ({InkPointerPhase phase, PointerSample sample});
 

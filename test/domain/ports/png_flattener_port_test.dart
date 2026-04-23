@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/anchor.dart';
-import 'package:gitmdannotations_tablet/domain/entities/canvas_size.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke_group.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_png_flattener.dart';
-import 'package:gitmdannotations_tablet/domain/ports/png_flattener_port.dart';
+import 'package:gitmdscribe/domain/entities/anchor.dart';
+import 'package:gitmdscribe/domain/entities/canvas_size.dart';
+import 'package:gitmdscribe/domain/entities/stroke.dart';
+import 'package:gitmdscribe/domain/entities/stroke_group.dart';
+import 'package:gitmdscribe/domain/fakes/fake_png_flattener.dart';
+import 'package:gitmdscribe/domain/ports/png_flattener_port.dart';
 
 /// Contract test for the [PngFlattener] port implemented by
 /// [FakePngFlattener]. The real offscreen-surface rasterizer is T10; this

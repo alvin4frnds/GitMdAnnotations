@@ -1,4 +1,4 @@
-import 'package:gitmdannotations_tablet/domain/ports/backup_export_port.dart';
+import 'package:gitmdscribe/domain/ports/backup_export_port.dart';
 
 /// Scriptable in-memory [BackupExportPort] for [SettingsController] +
 /// UI tests. Follows the same pattern as `FakeGitHubReposPort` in

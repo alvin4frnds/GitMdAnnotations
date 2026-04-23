@@ -1,16 +1,16 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/anchor.dart';
-import 'package:gitmdannotations_tablet/domain/entities/job_ref.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/entities/source_kind.dart';
-import 'package:gitmdannotations_tablet/domain/entities/spec_file.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke_group.dart';
-import 'package:gitmdannotations_tablet/domain/services/commit_planner.dart';
-import 'package:gitmdannotations_tablet/domain/services/commit_planner_error.dart';
-import 'package:gitmdannotations_tablet/domain/services/planned_write.dart';
+import 'package:gitmdscribe/domain/entities/anchor.dart';
+import 'package:gitmdscribe/domain/entities/job_ref.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/entities/source_kind.dart';
+import 'package:gitmdscribe/domain/entities/spec_file.dart';
+import 'package:gitmdscribe/domain/entities/stroke.dart';
+import 'package:gitmdscribe/domain/entities/stroke_group.dart';
+import 'package:gitmdscribe/domain/services/commit_planner.dart';
+import 'package:gitmdscribe/domain/services/commit_planner_error.dart';
+import 'package:gitmdscribe/domain/services/planned_write.dart';
 
 const _specSha = 'a3f91c';
 

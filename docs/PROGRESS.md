@@ -24,7 +24,7 @@ Claude should then:
 | Deploy                   | `fvm flutter run -d NBB6BMB6QGQWLFV4 --release` (bg + Monitor for events) |
 | Screenshot               | `adb -s NBB6BMB6QGQWLFV4 exec-out screencap -p > <path>.png`              |
 | Tap                      | `adb -s NBB6BMB6QGQWLFV4 shell input tap <x> <y>` (device pixels 2800×1980) |
-| Logcat (for crash diag)  | `adb -s NBB6BMB6QGQWLFV4 logcat -d -t 200 --pid=$(adb ... shell pidof com.praveen.gitmdannotations_tablet)` |
+| Logcat (for crash diag)  | `adb -s NBB6BMB6QGQWLFV4 logcat -d -t 200 --pid=$(adb ... shell pidof in.xuresolutions.gitmdscribe)` |
 
 APP_MODE default is `mockup` (fakes seeded in bootstrap). `--dart-define=APP_MODE=real` switches to real adapters, but `_prodClientId` is still `OVERRIDE_ME` until the GitHub OAuth App is registered (see Issues.md).
 
@@ -79,7 +79,7 @@ Across the two pushes documented in `docs/implementation-plan2.md`:
 
 ### Completed before 1a proper (UI spike)
 
-- ✅ Flutter project scaffolded (`com.praveen.gitmdannotations_tablet`, Android-only, landscape-locked).
+- ✅ Flutter project scaffolded (`in.xuresolutions.gitmdscribe`, Android-only, landscape-locked).
 - ✅ FVM pinned to Flutter stable 3.41.7 / Dart 3.11.5 via `.fvmrc`.
 - ✅ Design tokens (`lib/ui/theme/tokens.dart`) — PRD §5.11 palette, light + dark.
 - ✅ `AppTheme` (`lib/ui/theme/app_theme.dart`) — Material `ThemeData` with system fonts; Inter/JetBrains Mono/Caveat bundling is a known follow-up.

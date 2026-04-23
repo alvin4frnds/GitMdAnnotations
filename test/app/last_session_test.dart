@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/last_session.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_secure_storage.dart';
-import 'package:gitmdannotations_tablet/domain/ports/secure_storage_port.dart';
+import 'package:gitmdscribe/app/last_session.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/fakes/fake_secure_storage.dart';
+import 'package:gitmdscribe/domain/ports/secure_storage_port.dart';
 
 const _repo = RepoRef(
   owner: 'octocat',

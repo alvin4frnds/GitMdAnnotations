@@ -27,9 +27,9 @@
 
 ### 0.3 Reset state between runs
 
-- Full reset: `adb -s NBB6BMB6QGQWLFV4 shell pm clear com.praveen.gitmdannotations_tablet`.
+- Full reset: `adb -s NBB6BMB6QGQWLFV4 shell pm clear in.xuresolutions.gitmdscribe`.
 - Partial reset (keep token, wipe cache): sign out via Settings, then re-sign-in.
-- Backup folder inspection: `adb -s NBB6BMB6QGQWLFV4 shell run-as com.praveen.gitmdannotations_tablet ls files/backups/`.
+- Backup folder inspection: `adb -s NBB6BMB6QGQWLFV4 shell run-as in.xuresolutions.gitmdscribe ls files/backups/`.
 - Screenshot: `adb -s NBB6BMB6QGQWLFV4 exec-out screencap -p > <tc-id>.png`.
 - Logcat during a TC: `adb -s NBB6BMB6QGQWLFV4 logcat -c` before the run, `adb ... logcat -d > <tc-id>.log` after.
 

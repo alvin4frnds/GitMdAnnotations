@@ -1,11 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/anchor.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke_group.dart';
-import 'package:gitmdannotations_tablet/domain/services/annotation_sidecar_serializer.dart';
-import 'package:gitmdannotations_tablet/domain/services/svg_serializer.dart';
+import 'package:gitmdscribe/domain/entities/anchor.dart';
+import 'package:gitmdscribe/domain/entities/stroke.dart';
+import 'package:gitmdscribe/domain/entities/stroke_group.dart';
+import 'package:gitmdscribe/domain/services/annotation_sidecar_serializer.dart';
+import 'package:gitmdscribe/domain/services/svg_serializer.dart';
 
 void main() {
   group('AnnotationSidecarSerializer', () {

@@ -2,12 +2,12 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/anchor.dart';
-import 'package:gitmdannotations_tablet/domain/entities/canvas_size.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke.dart';
-import 'package:gitmdannotations_tablet/domain/entities/stroke_group.dart';
-import 'package:gitmdannotations_tablet/domain/ports/png_flattener_port.dart';
-import 'package:gitmdannotations_tablet/infra/png/png_flattener_adapter.dart';
+import 'package:gitmdscribe/domain/entities/anchor.dart';
+import 'package:gitmdscribe/domain/entities/canvas_size.dart';
+import 'package:gitmdscribe/domain/entities/stroke.dart';
+import 'package:gitmdscribe/domain/entities/stroke_group.dart';
+import 'package:gitmdscribe/domain/ports/png_flattener_port.dart';
+import 'package:gitmdscribe/infra/png/png_flattener_adapter.dart';
 
 /// The T10 adapter exercises `dart:ui.Picture.toImage` which needs
 /// `TestWidgetsFlutterBinding` — a bare `test` package binding does not

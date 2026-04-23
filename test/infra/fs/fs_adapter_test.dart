@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/ports/file_system_port.dart';
-import 'package:gitmdannotations_tablet/infra/fs/fs_adapter.dart';
+import 'package:gitmdscribe/domain/ports/file_system_port.dart';
+import 'package:gitmdscribe/infra/fs/fs_adapter.dart';
 
 /// Minimal smoke test for [FsAdapter]. Heavier filesystem round-trips belong
 /// in integration tests; here we just exercise the surface without requiring

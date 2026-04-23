@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/auth_session.dart';
-import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_auth_port.dart';
-import 'package:gitmdannotations_tablet/domain/ports/auth_port.dart';
+import 'package:gitmdscribe/domain/entities/auth_session.dart';
+import 'package:gitmdscribe/domain/entities/git_identity.dart';
+import 'package:gitmdscribe/domain/fakes/fake_auth_port.dart';
+import 'package:gitmdscribe/domain/ports/auth_port.dart';
 
 void main() {
   const identity = GitIdentity(name: 'Ada', email: 'ada@example.com');

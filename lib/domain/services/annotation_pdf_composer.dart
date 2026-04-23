@@ -46,7 +46,7 @@ class AnnotationPdfComposer {
   }) async {
     final doc = pw.Document(
       // Producer kept stable so re-runs produce byte-identical output.
-      producer: 'gitmdannotations_tablet',
+      producer: 'gitmdscribe',
     );
     doc.addPage(
       pw.Page(

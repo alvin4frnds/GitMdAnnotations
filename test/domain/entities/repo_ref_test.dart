@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
 
 void main() {
   group('RepoRef', () {

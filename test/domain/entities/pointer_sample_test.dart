@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/pointer_sample.dart';
+import 'package:gitmdscribe/domain/entities/pointer_sample.dart';
 
 /// Domain-level value object [PointerSample] + [PointerKind] enum tests.
 ///

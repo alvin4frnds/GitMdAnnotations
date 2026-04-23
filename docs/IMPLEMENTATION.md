@@ -899,7 +899,7 @@ Scenario: Theme persists across launches
 ### 5.1 Project tree
 
 ```
-gitmdannotations_tablet/
+gitmdscribe/
 ├── pubspec.yaml
 ├── analysis_options.yaml          # strict lints + import-boundary rules
 ├── android/

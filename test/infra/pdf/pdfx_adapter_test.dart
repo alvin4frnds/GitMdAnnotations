@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/pdf_document_handle.dart';
-import 'package:gitmdannotations_tablet/domain/ports/pdf_raster_port.dart';
-import 'package:gitmdannotations_tablet/infra/pdf/pdfx_adapter.dart';
+import 'package:gitmdscribe/domain/entities/pdf_document_handle.dart';
+import 'package:gitmdscribe/domain/ports/pdf_raster_port.dart';
+import 'package:gitmdscribe/infra/pdf/pdfx_adapter.dart';
 
 /// Host-side smoke coverage of [PdfxAdapter] — review follow-up to T8.
 ///

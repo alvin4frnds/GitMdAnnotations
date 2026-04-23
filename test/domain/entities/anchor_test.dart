@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/anchor.dart';
+import 'package:gitmdscribe/domain/entities/anchor.dart';
 
 void main() {
   group('MarkdownAnchor', () {

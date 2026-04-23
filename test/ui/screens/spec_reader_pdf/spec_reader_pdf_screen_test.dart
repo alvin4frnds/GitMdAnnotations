@@ -4,18 +4,18 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/providers/annotation_providers.dart';
-import 'package:gitmdannotations_tablet/app/providers/pdf_providers.dart';
-import 'package:gitmdannotations_tablet/domain/entities/job_ref.dart';
-import 'package:gitmdannotations_tablet/domain/entities/repo_ref.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_id_generator.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_pdf_raster_port.dart';
-import 'package:gitmdannotations_tablet/ui/screens/spec_reader_pdf/spec_reader_pdf_screen.dart';
-import 'package:gitmdannotations_tablet/ui/theme/app_theme.dart';
-import 'package:gitmdannotations_tablet/ui/theme/tokens.dart';
-import 'package:gitmdannotations_tablet/ui/widgets/ink_overlay/ink_overlay.dart';
-import 'package:gitmdannotations_tablet/ui/widgets/pdf_page_view/pdf_page_tile.dart';
+import 'package:gitmdscribe/app/providers/annotation_providers.dart';
+import 'package:gitmdscribe/app/providers/pdf_providers.dart';
+import 'package:gitmdscribe/domain/entities/job_ref.dart';
+import 'package:gitmdscribe/domain/entities/repo_ref.dart';
+import 'package:gitmdscribe/domain/fakes/fake_clock.dart';
+import 'package:gitmdscribe/domain/fakes/fake_id_generator.dart';
+import 'package:gitmdscribe/domain/fakes/fake_pdf_raster_port.dart';
+import 'package:gitmdscribe/ui/screens/spec_reader_pdf/spec_reader_pdf_screen.dart';
+import 'package:gitmdscribe/ui/theme/app_theme.dart';
+import 'package:gitmdscribe/ui/theme/tokens.dart';
+import 'package:gitmdscribe/ui/widgets/ink_overlay/ink_overlay.dart';
+import 'package:gitmdscribe/ui/widgets/pdf_page_view/pdf_page_tile.dart';
 
 final _jobRef = JobRef(
   repo: const RepoRef(owner: 'demo', name: 'payments-api'),

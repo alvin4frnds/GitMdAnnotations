@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/controllers/repo_browser_controller.dart';
-import 'package:gitmdannotations_tablet/app/providers/spec_import_providers.dart';
-import 'package:gitmdannotations_tablet/app/providers/spec_providers.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_file_system.dart';
+import 'package:gitmdscribe/app/controllers/repo_browser_controller.dart';
+import 'package:gitmdscribe/app/providers/spec_import_providers.dart';
+import 'package:gitmdscribe/app/providers/spec_providers.dart';
+import 'package:gitmdscribe/domain/fakes/fake_file_system.dart';
 
 ProviderContainer _buildContainer(FakeFileSystem fs, {String? workdir}) {
   final container = ProviderContainer(overrides: [

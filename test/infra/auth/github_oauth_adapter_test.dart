@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/app/controllers/auth_identity_codec.dart';
-import 'package:gitmdannotations_tablet/domain/entities/auth_session.dart';
-import 'package:gitmdannotations_tablet/domain/entities/git_identity.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_secure_storage.dart';
-import 'package:gitmdannotations_tablet/domain/ports/auth_port.dart';
-import 'package:gitmdannotations_tablet/domain/ports/secure_storage_port.dart';
-import 'package:gitmdannotations_tablet/infra/auth/github_oauth_adapter.dart';
+import 'package:gitmdscribe/app/controllers/auth_identity_codec.dart';
+import 'package:gitmdscribe/domain/entities/auth_session.dart';
+import 'package:gitmdscribe/domain/entities/git_identity.dart';
+import 'package:gitmdscribe/domain/fakes/fake_secure_storage.dart';
+import 'package:gitmdscribe/domain/ports/auth_port.dart';
+import 'package:gitmdscribe/domain/ports/secure_storage_port.dart';
+import 'package:gitmdscribe/infra/auth/github_oauth_adapter.dart';
 
 /// Scripted in-memory [HttpTransport]. Tests pre-populate [responses] in
 /// FIFO order keyed by HTTP verb + URL; the adapter pops the next matching

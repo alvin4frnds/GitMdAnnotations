@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/entities/ink_tool.dart';
-import 'package:gitmdannotations_tablet/domain/fakes/fake_clock.dart';
-import 'package:gitmdannotations_tablet/domain/services/annotation_session.dart';
+import 'package:gitmdscribe/domain/entities/ink_tool.dart';
+import 'package:gitmdscribe/domain/fakes/fake_clock.dart';
+import 'package:gitmdscribe/domain/services/annotation_session.dart';
 
 import '_annotation_session_fixtures.dart';
 

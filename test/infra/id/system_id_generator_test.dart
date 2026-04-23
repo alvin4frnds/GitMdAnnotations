@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gitmdannotations_tablet/domain/ports/id_generator_port.dart';
-import 'package:gitmdannotations_tablet/infra/id/system_id_generator.dart';
+import 'package:gitmdscribe/domain/ports/id_generator_port.dart';
+import 'package:gitmdscribe/infra/id/system_id_generator.dart';
 
 void main() {
   group('SystemIdGenerator', () {
