@@ -4,12 +4,12 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 
 ## From M2a QA (2026-04-24)
 
-### Issue: On-device manual QA still pending for Milestone A
+### Issue: On-device interactive walkthrough still pending for Milestone A
 - **Severity:** Medium
 - **Source:** M2a QA (2026-04-24)
 - **Screen/area:** Repo browser, Spec readers (md/pdf/svg).
-- **Detail:** Code-review triage ran clean against the M2a diff, build-debug-apk succeeds, and all 665 unit/widget tests pass. The spec's §5c.A manual checks (fixture repo with `inline.md`, `standalone.svg`, `spec.pdf`; verify tap dispatches, inline image rendering, pinch/pan) need to run on the OnePlus Pad Go 2 before M2a is truly closed.
-- **Proposed fix:** Install `build/app/outputs/flutter-apk/app-debug.apk` on device; walk through §5c.A fixtures; capture findings and either close the entry or add them here.
+- **Detail:** Code-review triage ran clean; debug APK installed on OnePlus Pad Go 2 (device `NBB6BMB6QGQWLFV4`); app launched without FATAL / Dart exceptions; repo picker renders the expected alvin4frnds/* repo list. The interactive §5c.A walkthrough — pick a fixture repo, tap a standalone `.svg`, tap a `.md` with inline png/svg/mmd refs, verify rendering + pinch-zoom — still needs a human at the screen.
+- **Proposed fix:** User walks §5c.A on device; findings either close this entry or add new ones here.
 
 ### Issue: Pre-existing sign_in_screen_test flakes on local runner
 - **Severity:** Low
