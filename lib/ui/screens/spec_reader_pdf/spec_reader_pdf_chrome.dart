@@ -19,7 +19,9 @@ class SpecReaderPdfChrome extends StatelessWidget {
     super.key,
   });
 
-  final JobRef jobRef;
+  /// Null when opened via the repo browser \u2014 in that case the pen tool
+  /// bar, undo/redo, Review panel, and Submit buttons are hidden.
+  final JobRef? jobRef;
   final String jobId;
   final VoidCallback onUndo;
   final VoidCallback onRedo;
@@ -29,48 +31,61 @@ class SpecReaderPdfChrome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final job = jobRef;
     return Container(
       color: t.surfaceElevated,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          Text('\u2190 jobs',
-              style: TextStyle(color: t.textMuted, fontSize: 13)),
+          InkWell(
+            onTap: () => Navigator.of(context).maybePop(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Text(
+                job == null ? '\u2190 back' : '\u2190 jobs',
+                style: TextStyle(color: t.textMuted, fontSize: 13),
+              ),
+            ),
+          ),
           const SizedBox(width: 12),
           Text(
             jobId,
             style: appMono(context, size: 13, weight: FontWeight.w500),
           ),
-          const SizedBox(width: 10),
-          const _PhaseTag(label: 'Awaiting review'),
+          if (job != null) ...[
+            const SizedBox(width: 10),
+            const _PhaseTag(label: 'Awaiting review'),
+          ],
           const Spacer(),
-          PenToolBar(jobRef: jobRef),
-          const SizedBox(width: 8),
-          IconButton(
-            tooltip: 'Undo',
-            onPressed: onUndo,
-            icon: Icon(Icons.undo_rounded, size: 18, color: t.textPrimary),
-            visualDensity: VisualDensity.compact,
-          ),
-          IconButton(
-            tooltip: 'Redo',
-            onPressed: onRedo,
-            icon: Icon(Icons.redo_rounded, size: 18, color: t.textPrimary),
-            visualDensity: VisualDensity.compact,
-          ),
-          const SizedBox(width: 4),
-          TextButton(
-            onPressed: onOpenReviewPanel,
-            child: Text(
-              'Review panel \u2192',
-              style: TextStyle(color: t.textPrimary, fontSize: 13),
+          if (job != null) ...[
+            PenToolBar(jobRef: job),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'Undo',
+              onPressed: onUndo,
+              icon: Icon(Icons.undo_rounded, size: 18, color: t.textPrimary),
+              visualDensity: VisualDensity.compact,
             ),
-          ),
-          const SizedBox(width: 4),
-          ElevatedButton(
-            onPressed: onSubmit,
-            child: const Text('Submit Review'),
-          ),
+            IconButton(
+              tooltip: 'Redo',
+              onPressed: onRedo,
+              icon: Icon(Icons.redo_rounded, size: 18, color: t.textPrimary),
+              visualDensity: VisualDensity.compact,
+            ),
+            const SizedBox(width: 4),
+            TextButton(
+              onPressed: onOpenReviewPanel,
+              child: Text(
+                'Review panel \u2192',
+                style: TextStyle(color: t.textPrimary, fontSize: 13),
+              ),
+            ),
+            const SizedBox(width: 4),
+            ElevatedButton(
+              onPressed: onSubmit,
+              child: const Text('Submit Review'),
+            ),
+          ],
         ],
       ),
     );

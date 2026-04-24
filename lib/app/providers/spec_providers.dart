@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/job_ref.dart';
 import '../../domain/entities/repo_ref.dart';
+import '../../domain/entities/source_kind.dart';
 import '../../domain/entities/spec_file.dart';
 import '../../domain/ports/file_system_port.dart';
 import '../../domain/services/spec_repository.dart';
@@ -69,3 +70,46 @@ final specFileProvider = FutureProvider.autoDispose.family<SpecFile?, JobRef>(
     return repo.loadSpec(job);
   },
 );
+
+/// Loads a [SpecFile] from an absolute filesystem path, bypassing the
+/// job-pending-folder convention used by [specFileProvider]. Used by the
+/// repo browser when the user taps a `.md`/`.markdown` file that isn't a
+/// tracked spec — spec-002 Milestone A. Source kind is markdown by
+/// construction (only `.md` reaches this path; the browser dispatches
+/// `.pdf` / `.svg` to their dedicated readers).
+final specFileByPathProvider =
+    FutureProvider.autoDispose.family<SpecFile, String>(
+  (ref, absPath) async {
+    final fs = ref.watch(fileSystemProvider);
+    final contents = await fs.readString(absPath);
+    return SpecFile(
+      path: absPath,
+      sha: _pathShaOf(contents),
+      contents: contents,
+      sourceKind: SourceKind.markdown,
+    );
+  },
+);
+
+// Deterministic content-hash; mirrors SpecRepository._contentSha (FNV-1a
+// x5 concatenated). Browser-flow edits don't have a real git blob SHA
+// until they commit — this placeholder keeps SpecFile's non-empty
+// invariant satisfied and the SHA stable across reads.
+String _pathShaOf(String contents) {
+  const salts = <int>[
+    0x00000000, 0x9E3779B1, 0x85EBCA77, 0xC2B2AE3D, 0x27D4EB2F,
+  ];
+  const mask32 = 0xFFFFFFFF;
+  const fnvPrime32 = 0x01000193;
+  final bytes = contents.codeUnits;
+  final buf = StringBuffer();
+  for (final salt in salts) {
+    var h = (0x811C9DC5 ^ salt) & mask32;
+    for (final b in bytes) {
+      h = (h ^ (b & 0xff)) & mask32;
+      h = (h * fnvPrime32) & mask32;
+    }
+    buf.write(h.toRadixString(16).padLeft(8, '0'));
+  }
+  return buf.toString();
+}

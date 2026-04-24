@@ -11,6 +11,7 @@ import '../../../domain/entities/anchor.dart';
 import '../../../domain/entities/job_ref.dart';
 import '../../../domain/entities/pdf_document_handle.dart';
 import '../../../domain/entities/pointer_sample.dart';
+import '../../../domain/entities/stroke_group.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/ink_overlay/ink_overlay.dart';
 import '../review_panel/review_panel_screen.dart';
@@ -36,12 +37,16 @@ import 'spec_reader_pdf_rail.dart';
 class SpecReaderPdfScreen extends ConsumerStatefulWidget {
   const SpecReaderPdfScreen({
     required this.filePath,
-    required this.jobRef,
+    this.jobRef,
     super.key,
   });
 
   final String filePath;
-  final JobRef jobRef;
+
+  /// Null when the screen is opened via the repo browser (spec-002
+  /// Milestone A — browser flow). When null, the Annotate / Review /
+  /// Submit chrome is hidden and the pen-capture pipeline is disabled.
+  final JobRef? jobRef;
 
   @override
   ConsumerState<SpecReaderPdfScreen> createState() =>
@@ -60,7 +65,8 @@ class _SpecReaderPdfScreenState
   // zero-area rect, but the sourceSha is the real PDF content SHA so
   // `CommitPlanner._assertAnchorsMatchSource` accepts the submit.
   Anchor _placeholderAnchor() {
-    final sha = ref.read(specFileProvider(widget.jobRef)).value?.sha ?? '';
+    final job = widget.jobRef!;
+    final sha = ref.read(specFileProvider(job)).value?.sha ?? '';
     return PdfAnchor(
       page: _visiblePage,
       bbox: const Rect(left: 0, top: 0, right: 0, bottom: 0),
@@ -75,10 +81,11 @@ class _SpecReaderPdfScreenState
   }
 
   void _onSample(InkPointerPhase phase, PointerSample sample) {
-    final ctrl =
-        ref.read(annotationControllerProvider(widget.jobRef).notifier);
+    final job = widget.jobRef;
+    if (job == null) return; // browser flow: no annotation pipeline
+    final ctrl = ref.read(annotationControllerProvider(job).notifier);
     final drawingEnabled =
-        ref.read(annotationControllerProvider(widget.jobRef)).drawingEnabled;
+        ref.read(annotationControllerProvider(job)).drawingEnabled;
     switch (phase) {
       case InkPointerPhase.down:
         if (sample.kind == PointerKind.stylus &&
@@ -115,25 +122,35 @@ class _SpecReaderPdfScreenState
     }
   }
 
-  void _undo() =>
-      ref.read(annotationControllerProvider(widget.jobRef).notifier).undo();
+  void _undo() {
+    final job = widget.jobRef;
+    if (job == null) return;
+    ref.read(annotationControllerProvider(job).notifier).undo();
+  }
 
-  void _redo() =>
-      ref.read(annotationControllerProvider(widget.jobRef).notifier).redo();
+  void _redo() {
+    final job = widget.jobRef;
+    if (job == null) return;
+    ref.read(annotationControllerProvider(job).notifier).redo();
+  }
 
   void _openReviewPanel() {
+    final job = widget.jobRef;
+    if (job == null) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => Scaffold(
-          body: ReviewPanelScreen(jobRef: widget.jobRef),
+          body: ReviewPanelScreen(jobRef: job),
         ),
       ),
     );
   }
 
   Future<void> _submitReview() async {
+    final job = widget.jobRef;
+    if (job == null) return;
     final orchestrator = ReviewOrchestrator(ref.read);
-    final outcome = await orchestrator.prepare(widget.jobRef);
+    final outcome = await orchestrator.prepare(job);
     if (!mounted) return;
     switch (outcome) {
       case ReviewOrchestratorSignInRequired():
@@ -149,7 +166,7 @@ class _SpecReaderPdfScreenState
         final result = await showDialog<ReviewSubmission>(
           context: context,
           builder: (_) => SubmitConfirmationScreen(
-            jobRef: widget.jobRef,
+            jobRef: job,
             source: source,
             questions: questions,
             strokeGroups: strokeGroups,
@@ -177,7 +194,13 @@ class _SpecReaderPdfScreenState
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final state = ref.watch(annotationControllerProvider(widget.jobRef));
+    final job = widget.jobRef;
+    // Browser flow has no job-scoped annotation state; render an empty
+    // group list so the pane still composes the InkOverlay stack at
+    // zero cost.
+    final groups = job == null
+        ? const <StrokeGroup>[]
+        : ref.watch(annotationControllerProvider(job)).groups;
     final docAsync =
         ref.watch(pdfDocumentNotifierProvider(widget.filePath));
     return Container(
@@ -185,8 +208,8 @@ class _SpecReaderPdfScreenState
       child: Column(
         children: [
           SpecReaderPdfChrome(
-            jobRef: widget.jobRef,
-            jobId: widget.jobRef.jobId,
+            jobRef: job,
+            jobId: job?.jobId ?? _basename(widget.filePath),
             onUndo: _undo,
             onRedo: _redo,
             onOpenReviewPanel: _openReviewPanel,
@@ -206,7 +229,7 @@ class _SpecReaderPdfScreenState
                 ),
                 Container(width: 1, color: t.borderSubtle),
                 Expanded(
-                  child: _buildMainPane(docAsync, state.groups),
+                  child: _buildMainPane(docAsync, groups),
                 ),
               ],
             ),
@@ -214,6 +237,11 @@ class _SpecReaderPdfScreenState
         ],
       ),
     );
+  }
+
+  static String _basename(String path) {
+    final slash = path.lastIndexOf(RegExp(r'[/\\]'));
+    return slash < 0 ? path : path.substring(slash + 1);
   }
 
   Widget _buildMainPane(

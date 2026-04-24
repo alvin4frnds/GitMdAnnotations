@@ -16,19 +16,29 @@ import 'md_image_resolver.dart';
 
 /// Spec reader — markdown view.
 ///
-/// Left nav rail lists the document's H1/H2 outline extracted from the
-/// loaded markdown. The top chrome hosts the breadcrumb, pen tool bar,
-/// and Annotate / Review panel / Submit actions. The main pane renders
-/// the real spec markdown via `flutter_markdown`, reading through
-/// `specFileProvider(jobRef)` → `SpecRepository.loadSpec`.
+/// Two entry points:
+///   * Job flow: constructed with [jobRef]; reads via
+///     `specFileProvider(jobRef)` → `SpecRepository.loadSpec`. Annotate /
+///     Review panel / Submit chrome is enabled.
+///   * Browser flow ([SpecReaderMdScreen.fromPath]): constructed with an
+///     absolute filesystem path; reads via `specFileByPathProvider` →
+///     `FileSystemPort.readString`. Annotate / Submit chrome is hidden
+///     because the file isn't a tracked spec.
 ///
-/// When [jobRef] is null (mockup browser surface) the pane shows a
-/// short "No job selected" placeholder and the outline rail displays
-/// muted placeholders. The real app always passes a [jobRef].
+/// Left nav rail lists the document's H1/H2 outline extracted from the
+/// loaded markdown.
 class SpecReaderMdScreen extends StatelessWidget {
-  const SpecReaderMdScreen({this.jobRef, super.key});
+  const SpecReaderMdScreen({this.jobRef, super.key}) : filePath = null;
+
+  /// Browser-flow entry: open any `.md` / `.markdown` file by absolute
+  /// path. [jobRef] is null so job-flow chrome is gated off.
+  const SpecReaderMdScreen.fromPath({
+    required String this.filePath,
+    super.key,
+  }) : jobRef = null;
 
   final JobRef? jobRef;
+  final String? filePath;
 
   @override
   Widget build(BuildContext context) {
@@ -38,13 +48,15 @@ class SpecReaderMdScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _TopChrome(jobRef: jobRef),
+          _TopChrome(jobRef: jobRef, filePath: filePath),
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _OnThisPageRail(jobRef: jobRef),
-                Expanded(child: _MarkdownPane(jobRef: jobRef)),
+                _OnThisPageRail(jobRef: jobRef, filePath: filePath),
+                Expanded(
+                  child: _MarkdownPane(jobRef: jobRef, filePath: filePath),
+                ),
               ],
             ),
           ),
@@ -59,8 +71,9 @@ class SpecReaderMdScreen extends StatelessWidget {
 // -----------------------------------------------------------------------------
 
 class _TopChrome extends ConsumerWidget {
-  const _TopChrome({required this.jobRef});
+  const _TopChrome({required this.jobRef, required this.filePath});
   final JobRef? jobRef;
+  final String? filePath;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -75,26 +88,30 @@ class _TopChrome extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          Flexible(child: _FileBreadcrumb(jobRef: jobRef)),
+          Flexible(
+            child: _FileBreadcrumb(jobRef: jobRef, filePath: filePath),
+          ),
           const Spacer(),
-          const _PenToolBar(),
-          const SizedBox(width: 12),
-          _GhostButton(
-            label: 'Annotate',
-            trailing: Icons.edit_outlined,
-            onPressed: hasJob ? () => _openCanvas(context) : () {},
-          ),
-          const SizedBox(width: 8),
-          _GhostButton(
-            label: 'Review panel',
-            trailing: Icons.chevron_right,
-            onPressed: hasJob ? () => _openReviewPanel(context) : () {},
-          ),
-          const SizedBox(width: 8),
-          _PrimaryButton(
-            label: 'Submit',
-            onPressed: hasJob ? () => _submit(context, ref) : () {},
-          ),
+          if (hasJob) ...[
+            const _PenToolBar(),
+            const SizedBox(width: 12),
+            _GhostButton(
+              label: 'Annotate',
+              trailing: Icons.edit_outlined,
+              onPressed: () => _openCanvas(context),
+            ),
+            const SizedBox(width: 8),
+            _GhostButton(
+              label: 'Review panel',
+              trailing: Icons.chevron_right,
+              onPressed: () => _openReviewPanel(context),
+            ),
+            const SizedBox(width: 8),
+            _PrimaryButton(
+              label: 'Submit',
+              onPressed: () => _submit(context, ref),
+            ),
+          ],
         ],
       ),
     );
@@ -165,22 +182,21 @@ class _TopChrome extends ConsumerWidget {
 }
 
 class _FileBreadcrumb extends ConsumerWidget {
-  const _FileBreadcrumb({required this.jobRef});
+  const _FileBreadcrumb({required this.jobRef, required this.filePath});
   final JobRef? jobRef;
+  final String? filePath;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
     final job = jobRef;
-    final filename = job == null
-        ? '02-spec.md'
-        : ref
-                .watch(specFileProvider(job))
-                .value
-                ?.path
-                .split('/')
-                .last ??
-            '02-spec.md';
+    final path = filePath;
+    final filename = job != null
+        ? ref.watch(specFileProvider(job)).value?.path.split('/').last ??
+            '02-spec.md'
+        : path != null
+            ? path.replaceAll('\\', '/').split('/').last
+            : '02-spec.md';
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -359,20 +375,28 @@ class _PrimaryButton extends StatelessWidget {
 /// surface) or the spec hasn't loaded yet, shows a muted placeholder so
 /// the chrome doesn't reflow.
 class _OnThisPageRail extends ConsumerWidget {
-  const _OnThisPageRail({required this.jobRef});
+  const _OnThisPageRail({required this.jobRef, required this.filePath});
   final JobRef? jobRef;
+  final String? filePath;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
     final List<String> headings;
-    if (jobRef == null) {
-      headings = const ['Overview', 'Goals', 'Open questions'];
-    } else {
-      final spec = ref.watch(specFileProvider(jobRef!)).value;
+    final job = jobRef;
+    final path = filePath;
+    if (job != null) {
+      final spec = ref.watch(specFileProvider(job)).value;
       headings = spec == null
           ? const ['Loading...']
           : _extractHeadings(spec.contents);
+    } else if (path != null) {
+      final spec = ref.watch(specFileByPathProvider(path)).value;
+      headings = spec == null
+          ? const ['Loading...']
+          : _extractHeadings(spec.contents);
+    } else {
+      headings = const ['Overview', 'Goals', 'Open questions'];
     }
     return Container(
       width: 192,
@@ -468,31 +492,46 @@ final _headingPattern = RegExp(r'^(#{1,2})\s+(.+?)\s*$');
 // -----------------------------------------------------------------------------
 
 class _MarkdownPane extends ConsumerWidget {
-  const _MarkdownPane({required this.jobRef});
+  const _MarkdownPane({required this.jobRef, required this.filePath});
   final JobRef? jobRef;
+  final String? filePath;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (jobRef == null) {
-      return const _MuteMessage(
-        message: 'No job selected.',
-        submessage: 'Pick a job from the JobList to view its spec.',
+    final job = jobRef;
+    final path = filePath;
+    if (job != null) {
+      final async = ref.watch(specFileProvider(job));
+      return async.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => _MuteMessage(
+          message: "Couldn't load the spec.",
+          submessage: e.toString(),
+          isError: true,
+        ),
+        data: (spec) => spec == null
+            ? const _MuteMessage(
+                message: 'No workdir.',
+                submessage: 'Pick a repo from the RepoPicker first.',
+              )
+            : _MarkdownBodyView(spec: spec),
       );
     }
-    final async = ref.watch(specFileProvider(jobRef!));
-    return async.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => _MuteMessage(
-        message: "Couldn't load the spec.",
-        submessage: e.toString(),
-        isError: true,
-      ),
-      data: (spec) => spec == null
-          ? const _MuteMessage(
-              message: 'No workdir.',
-              submessage: 'Pick a repo from the RepoPicker first.',
-            )
-          : _MarkdownBodyView(spec: spec),
+    if (path != null) {
+      final async = ref.watch(specFileByPathProvider(path));
+      return async.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => _MuteMessage(
+          message: "Couldn't open the file.",
+          submessage: e.toString(),
+          isError: true,
+        ),
+        data: (spec) => _MarkdownBodyView(spec: spec),
+      );
+    }
+    return const _MuteMessage(
+      message: 'No job selected.',
+      submessage: 'Pick a job from the JobList to view its spec.',
     );
   }
 }

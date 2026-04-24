@@ -4,8 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/controllers/repo_browser_controller.dart';
 import '../../../app/controllers/spec_importer.dart';
 import '../../../app/providers/spec_import_providers.dart';
+import '../../../app/providers/spec_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../spec_reader_md/spec_reader_md_screen.dart';
+import '../spec_reader_pdf/spec_reader_pdf_screen.dart';
+import '../spec_reader_svg/spec_reader_svg_screen.dart';
 
 /// Repo-file browser for the "convert existing .md / .pdf → spec" flow.
 /// Rooted at the current workdir. The user navigates folders + picks a
@@ -223,10 +227,48 @@ class _EntryList extends ConsumerWidget {
               : () => ref
                   .read(specImportControllerProvider.notifier)
                   .run(e.relPath),
+          onOpen: disabled ? null : () => _openFile(ctx, ref, e.relPath),
         );
       },
     );
   }
+
+  void _openFile(BuildContext context, WidgetRef ref, String relPath) {
+    final workdir = ref.read(currentWorkdirProvider);
+    if (workdir == null) return;
+    final screen = readerScreenForBrowserPath(
+      workdir: workdir,
+      relPath: relPath,
+    );
+    if (screen == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => Scaffold(body: screen)),
+    );
+  }
+}
+
+/// Pure dispatch: pick the right reader screen for a repo-browser entry
+/// based on the lowercased extension. Returns null for unsupported types
+/// so callers can ignore the tap. Spec-002 Milestone A.
+///
+/// Exposed at library scope so widget tests can exercise the dispatch
+/// without mounting the full browser tree.
+Widget? readerScreenForBrowserPath({
+  required String workdir,
+  required String relPath,
+}) {
+  final absPath = '$workdir/$relPath';
+  final lower = relPath.toLowerCase();
+  if (lower.endsWith('.md') || lower.endsWith('.markdown')) {
+    return SpecReaderMdScreen.fromPath(filePath: absPath);
+  }
+  if (lower.endsWith('.pdf')) {
+    return SpecReaderPdfScreen(filePath: absPath);
+  }
+  if (lower.endsWith('.svg')) {
+    return SpecReaderSvgScreen(filePath: absPath);
+  }
+  return null;
 }
 
 class _DirectoryRow extends StatelessWidget {
@@ -270,67 +312,84 @@ class _DirectoryRow extends StatelessWidget {
 }
 
 class _FileRow extends StatelessWidget {
-  const _FileRow({required this.entry, required this.onConvert});
+  const _FileRow({
+    required this.entry,
+    required this.onConvert,
+    required this.onOpen,
+  });
   final RepoBrowserEntry entry;
   final VoidCallback? onConvert;
+
+  /// Spec-002 Milestone A: tapping the row body opens the appropriate
+  /// reader. Null when the controller is in a disabled state (e.g. an
+  /// import is in flight).
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final isSvg = entry.name.toLowerCase().endsWith('.svg');
     return Material(
       color: t.surfaceBackground,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
-        child: Row(
-          children: [
-            Icon(Icons.description_outlined, size: 18, color: t.textMuted),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.name,
-                    style: appMono(
-                      context,
-                      size: 13,
-                      weight: FontWeight.w500,
-                      color: t.textPrimary,
+      child: InkWell(
+        onTap: onOpen,
+        hoverColor: t.surfaceSunken,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+          child: Row(
+            children: [
+              Icon(Icons.description_outlined, size: 18, color: t.textMuted),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.name,
+                      style: appMono(
+                        context,
+                        size: 13,
+                        weight: FontWeight.w500,
+                        color: t.textPrimary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    entry.relPath,
-                    style: TextStyle(
-                      color: t.textMuted,
-                      fontSize: 11,
-                      height: 1.4,
+                    Text(
+                      entry.relPath,
+                      style: TextStyle(
+                        color: t.textMuted,
+                        fontSize: 11,
+                        height: 1.4,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // SVG files are non-annotatable (spec-002) — hide the
+              // convert-to-spec action; the file is read-only.
+              if (!isSvg)
+                ElevatedButton(
+                  onPressed: onConvert,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: t.accentPrimary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6)),
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: onConvert,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: t.accentPrimary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6)),
-                minimumSize: const Size(0, 32),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text(
-                'Convert to spec',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
+                  child: const Text(
+                    'Convert to spec',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
