@@ -50,6 +50,10 @@ class FakeGitPort implements GitPort {
   /// Default outcome for [push]. Null -> returns `PushSuccess(headSha)`.
   PushOutcome? scriptedPushOutcome;
 
+  /// Branch name returned by [currentBranch]. Tests override per scenario;
+  /// defaults to `main` because that's what a fresh clone looks like.
+  String activeBranch = 'main';
+
   /// Every [BackupRef] returned from [backupBranchHead], in call order.
   final List<BackupRef> backups = [];
 
@@ -265,6 +269,9 @@ class FakeGitPort implements GitPort {
     if (remoteLog != null) _log[localBranch] = List.of(remoteLog);
     return true;
   }
+
+  @override
+  Future<String> currentBranch() async => activeBranch;
 
   @override
   Future<int> countCommitsAhead({

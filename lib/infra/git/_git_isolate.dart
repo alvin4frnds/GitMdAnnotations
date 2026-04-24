@@ -100,6 +100,7 @@ Future<GitResponse> _dispatch(_IsolateState state, GitRequest req) async {
       GitReqHeadSha() => _handleHeadSha(state, req),
       GitReqBootstrapLocalBranch() => _handleBootstrapLocalBranch(state, req),
       GitReqCommitsAhead() => _handleCommitsAhead(state, req),
+      GitReqCurrentBranch() => _handleCurrentBranch(state, req),
     };
   } catch (e) {
     return GitResponseError(id: req.id, error: e);
@@ -485,6 +486,34 @@ GitResponse _handleCommitsAhead(
     return GitResponseOk<int>(id: req.id, value: counts.first);
   } on git2.LibGit2Error {
     return GitResponseOk<int>(id: req.id, value: 0);
+  }
+}
+
+/// Currently checked-out branch name. Errors if HEAD is detached or
+/// unreadable — spec-002 Milestone B doesn't support detached-HEAD
+/// editing.
+GitResponse _handleCurrentBranch(
+  _IsolateState state,
+  GitReqCurrentBranch req,
+) {
+  final repo = _onlyRepo(state);
+  try {
+    final head = repo.head;
+    // `head.shorthand` strips the `refs/heads/` prefix when HEAD is on
+    // a branch. Detached HEAD returns the sha — surface that as a
+    // GitCorrupted so the caller can bail.
+    if (!head.isBranch) {
+      return GitResponseError(
+        id: req.id,
+        error: const GitCorrupted('HEAD is detached'),
+      );
+    }
+    return GitResponseOk<String>(id: req.id, value: head.shorthand);
+  } on git2.LibGit2Error catch (e) {
+    return GitResponseError(
+      id: req.id,
+      error: GitCorrupted('cannot read HEAD: $e'),
+    );
   }
 }
 

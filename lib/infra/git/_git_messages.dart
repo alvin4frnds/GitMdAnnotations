@@ -169,6 +169,13 @@ class GitReqCommitsAhead extends GitRequest {
   final String remoteBranch;
 }
 
+/// Current checked-out branch name. Used by the browser-flow markdown
+/// editor (spec-002) so a commit from a non-job edit lands on whichever
+/// branch the user already has checked out.
+class GitReqCurrentBranch extends GitRequest {
+  const GitReqCurrentBranch({required super.id});
+}
+
 /// Lifecycle-only message — carries no request id because no reply is
 /// expected. The isolate self-terminates on receipt.
 class GitReqShutdown {

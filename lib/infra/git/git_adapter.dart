@@ -268,6 +268,12 @@ class GitAdapter implements GitPort {
     return _unwrap<int>(resp);
   }
 
+  @override
+  Future<String> currentBranch() async {
+    final resp = await _send((id) => GitReqCurrentBranch(id: id));
+    return _unwrap<String>(resp);
+  }
+
   /// Shuts the background isolate down. Safe to call multiple times; later
   /// calls become no-ops.
   Future<void> dispose() async {

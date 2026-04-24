@@ -87,6 +87,14 @@ abstract class GitPort {
     required String localBranch,
     required String remoteBranch,
   });
+
+  /// Name of the branch currently checked out in the working tree
+  /// (typically `main`, sometimes `claude-jobs`). Used by the
+  /// browser-flow markdown editor (spec-002) so a non-job edit commits
+  /// back to whatever branch the user is looking at, not a forced
+  /// `claude-jobs`. Throws [GitCorrupted] if HEAD is detached or
+  /// unreadable — detached-HEAD editing is out of scope for now.
+  Future<String> currentBranch();
 }
 
 /// A single file write that will be staged + committed as part of
