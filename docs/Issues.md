@@ -2,6 +2,29 @@
 
 Deferred findings from milestone QA rounds. Critical + High items are fixed before milestone close-out; Medium and Low accumulate here for the next scheduled polish pass or for opportunistic fixes during related work.
 
+## From M2b QA (2026-04-24)
+
+### Issue: `_MarkdownPane.onSpecLoaded` name suggests one-shot but fires on every build
+- **Severity:** Low
+- **Source:** M2b QA (2026-04-24)
+- **Screen/area:** `lib/ui/screens/spec_reader_md/spec_reader_md_screen.dart` — `_MarkdownPane._buildBody`.
+- **Detail:** The callback is idempotent (the state's `_seedIfNeeded` early-returns when `_originalContents != null`), but the name suggests it fires only once on load. Not a bug; a future reader might be confused.
+- **Proposed fix:** Rename to `onSpecReady` or only call from the async provider's `data:` arm (not from `_buildBody` which runs on every view-mode change).
+
+### Issue: Post-save provider invalidation fires on stale path after screen swap
+- **Severity:** Low
+- **Source:** M2b QA (2026-04-24)
+- **Screen/area:** `spec_reader_md_screen.dart` — `_save` method.
+- **Detail:** After a successful save, `ref.invalidate(specFileByPathProvider(path))` is called using `widget.filePath` captured at save time. If the screen has swapped to a different spec (rare — requires a live ctor swap), invalidation fires on the wrong key. Benign: invalidating an unused key is a no-op.
+- **Proposed fix:** Store the loaded `SpecFile.path` in state and invalidate against that instead.
+
+### Issue: No explicit test for browser-flow save landing on `GitPort.currentBranch`
+- **Severity:** Medium
+- **Source:** M2b QA (2026-04-24)
+- **Screen/area:** `test/ui/screens/spec_reader_md/edit_mode_test.dart`.
+- **Detail:** The unit test for `MdEditorSubmitter` covers the `currentBranch` fallback, but there's no end-to-end widget test that taps a `.md` in the repo browser → enters edit → saves → asserts the commit landed on the faked `activeBranch` (not forced `claude-jobs`).
+- **Proposed fix:** Add a widget test that mounts the repo browser + reader flow; override `FakeGitPort.activeBranch = 'main'`; save; assert `git.branches['main']` contains the commit.
+
 ## From M2a QA (2026-04-24)
 
 ### Issue: On-device interactive walkthrough still pending for Milestone A

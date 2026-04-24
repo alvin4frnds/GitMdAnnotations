@@ -11,6 +11,7 @@ import '../../../app/providers/spec_providers.dart';
 import '../../../domain/entities/job_ref.dart';
 import '../../../domain/entities/source_kind.dart';
 import '../../../domain/entities/spec_file.dart';
+import '../../../domain/ports/git_port.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../annotation_canvas/annotation_canvas_screen.dart';
@@ -126,6 +127,10 @@ class _SpecReaderMdScreenState extends ConsumerState<SpecReaderMdScreen> {
       } else if (path != null) {
         ref.invalidate(specFileByPathProvider(path));
       }
+    } on GitCorrupted {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _toast('Save failed: repo has no branch checked out (detached HEAD).');
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -180,6 +185,7 @@ class _SpecReaderMdScreenState extends ConsumerState<SpecReaderMdScreen> {
               filePath: widget.filePath,
               viewMode: _viewMode,
               controller: _controller,
+              originalContents: _originalContents,
               isSaving: _saving,
               onViewModeChanged: _setViewMode,
               onSave: () async {
@@ -287,6 +293,7 @@ class _TopChrome extends ConsumerWidget {
     required this.filePath,
     required this.viewMode,
     required this.controller,
+    required this.originalContents,
     required this.isSaving,
     required this.onViewModeChanged,
     required this.onSave,
@@ -295,6 +302,7 @@ class _TopChrome extends ConsumerWidget {
   final String? filePath;
   final MdViewMode viewMode;
   final TextEditingController controller;
+  final String? originalContents;
   final bool isSaving;
   final ValueChanged<MdViewMode> onViewModeChanged;
   final Future<void> Function() onSave;
@@ -325,6 +333,7 @@ class _TopChrome extends ConsumerWidget {
             const SizedBox(width: 8),
             _SaveButton(
               controller: controller,
+              originalContents: originalContents,
               isSaving: isSaving,
               onSave: onSave,
             ),
@@ -659,14 +668,18 @@ class _SegEntry extends StatelessWidget {
 
 /// Save button that listens directly to the editor controller so its
 /// enabled state updates the moment the user types, without rebuilding
-/// the whole chrome.
+/// the whole chrome. [originalContents] is passed explicitly so dirty
+/// status doesn't rely on ancestor-state lookup (which silently breaks
+/// if anyone wraps this widget in another layer).
 class _SaveButton extends StatelessWidget {
   const _SaveButton({
     required this.controller,
+    required this.originalContents,
     required this.isSaving,
     required this.onSave,
   });
   final TextEditingController controller;
+  final String? originalContents;
   final bool isSaving;
   final Future<void> Function() onSave;
 
@@ -676,7 +689,8 @@ class _SaveButton extends StatelessWidget {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
-        final dirty = _SpecReaderMdScope.isDirty(context, controller);
+        final orig = originalContents;
+        final dirty = orig != null && controller.text != orig;
         final enabled = dirty && !isSaving;
         return ElevatedButton(
           onPressed: enabled ? onSave : null,
@@ -698,21 +712,6 @@ class _SaveButton extends StatelessWidget {
         );
       },
     );
-  }
-}
-
-/// Utility to read the enclosing state's `_originalContents` so the
-/// Save button can compute dirty status without pulling in the full
-/// state object. Looks up `_SpecReaderMdScreenState` via the element
-/// tree. Fail-safe: if not mounted under the stateful screen, returns
-/// false so Save stays disabled.
-class _SpecReaderMdScope {
-  static bool isDirty(BuildContext context, TextEditingController controller) {
-    final state =
-        context.findAncestorStateOfType<_SpecReaderMdScreenState>();
-    if (state == null) return false;
-    final orig = state._originalContents;
-    return orig != null && controller.text != orig;
   }
 }
 
