@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/auth_controller.dart';
+import '../../../app/controllers/md_editor_submitter.dart';
 import '../../../app/controllers/review_controller.dart';
 import '../../../app/controllers/review_orchestrator.dart';
+import '../../../app/providers/auth_providers.dart';
 import '../../../app/providers/spec_providers.dart';
 import '../../../domain/entities/job_ref.dart';
+import '../../../domain/entities/source_kind.dart';
 import '../../../domain/entities/spec_file.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
@@ -13,6 +17,9 @@ import '../annotation_canvas/annotation_canvas_screen.dart';
 import '../review_panel/review_panel_screen.dart';
 import '../submit_confirmation/submit_confirmation_screen.dart';
 import 'md_image_resolver.dart';
+
+/// Spec-002 Milestone B view-mode toggle on the markdown reader.
+enum MdViewMode { preview, split, edit }
 
 /// Spec reader — markdown view.
 ///
@@ -27,7 +34,7 @@ import 'md_image_resolver.dart';
 ///
 /// Left nav rail lists the document's H1/H2 outline extracted from the
 /// loaded markdown.
-class SpecReaderMdScreen extends StatelessWidget {
+class SpecReaderMdScreen extends ConsumerStatefulWidget {
   const SpecReaderMdScreen({this.jobRef, super.key}) : filePath = null;
 
   /// Browser-flow entry: open any `.md` / `.markdown` file by absolute
@@ -41,26 +48,230 @@ class SpecReaderMdScreen extends StatelessWidget {
   final String? filePath;
 
   @override
+  ConsumerState<SpecReaderMdScreen> createState() =>
+      _SpecReaderMdScreenState();
+}
+
+class _SpecReaderMdScreenState extends ConsumerState<SpecReaderMdScreen> {
+  final TextEditingController _controller = TextEditingController();
+  String? _originalContents;
+  MdViewMode _viewMode = MdViewMode.preview;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  bool get _isDirty {
+    final orig = _originalContents;
+    return orig != null && _controller.text != orig;
+  }
+
+  /// Seed the editor state once, on first successful spec load.
+  /// Scheduled via a post-frame callback because the caller invokes us
+  /// from inside `_MarkdownPane.build`, and mutating `_controller.text`
+  /// during build would re-notify ancestors that are already building.
+  void _seedIfNeeded(SpecFile spec) {
+    if (_originalContents != null) return;
+    _originalContents = spec.contents;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _controller.text = spec.contents;
+    });
+  }
+
+  void _setViewMode(MdViewMode next) {
+    if (_viewMode == next) return;
+    setState(() => _viewMode = next);
+  }
+
+  Future<void> _save(SpecFile spec) async {
+    if (_saving || !_isDirty) return;
+    final workdir = ref.read(currentWorkdirProvider);
+    if (workdir == null) {
+      _toast('No workdir — pick a repo first.');
+      return;
+    }
+    final authState = ref.read(authControllerProvider).value;
+    if (authState is! AuthSignedIn) {
+      _toast('Sign in to save.');
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await ref.read(mdEditorSubmitterProvider).submit(
+            workdir: workdir,
+            absSpecPath: spec.path,
+            newContents: _controller.text,
+            identity: authState.session.identity,
+            jobFlowBranch:
+                widget.jobRef != null ? 'claude-jobs' : null,
+          );
+      if (!mounted) return;
+      setState(() {
+        _originalContents = _controller.text;
+        _saving = false;
+      });
+      _toast('Saved.');
+      // Invalidate the cached SpecFile so a re-read picks up the new
+      // content if the user re-opens or the view mode toggles to
+      // preview (which reads from spec.contents, not the controller
+      // directly in preview-only mode).
+      final job = widget.jobRef;
+      final path = widget.filePath;
+      if (job != null) {
+        ref.invalidate(specFileProvider(job));
+      } else if (path != null) {
+        ref.invalidate(specFileByPathProvider(path));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _toast('Save failed: $e');
+    }
+  }
+
+  Future<bool> _confirmDiscard() async {
+    if (!_isDirty) return true;
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      isDismissible: true,
+      builder: (sheetCtx) => const _DiscardSheet(),
+    );
+    return ok == true;
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return ColoredBox(
-      color: t.surfaceBackground,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _TopChrome(jobRef: jobRef, filePath: filePath),
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+    return ListenableBuilder(
+      // Rebuild the PopScope (and only the PopScope subtree's top-level
+      // shell) when the controller's text changes so canPop tracks
+      // dirty status without re-rendering every child on each keystroke.
+      listenable: _controller,
+      builder: (context, child) {
+        return PopScope(
+          canPop: !_isDirty,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            final confirmed = await _confirmDiscard();
+            if (!confirmed || !mounted) return;
+            Navigator.of(this.context).pop();
+          },
+          child: child!,
+        );
+      },
+      child: ColoredBox(
+        color: t.surfaceBackground,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _TopChrome(
+              jobRef: widget.jobRef,
+              filePath: widget.filePath,
+              viewMode: _viewMode,
+              controller: _controller,
+              isSaving: _saving,
+              onViewModeChanged: _setViewMode,
+              onSave: () async {
+                final spec = _currentSpecOrNull();
+                if (spec != null) await _save(spec);
+              },
+            ),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _OnThisPageRail(
+                    jobRef: widget.jobRef,
+                    filePath: widget.filePath,
+                  ),
+                  Expanded(
+                    child: _MarkdownPane(
+                      jobRef: widget.jobRef,
+                      filePath: widget.filePath,
+                      viewMode: _viewMode,
+                      controller: _controller,
+                      onSpecLoaded: _seedIfNeeded,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  SpecFile? _currentSpecOrNull() {
+    final job = widget.jobRef;
+    final path = widget.filePath;
+    if (job != null) return ref.read(specFileProvider(job)).value;
+    if (path != null) return ref.read(specFileByPathProvider(path)).value;
+    return null;
+  }
+}
+
+class _DiscardSheet extends StatelessWidget {
+  const _DiscardSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Discard unsaved edits?',
+              style: TextStyle(
+                color: t.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You have unsaved changes. Leaving will lose them.',
+              style: TextStyle(color: t.textMuted, fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            Row(
               children: [
-                _OnThisPageRail(jobRef: jobRef, filePath: filePath),
                 Expanded(
-                  child: _MarkdownPane(jobRef: jobRef, filePath: filePath),
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: t.statusDanger,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Discard'),
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -71,14 +282,28 @@ class SpecReaderMdScreen extends StatelessWidget {
 // -----------------------------------------------------------------------------
 
 class _TopChrome extends ConsumerWidget {
-  const _TopChrome({required this.jobRef, required this.filePath});
+  const _TopChrome({
+    required this.jobRef,
+    required this.filePath,
+    required this.viewMode,
+    required this.controller,
+    required this.isSaving,
+    required this.onViewModeChanged,
+    required this.onSave,
+  });
   final JobRef? jobRef;
   final String? filePath;
+  final MdViewMode viewMode;
+  final TextEditingController controller;
+  final bool isSaving;
+  final ValueChanged<MdViewMode> onViewModeChanged;
+  final Future<void> Function() onSave;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
     final hasJob = jobRef != null;
+    final isEditing = viewMode != MdViewMode.preview;
     return Container(
       height: 52,
       decoration: BoxDecoration(
@@ -92,7 +317,20 @@ class _TopChrome extends ConsumerWidget {
             child: _FileBreadcrumb(jobRef: jobRef, filePath: filePath),
           ),
           const Spacer(),
-          if (hasJob) ...[
+          _ViewModeSegmented(
+            mode: viewMode,
+            onChanged: onViewModeChanged,
+          ),
+          if (isEditing) ...[
+            const SizedBox(width: 8),
+            _SaveButton(
+              controller: controller,
+              isSaving: isSaving,
+              onSave: onSave,
+            ),
+          ],
+          if (hasJob && !isEditing) ...[
+            const SizedBox(width: 12),
             const _PenToolBar(),
             const SizedBox(width: 12),
             _GhostButton(
@@ -341,6 +579,143 @@ class _GhostButton extends StatelessWidget {
   }
 }
 
+class _ViewModeSegmented extends StatelessWidget {
+  const _ViewModeSegmented({required this.mode, required this.onChanged});
+  final MdViewMode mode;
+  final ValueChanged<MdViewMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      height: 34,
+      decoration: BoxDecoration(
+        color: t.surfaceSunken,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: t.borderSubtle),
+      ),
+      padding: const EdgeInsets.all(2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _SegEntry(
+            label: 'Preview',
+            selected: mode == MdViewMode.preview,
+            onTap: () => onChanged(MdViewMode.preview),
+          ),
+          _SegEntry(
+            label: 'Split',
+            selected: mode == MdViewMode.split,
+            onTap: () => onChanged(MdViewMode.split),
+          ),
+          _SegEntry(
+            label: 'Edit',
+            selected: mode == MdViewMode.edit,
+            onTap: () => onChanged(MdViewMode.edit),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SegEntry extends StatelessWidget {
+  const _SegEntry({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? t.surfaceElevated : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: selected ? t.borderSubtle : Colors.transparent,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? t.textPrimary : t.textMuted,
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Save button that listens directly to the editor controller so its
+/// enabled state updates the moment the user types, without rebuilding
+/// the whole chrome.
+class _SaveButton extends StatelessWidget {
+  const _SaveButton({
+    required this.controller,
+    required this.isSaving,
+    required this.onSave,
+  });
+  final TextEditingController controller;
+  final bool isSaving;
+  final Future<void> Function() onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        final dirty = _SpecReaderMdScope.isDirty(context, controller);
+        final enabled = dirty && !isSaving;
+        return ElevatedButton(
+          onPressed: enabled ? onSave : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: t.accentPrimary,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: t.surfaceSunken,
+            disabledForegroundColor: t.textMuted,
+            elevation: 0,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: Text(
+            isSaving ? 'Saving…' : 'Save',
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Utility to read the enclosing state's `_originalContents` so the
+/// Save button can compute dirty status without pulling in the full
+/// state object. Looks up `_SpecReaderMdScreenState` via the element
+/// tree. Fail-safe: if not mounted under the stateful screen, returns
+/// false so Save stays disabled.
+class _SpecReaderMdScope {
+  static bool isDirty(BuildContext context, TextEditingController controller) {
+    final state =
+        context.findAncestorStateOfType<_SpecReaderMdScreenState>();
+    if (state == null) return false;
+    final orig = state._originalContents;
+    return orig != null && controller.text != orig;
+  }
+}
+
 class _PrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
@@ -492,9 +867,18 @@ final _headingPattern = RegExp(r'^(#{1,2})\s+(.+?)\s*$');
 // -----------------------------------------------------------------------------
 
 class _MarkdownPane extends ConsumerWidget {
-  const _MarkdownPane({required this.jobRef, required this.filePath});
+  const _MarkdownPane({
+    required this.jobRef,
+    required this.filePath,
+    required this.viewMode,
+    required this.controller,
+    required this.onSpecLoaded,
+  });
   final JobRef? jobRef;
   final String? filePath;
+  final MdViewMode viewMode;
+  final TextEditingController controller;
+  final void Function(SpecFile spec) onSpecLoaded;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -514,7 +898,7 @@ class _MarkdownPane extends ConsumerWidget {
                 message: 'No workdir.',
                 submessage: 'Pick a repo from the RepoPicker first.',
               )
-            : _MarkdownBodyView(spec: spec),
+            : _buildBody(spec),
       );
     }
     if (path != null) {
@@ -526,12 +910,105 @@ class _MarkdownPane extends ConsumerWidget {
           submessage: e.toString(),
           isError: true,
         ),
-        data: (spec) => _MarkdownBodyView(spec: spec),
+        data: _buildBody,
       );
     }
     return const _MuteMessage(
       message: 'No job selected.',
       submessage: 'Pick a job from the JobList to view its spec.',
+    );
+  }
+
+  Widget _buildBody(SpecFile spec) {
+    onSpecLoaded(spec);
+    switch (viewMode) {
+      case MdViewMode.preview:
+        return _MarkdownBodyView(spec: spec);
+      case MdViewMode.edit:
+        return _MarkdownEditField(
+          controller: controller,
+          specPath: spec.path,
+        );
+      case MdViewMode.split:
+        return Row(
+          children: [
+            Expanded(
+              child: _MarkdownEditField(
+                controller: controller,
+                specPath: spec.path,
+              ),
+            ),
+            VerticalDivider(width: 1, thickness: 1, color: _dividerColor()),
+            Expanded(
+              child: _MarkdownLivePreview(
+                controller: controller,
+                specPath: spec.path,
+              ),
+            ),
+          ],
+        );
+    }
+  }
+
+  Color _dividerColor() => const Color(0xFFE5E7EB);
+}
+
+class _MarkdownEditField extends StatelessWidget {
+  const _MarkdownEditField({
+    required this.controller,
+    required this.specPath,
+  });
+  final TextEditingController controller;
+  final String specPath;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      color: t.surfaceBackground,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: TextField(
+        controller: controller,
+        maxLines: null,
+        expands: true,
+        textAlignVertical: TextAlignVertical.top,
+        style: appMono(context, size: 13, color: t.textPrimary),
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+          isCollapsed: true,
+          contentPadding: EdgeInsets.zero,
+        ),
+      ),
+    );
+  }
+}
+
+/// Preview pane used in split mode: rebuilds from [controller].text on
+/// every keystroke so the user sees their edits live.
+class _MarkdownLivePreview extends StatelessWidget {
+  const _MarkdownLivePreview({
+    required this.controller,
+    required this.specPath,
+  });
+  final TextEditingController controller;
+  final String specPath;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        return _MarkdownBodyView(
+          spec: SpecFile(
+            path: specPath,
+            // Non-empty SHA placeholder; split-mode preview isn't
+            // committed and the SHA isn't persisted anywhere here.
+            sha: 'split-preview',
+            contents: controller.text,
+            sourceKind: SourceKind.markdown,
+          ),
+        );
+      },
     );
   }
 }
