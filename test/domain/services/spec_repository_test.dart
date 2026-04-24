@@ -58,6 +58,19 @@ void main() {
       final fs = FakeFileSystem();
       expect(await build(fs).listOpenJobs(repo), isEmpty);
     });
+
+    test('spec.svg folder -> SourceKind.svg + Phase.spec', () async {
+      final fs = FakeFileSystem()
+        ..writeBytes(
+          '$workdir/jobs/pending/spec-d/spec.svg',
+          <int>[0x3C, 0x73, 0x76, 0x67, 0x2F, 0x3E], // '<svg/>'
+        );
+      final jobs = await build(fs).listOpenJobs(repo);
+      final byId = {for (final j in jobs) j.ref.jobId: j};
+      expect(byId.keys, contains('spec-d'));
+      expect(byId['spec-d']!.sourceKind, SourceKind.svg);
+      expect(byId['spec-d']!.phase, Phase.spec);
+    });
   });
 
   group('SpecRepository.loadSpec', () {
@@ -98,6 +111,19 @@ void main() {
       expect(file.sourceKind, SourceKind.pdf);
       expect(file.path, '$workdir/jobs/pending/spec-p/spec.pdf');
       expect(file.contents, base64.encode(pdfBytes));
+    });
+
+    test(
+        'returns base64-encoded contents for an SVG job and SourceKind.svg',
+        () async {
+      final svgBytes = <int>[0x3C, 0x73, 0x76, 0x67, 0x2F, 0x3E]; // '<svg/>'
+      final fs = FakeFileSystem()
+        ..writeBytes('$workdir/jobs/pending/spec-s/spec.svg', svgBytes);
+
+      final file = await build(fs).loadSpec(refOf('spec-s'));
+      expect(file.sourceKind, SourceKind.svg);
+      expect(file.path, '$workdir/jobs/pending/spec-s/spec.svg');
+      expect(file.contents, base64.encode(svgBytes));
     });
 
     test('throws SpecNotFound when no spec files exist', () async {
@@ -164,6 +190,20 @@ void main() {
               '- 2026-04-20 10:00 desktop: initial pdf upload\n',
         );
       final entries = await build(fs).readChangelog(refOf('spec-p'));
+      expect(entries, hasLength(1));
+      expect(entries.first.author, 'desktop');
+    });
+
+    test('SVG job WITH sibling CHANGELOG.md -> parsed entries', () async {
+      final fs = FakeFileSystem()
+        ..writeBytes(
+            '$workdir/jobs/pending/spec-s/spec.svg', <int>[0x3C, 0x73, 0x76])
+        ..seedFile(
+          '$workdir/jobs/pending/spec-s/CHANGELOG.md',
+          '## Changelog\n\n'
+              '- 2026-04-20 11:00 desktop: initial svg upload\n',
+        );
+      final entries = await build(fs).readChangelog(refOf('spec-s'));
       expect(entries, hasLength(1));
       expect(entries.first.author, 'desktop');
     });

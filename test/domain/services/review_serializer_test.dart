@@ -35,6 +35,13 @@ SpecFile _pdf({required String sha}) => SpecFile(
       sourceKind: SourceKind.pdf,
     );
 
+SpecFile _svg({required String sha}) => SpecFile(
+      path: 'jobs/pending/spec-auth/spec.svg',
+      sha: sha,
+      contents: '',
+      sourceKind: SourceKind.svg,
+    );
+
 StrokeGroup _mdGroup({required int line, required String ts}) => StrokeGroup(
       id: 'ignored',
       anchor: MarkdownAnchor(lineNumber: line, sourceSha: 'a3f91c'),
@@ -300,6 +307,49 @@ void main() {
       );
 
       expect(out.endsWith('\n') && !out.endsWith('\n\n'), isTrue);
+    });
+  });
+
+  group('ReviewSerializer — source line format', () {
+    test('markdown source includes @ <sha>', () {
+      final clock = FakeClock(DateTime(2026, 4, 20, 9, 32));
+      final out = ReviewSerializer(clock: clock).buildReviewMd(
+        job: _job('spec-md-src'),
+        source: _md(sha: 'a3f91c'),
+        questions: const [],
+        answers: const {},
+        freeFormNotes: '',
+        strokeGroups: const [],
+      );
+      expect(out, contains('**Source:** 02-spec.md @ a3f91c'));
+    });
+
+    test('pdf source is the bare basename (no @ <sha>)', () {
+      final clock = FakeClock(DateTime(2026, 4, 20, 9, 32));
+      final out = ReviewSerializer(clock: clock).buildReviewMd(
+        job: _job('spec-pdf-src'),
+        source: _pdf(sha: 'deadbeef'),
+        questions: const [],
+        answers: const {},
+        freeFormNotes: '',
+        strokeGroups: const [],
+      );
+      expect(out, contains('**Source:** spec.pdf'));
+      expect(out, isNot(contains('@ deadbeef')));
+    });
+
+    test('svg source is the bare basename (no @ <sha>)', () {
+      final clock = FakeClock(DateTime(2026, 4, 20, 9, 32));
+      final out = ReviewSerializer(clock: clock).buildReviewMd(
+        job: _job('spec-svg-src'),
+        source: _svg(sha: 'cafef00d'),
+        questions: const [],
+        answers: const {},
+        freeFormNotes: '',
+        strokeGroups: const [],
+      );
+      expect(out, contains('**Source:** spec.svg'));
+      expect(out, isNot(contains('@ cafef00d')));
     });
   });
 

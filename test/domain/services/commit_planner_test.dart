@@ -33,6 +33,13 @@ SpecFile _pdf({String sha = _specSha, String id = 'spec-auth'}) => SpecFile(
       sourceKind: SourceKind.pdf,
     );
 
+SpecFile _svg({String sha = _specSha, String id = 'spec-auth'}) => SpecFile(
+      path: 'jobs/pending/$id/spec.svg',
+      sha: sha,
+      contents: '',
+      sourceKind: SourceKind.svg,
+    );
+
 StrokeGroup _mdGroup({String sha = _specSha, int line = 10}) => StrokeGroup(
       id: 'g1',
       anchor: MarkdownAnchor(lineNumber: line, sourceSha: sha),
@@ -213,6 +220,80 @@ void main() {
           'jobs/pending/spec-auth/03-annotations-p10.svg',
         }).length,
         3,
+      );
+    });
+  });
+
+  group('planReview svg (non-annotatable)', () {
+    test('svg + null annotations + empty strokes -> review + CHANGELOG only',
+        () {
+      const planner = CommitPlanner();
+      final plan = planner.planReview(
+        job: _job(),
+        source: _svg(),
+        reviewMd: '# Review',
+        markdownAnnotations: null,
+        pdfAnnotations: null,
+        updatedSpecOrSidecar: '## Changelog',
+        strokeGroups: const [],
+      );
+      expect(
+        plan.writes.map((w) => w.path).toSet(),
+        {
+          'jobs/pending/spec-auth/03-review.md',
+          'jobs/pending/spec-auth/CHANGELOG.md',
+        },
+      );
+    });
+
+    test('svg + any stroke group -> CommitPlannerAnchorKindMismatch', () {
+      const planner = CommitPlanner();
+      expect(
+        () => planner.planReview(
+          job: _job(),
+          source: _svg(),
+          reviewMd: '# R',
+          markdownAnnotations: null,
+          pdfAnnotations: null,
+          updatedSpecOrSidecar: '## Changelog',
+          strokeGroups: [_mdGroup()],
+        ),
+        throwsA(isA<CommitPlannerAnchorKindMismatch>()),
+      );
+    });
+
+    test('svg + markdownAnnotations -> CommitPlannerMissingPair', () {
+      const planner = CommitPlanner();
+      expect(
+        () => planner.planReview(
+          job: _job(),
+          source: _svg(),
+          reviewMd: '# R',
+          markdownAnnotations: _mdAnnotations(),
+          pdfAnnotations: null,
+          updatedSpecOrSidecar: '## Changelog',
+          strokeGroups: const [],
+        ),
+        throwsA(isA<CommitPlannerMissingPair>()),
+      );
+    });
+
+    test('svg + pdfAnnotations -> CommitPlannerMissingPair', () {
+      const planner = CommitPlanner();
+      expect(
+        () => planner.planReview(
+          job: _job(),
+          source: _svg(),
+          reviewMd: '# R',
+          markdownAnnotations: null,
+          pdfAnnotations: PdfAnnotationSet(
+            svgByPage: {1: '<svg/>'},
+            pngByPage: {1: _png()},
+          ),
+          updatedSpecOrSidecar: '## Changelog',
+          strokeGroups: const [],
+        ),
+        throwsA(isA<CommitPlannerMissingPair>()),
       );
     });
   });
