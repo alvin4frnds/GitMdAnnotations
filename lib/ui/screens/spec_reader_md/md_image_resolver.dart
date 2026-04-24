@@ -151,7 +151,15 @@ class _MmdReferenceState extends ConsumerState<_MmdReference> {
             reason: 'Mermaid read failed: ${snap.error}',
           );
         }
-        return MermaidView(source: snap.data ?? '');
+        final source = snap.data ?? '';
+        if (source.trim().isEmpty) {
+          return _unsupportedCard(
+            context,
+            alt: widget.alt,
+            reason: 'Mermaid source is empty',
+          );
+        }
+        return MermaidView(source: source);
       },
     );
   }

@@ -47,8 +47,15 @@ class MermaidCache {
 
   /// Deterministic SHA-256 key for [source]. Public so tests can
   /// assert the caching contract without reading the filesystem.
+  ///
+  /// CRLF normalization: Windows editors emit `\r\n` line endings,
+  /// Linux/Mac emit `\n`. Users editing the same diagram across
+  /// platforms should land on the same cache entry — otherwise every
+  /// cross-platform open is a miss even when the visible content is
+  /// identical.
   static String keyFor(String source) {
-    final digest = sha256.convert(utf8.encode(source));
+    final normalized = source.replaceAll('\r\n', '\n');
+    final digest = sha256.convert(utf8.encode(normalized));
     return digest.toString();
   }
 

@@ -2,6 +2,36 @@
 
 Deferred findings from milestone QA rounds. Critical + High items are fixed before milestone close-out; Medium and Low accumulate here for the next scheduled polish pass or for opportunistic fixes during related work.
 
+## From M2c QA (2026-04-24)
+
+### Issue: MermaidView spawns duplicate WebViews for the same source
+- **Severity:** Medium
+- **Source:** M2c QA (2026-04-24)
+- **Screen/area:** `lib/ui/widgets/mermaid_view/mermaid_view.dart`.
+- **Detail:** If a document has two fenced blocks with identical source, both `MermaidView` instances race to the cache, find a miss, and spin independent WebViews to render the same diagram. Wasteful but not incorrect — the second write to the cache is an overwrite with the same bytes.
+- **Proposed fix:** Memoize in-flight renders by source SHA in a Riverpod provider so concurrent mounts await the same Future. Defer until QA shows a scenario where it actually matters.
+
+### Issue: 2.5 MB mermaid.min.js bundled into every APK
+- **Severity:** Medium
+- **Source:** M2c QA (2026-04-24)
+- **Screen/area:** `assets/js/mermaid.min.js`.
+- **Detail:** Mermaid v11 ships as a single bundle; we include the full library (flowchart, sequence, class, state, gantt, er, user-journey, gitGraph, etc). Most specs only use flowcharts.
+- **Proposed fix:** Investigate whether esbuild's tree-shake / the mermaid-core subset reduces to a fraction of the full bundle. Defer: APK size isn't the bottleneck today.
+
+### Issue: WebViewController leaks on mid-render dispose
+- **Severity:** Low
+- **Source:** M2c QA (2026-04-24)
+- **Screen/area:** `lib/ui/widgets/mermaid_view/mermaid_view.dart` — `_renderViaWebView`.
+- **Detail:** The controller is referenced only via `final _ = controller;`. If the widget disposes while the JS is running, the `mounted` guards prevent any setState, but the WebView continues to render until GC. Not a correctness issue; small memory pressure on long scrolls with many diagrams.
+- **Proposed fix:** Stash the controller as a state field and null it in dispose(). Would also let us short-circuit by abandoning the completer.
+
+### Issue: MermaidView has no widget tests (WebView path is hard to unit-test)
+- **Severity:** Low
+- **Source:** M2c QA (2026-04-24)
+- **Screen/area:** `test/ui/widgets/mermaid_view/` — missing.
+- **Detail:** `MermaidCache` and `MdMermaidBuilder` are fully tested. `MermaidView` itself is not — WebView is a platform view that doesn't render headless in flutter_test. Real end-to-end coverage requires `integration_test/`.
+- **Proposed fix:** Add an `integration_test/mermaid_render_test.dart` that mounts `MermaidView` on a real device, waits for render, and asserts the resulting SVG contains `<svg`. Defer unless a regression shows up.
+
 ## From M2b QA (2026-04-24)
 
 ### Issue: `_MarkdownPane.onSpecLoaded` name suggests one-shot but fires on every build

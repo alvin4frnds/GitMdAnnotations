@@ -17,6 +17,13 @@ void main() {
       expect(a, isNot(b));
     });
 
+    test('CRLF line endings are normalized so cache is stable across OSes',
+        () {
+      final lf = MermaidCache.keyFor('graph TD\nA-->B\n');
+      final crlf = MermaidCache.keyFor('graph TD\r\nA-->B\r\n');
+      expect(lf, crlf);
+    });
+
     test('key is a 64-hex SHA-256 digest', () {
       final k = MermaidCache.keyFor('whatever');
       expect(k, matches(RegExp(r'^[0-9a-f]{64}$')));

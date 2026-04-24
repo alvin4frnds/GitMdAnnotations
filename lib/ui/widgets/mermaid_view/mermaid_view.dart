@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -103,12 +104,13 @@ class _MermaidViewState extends ConsumerState<MermaidView> {
 
   Future<String> _buildHtml(String source) async {
     final js = await rootBundle.loadString('assets/js/mermaid.min.js');
-    // Escape back-tick + backslash + $ so the source can sit inside a
-    // JS template literal safely.
-    final escaped = source
-        .replaceAll(r'\', r'\\')
-        .replaceAll('`', r'\`')
-        .replaceAll(r'$', r'\$');
+    // Pass the source as a JSON string literal so all Unicode, quotes,
+    // backticks, backslashes, and `$`-expansions are handled by the
+    // spec-compliant JSON encoder. Then stop the HTML parser from
+    // treating a literal `</script>` inside the source as the end of
+    // the surrounding <script> tag — `<\/` is the same string for JS
+    // but invisible to the HTML tokenizer.
+    final literal = jsonEncode(source).replaceAll('</', r'<\/');
     return '''
 <!DOCTYPE html>
 <html>
@@ -123,7 +125,7 @@ class _MermaidViewState extends ConsumerState<MermaidView> {
   (function () {
     try {
       mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
-      mermaid.render('m', `$escaped`).then(function (result) {
+      mermaid.render('m', $literal).then(function (result) {
         MermaidBridge.postMessage(result.svg);
       }).catch(function (err) {
         MermaidBridge.postMessage('ERR:' + (err && err.message ? err.message : String(err)));
