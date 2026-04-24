@@ -1,9 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../app/providers/spec_providers.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/mermaid_view/mermaid_view.dart';
 
 /// Resolves a markdown `![alt](uri)` reference to a widget, used as
 /// `flutter_markdown`'s `imageBuilder` callback. Pure: takes the URI +
@@ -52,14 +55,10 @@ Widget resolveInlineImage({
             const SizedBox(height: 24, child: LinearProgressIndicator()),
       );
     case '.mmd':
-      // Milestone C replaces this with a MermaidView that reads the file
-      // and runs the renderer. Until then, a stable-height placeholder so
-      // scroll position doesn't jump when C lands.
-      return _placeholderCard(
-        context,
-        title: 'Mermaid preview pending',
-        body: alt ?? _basename(absPath),
-      );
+      // Milestone C: read the referenced `.mmd` file and hand its source
+      // to MermaidView. Stable-height placeholder during the async read
+      // so scroll position doesn't jump.
+      return _MmdReference(absPath: absPath, alt: alt);
     default:
       return _unsupportedCard(
         context,
@@ -110,6 +109,52 @@ String _extension(String path) {
 String _basename(String path) {
   final slash = path.lastIndexOf(RegExp(r'[/\\]'));
   return slash < 0 ? path : path.substring(slash + 1);
+}
+
+/// Consumes `FileSystemPort.readString(absPath)` and hands the contents
+/// to [MermaidView]. Stateful wrapper so the async read happens exactly
+/// once per mount and scroll-position stays stable.
+class _MmdReference extends ConsumerStatefulWidget {
+  const _MmdReference({required this.absPath, required this.alt});
+  final String absPath;
+  final String? alt;
+
+  @override
+  ConsumerState<_MmdReference> createState() => _MmdReferenceState();
+}
+
+class _MmdReferenceState extends ConsumerState<_MmdReference> {
+  late Future<String> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = ref.read(fileSystemProvider).readString(widget.absPath);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return _placeholderCard(
+            context,
+            title: 'Reading Mermaid source…',
+            body: widget.alt ?? _basename(widget.absPath),
+          );
+        }
+        if (snap.hasError) {
+          return _unsupportedCard(
+            context,
+            alt: widget.alt,
+            reason: 'Mermaid read failed: ${snap.error}',
+          );
+        }
+        return MermaidView(source: snap.data ?? '');
+      },
+    );
+  }
 }
 
 Widget _placeholderCard(

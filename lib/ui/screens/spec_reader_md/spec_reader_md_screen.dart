@@ -18,6 +18,7 @@ import '../annotation_canvas/annotation_canvas_screen.dart';
 import '../review_panel/review_panel_screen.dart';
 import '../submit_confirmation/submit_confirmation_screen.dart';
 import 'md_image_resolver.dart';
+import 'md_mermaid_builder.dart';
 
 /// Spec-002 Milestone B view-mode toggle on the markdown reader.
 enum MdViewMode { preview, split, edit }
@@ -1027,6 +1028,9 @@ class _MarkdownBodyView extends StatelessWidget {
         shrinkWrap: false,
         selectable: false,
         styleSheet: _styleSheet(context),
+        builders: {
+          'code': MdMermaidBuilder(),
+        },
         sizedImageBuilder: (config) => resolveInlineImage(
           uri: config.uri,
           specPath: spec.path,

@@ -66,6 +66,20 @@ dependencies:
   # builds the `pw.Document` directly because the composer is pure-Dart
   # and runs on the caller's isolate at submit time.
   pdf: ^3.11.3
+  # Spec-002 Milestone C: Mermaid renderer. No pure-Dart Mermaid engine
+  # exists; we host a headless WebView that loads a bundled
+  # mermaid.min.js (see assets/js/) and returns the rendered SVG via a
+  # JS channel. Consumed only from lib/ui/widgets/mermaid_view/.
+  webview_flutter: ^4.10.0
+  # SHA-256 cache key for the Mermaid SVG cache (MermaidCache reads/
+  # writes app-docs/mermaid-cache/<sha>.svg). Consumed only from
+  # lib/domain/services/mermaid_cache.dart.
+  crypto: ^3.0.5
+  # Transitive dep of flutter_markdown, referenced directly by
+  # MdMermaidBuilder to type its `md.Element` parameter. Pinned at any
+  # ^7.x so it resolves against the same version flutter_markdown
+  # already uses.
+  markdown: ^7.2.2
 
 dev_dependencies:
   flutter_test:
@@ -117,6 +131,10 @@ flutter:
     # `integration_test/fixtures/` directory during a
     # `flutter test integration_test/...` run.
     - integration_test/fixtures/hello.pdf
+    # Spec-002 Milestone C: bundled Mermaid renderer. Shipped offline
+    # so the tablet can render `.mmd` / ```mermaid fenced blocks
+    # without network access.
+    - assets/js/mermaid.min.js
     # Mozilla's Trust Store (from https://curl.se/docs/caextract.html).
     # Our forked libgit2 is linked against mbedTLS 2.28 which does not
     # ship a CA bundle, and Android's system CA directory lives under

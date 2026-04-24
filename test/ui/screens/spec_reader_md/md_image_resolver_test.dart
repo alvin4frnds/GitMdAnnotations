@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gitmdscribe/app/providers/spec_providers.dart';
+import 'package:gitmdscribe/domain/fakes/fake_file_system.dart';
 import 'package:gitmdscribe/ui/screens/spec_reader_md/md_image_resolver.dart';
 
 Future<Widget> _resolveInScaffold(
@@ -9,22 +12,28 @@ Future<Widget> _resolveInScaffold(
   required String specPath,
   String? alt,
   String? title,
+  FakeFileSystem? fs,
 }) async {
   late Widget resolved;
   await tester.pumpWidget(
-    MaterialApp(
-      home: Scaffold(
-        body: Builder(
-          builder: (ctx) {
-            resolved = resolveInlineImage(
-              uri: uri,
-              specPath: specPath,
-              context: ctx,
-              alt: alt,
-              title: title,
-            );
-            return resolved;
-          },
+    ProviderScope(
+      overrides: [
+        fileSystemProvider.overrideWithValue(fs ?? FakeFileSystem()),
+      ],
+      child: MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) {
+              resolved = resolveInlineImage(
+                uri: uri,
+                specPath: specPath,
+                context: ctx,
+                alt: alt,
+                title: title,
+              );
+              return resolved;
+            },
+          ),
         ),
       ),
     ),
@@ -86,16 +95,20 @@ void main() {
       );
     });
 
-    testWidgets('.mmd extension returns a placeholder card (pre-Milestone-C)',
+    testWidgets('.mmd extension shows a stable-height reading placeholder '
+        'while the file read is in flight (Milestone C)',
         (tester) async {
+      final fs = FakeFileSystem()
+        ..seedFile('/repo/diagrams/flow.mmd', 'graph TD\nA-->B\n');
       await _resolveInScaffold(
         tester,
         uri: Uri.parse('diagrams/flow.mmd'),
         specPath: '/repo/s.md',
         alt: 'flow diagram',
+        fs: fs,
       );
-      expect(find.text('Mermaid preview pending'), findsOneWidget);
-      // The alt text is shown as the body.
+      // First frame: FutureBuilder still loading → placeholder visible.
+      expect(find.text('Reading Mermaid source…'), findsOneWidget);
       expect(find.text('flow diagram'), findsOneWidget);
     });
 
