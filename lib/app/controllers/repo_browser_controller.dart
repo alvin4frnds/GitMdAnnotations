@@ -4,7 +4,8 @@ import '../../domain/ports/file_system_port.dart';
 import '../providers/spec_providers.dart';
 
 /// One row in the repo-file browser — either a directory the user can
-/// enter or a `.md` / `.pdf` file they can convert to a spec.
+/// enter or a `.md` / `.pdf` / `.svg` file (spec-002). SVG files are
+/// view-only (non-annotatable) and can't be converted to specs.
 class RepoBrowserEntry {
   const RepoBrowserEntry({
     required this.name,
@@ -120,6 +121,7 @@ class RepoBrowserController extends AutoDisposeAsyncNotifier<RepoBrowserState> {
     final lower = name.toLowerCase();
     return lower.endsWith('.md') ||
         lower.endsWith('.markdown') ||
-        lower.endsWith('.pdf');
+        lower.endsWith('.pdf') ||
+        lower.endsWith('.svg');
   }
 }
