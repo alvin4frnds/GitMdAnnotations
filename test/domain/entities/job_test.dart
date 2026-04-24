@@ -66,8 +66,11 @@ void main() {
   });
 
   group('SourceKind', () {
-    test('has markdown and pdf values', () {
-      expect(SourceKind.values, [SourceKind.markdown, SourceKind.pdf]);
+    test('has markdown, pdf, and svg values', () {
+      expect(
+        SourceKind.values,
+        [SourceKind.markdown, SourceKind.pdf, SourceKind.svg],
+      );
     });
   });
 }

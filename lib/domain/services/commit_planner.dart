@@ -80,50 +80,63 @@ class CommitPlanner {
     MarkdownAnnotations? md,
     PdfAnnotationSet? pdf,
   ) sync* {
-    if (source.sourceKind == SourceKind.markdown) {
-      // Four artifacts per submit:
-      //   .svg — legacy vector (IMPLEMENTATION.md §3.4)
-      //   .png — legacy flattened raster (§4.5)
-      //   .pdf — composite markdown-background + vector-stroke overlay
-      //   .json — format-agnostic sidecar (anchors + stroke points)
-      // The `.svg` + `.png` pair stays until downstream tooling is
-      // confirmed PDF/JSON-ready; then the planner trims to just the
-      // new pair.
-      yield PlannedTextWrite(
-          path: _p(job, '03-annotations.svg'), contents: md!.svg);
-      yield PlannedBinaryWrite(
-          path: _p(job, '03-annotations.png'), bytes: md.png);
-      yield PlannedBinaryWrite(
-          path: _p(job, '03-annotations.pdf'), bytes: md.pdf);
-      yield PlannedTextWrite(
-          path: _p(job, '03-annotations.json'), contents: md.json);
-      return;
-    }
-    final pages = pdf!.svgByPage.keys.toList()..sort();
-    for (final page in pages) {
-      yield PlannedTextWrite(
-          path: _p(job, '03-annotations-p$page.svg'),
-          contents: pdf.svgByPage[page]!);
-      yield PlannedBinaryWrite(
-          path: _p(job, '03-annotations-p$page.png'),
-          bytes: pdf.pngByPage[page]!);
+    switch (source.sourceKind) {
+      case SourceKind.markdown:
+        // Four artifacts per submit:
+        //   .svg — legacy vector (IMPLEMENTATION.md §3.4)
+        //   .png — legacy flattened raster (§4.5)
+        //   .pdf — composite markdown-background + vector-stroke overlay
+        //   .json — format-agnostic sidecar (anchors + stroke points)
+        // The `.svg` + `.png` pair stays until downstream tooling is
+        // confirmed PDF/JSON-ready; then the planner trims to just the
+        // new pair.
+        yield PlannedTextWrite(
+            path: _p(job, '03-annotations.svg'), contents: md!.svg);
+        yield PlannedBinaryWrite(
+            path: _p(job, '03-annotations.png'), bytes: md.png);
+        yield PlannedBinaryWrite(
+            path: _p(job, '03-annotations.pdf'), bytes: md.pdf);
+        yield PlannedTextWrite(
+            path: _p(job, '03-annotations.json'), contents: md.json);
+      case SourceKind.pdf:
+        final pages = pdf!.svgByPage.keys.toList()..sort();
+        for (final page in pages) {
+          yield PlannedTextWrite(
+              path: _p(job, '03-annotations-p$page.svg'),
+              contents: pdf.svgByPage[page]!);
+          yield PlannedBinaryWrite(
+              path: _p(job, '03-annotations-p$page.png'),
+              bytes: pdf.pngByPage[page]!);
+        }
+      case SourceKind.svg:
+        // Non-annotatable — the SVG reader never offers Submit; pairing
+        // guard asserts md == null && pdf == null so no artifacts are
+        // emitted.
+        return;
     }
   }
 
   String _changelogTarget(JobRef job, SpecFile source) {
-    if (source.sourceKind == SourceKind.pdf) {
-      return _p(job, 'CHANGELOG.md');
+    // PDF and SVG both use a sibling CHANGELOG.md because their source
+    // files can't host an embedded `## Changelog` section. Markdown
+    // folds the changelog back into the spec's own trailing section.
+    switch (source.sourceKind) {
+      case SourceKind.pdf:
+      case SourceKind.svg:
+        return _p(job, 'CHANGELOG.md');
+      case SourceKind.markdown:
+        // `source.path` is an absolute filesystem path
+        // (`<workdir>/jobs/pending/<jobId>/02-spec.md`) because
+        // SpecRepository builds it by joining `workdir`. Using it
+        // verbatim as the commit target makes git store a file at the
+        // full absolute path (minus leading `/`) INSIDE the repo tree,
+        // polluting the branch with a deep nested dupe of the real
+        // spec. Only the last path segment is meaningful — the
+        // jobs-pending prefix is stable (see [_p]) and the basename is
+        // either `02-spec.md` or `04-spec-v<N>.md` per
+        // IMPLEMENTATION.md §3.2.
+        return _p(job, _basename(source.path));
     }
-    // `source.path` is an absolute filesystem path
-    // (`<workdir>/jobs/pending/<jobId>/02-spec.md`) because SpecRepository
-    // builds it by joining `workdir`. Using it verbatim as the commit
-    // target makes git store a file at the full absolute path (minus
-    // leading `/`) INSIDE the repo tree, polluting the branch with
-    // a deep nested dupe of the real spec. Only the last path segment
-    // is meaningful for the commit — the jobs-pending prefix is stable
-    // (see [_p]) and the basename is either `02-spec.md` or
-    // `04-spec-v<N>.md` per IMPLEMENTATION.md §3.2.
-    return _p(job, _basename(source.path));
   }
 
   String _basename(String path) {
@@ -139,16 +152,24 @@ class CommitPlanner {
     MarkdownAnnotations? md,
     PdfAnnotationSet? pdf,
   ) {
-    final isMd = source.sourceKind == SourceKind.markdown;
-    if (isMd && (md == null || pdf != null)) {
-      throw const CommitPlannerMissingPair(
-          'markdown source requires markdownAnnotations and null pdfAnnotations');
+    switch (source.sourceKind) {
+      case SourceKind.markdown:
+        if (md == null || pdf != null) {
+          throw const CommitPlannerMissingPair(
+              'markdown source requires markdownAnnotations and null pdfAnnotations');
+        }
+      case SourceKind.pdf:
+        if (pdf == null || md != null) {
+          throw const CommitPlannerMissingPair(
+              'pdf source requires pdfAnnotations and null markdownAnnotations');
+        }
+        _assertPdfPageSetsMatch(pdf);
+      case SourceKind.svg:
+        if (md != null || pdf != null) {
+          throw const CommitPlannerMissingPair(
+              'svg source is non-annotatable; markdownAnnotations and pdfAnnotations must both be null');
+        }
     }
-    if (!isMd && (pdf == null || md != null)) {
-      throw const CommitPlannerMissingPair(
-          'pdf source requires pdfAnnotations and null markdownAnnotations');
-    }
-    if (!isMd) _assertPdfPageSetsMatch(pdf!);
   }
 
   void _assertPdfPageSetsMatch(PdfAnnotationSet set) {
@@ -160,10 +181,15 @@ class CommitPlanner {
   }
 
   void _assertAnchorsMatchSource(SpecFile source, List<StrokeGroup> groups) {
-    final isMd = source.sourceKind == SourceKind.markdown;
     for (final g in groups) {
       final anchor = g.anchor;
-      final kindOk = isMd ? anchor is MarkdownAnchor : anchor is PdfAnchor;
+      final kindOk = switch (source.sourceKind) {
+        SourceKind.markdown => anchor is MarkdownAnchor,
+        SourceKind.pdf => anchor is PdfAnchor,
+        // SVG is non-annotatable — any stroke with an SVG source is a
+        // bug in the caller.
+        SourceKind.svg => false,
+      };
       if (!kindOk) throw CommitPlannerAnchorKindMismatch(groupId: g.id);
       if (anchor.sourceSha != source.sha) {
         throw CommitPlannerAnchorShaMismatch(

@@ -176,10 +176,13 @@ class ReviewSubmitter {
     required SpecFile source,
     required String description,
   }) async {
+    // Markdown folds its changelog back into the spec body; PDF and SVG
+    // use a sibling CHANGELOG.md because their source files can't host an
+    // embedded `## Changelog` section.
     final existing = await _readExisting(
-      source.sourceKind == SourceKind.pdf
-          ? 'jobs/pending/${job.jobId}/CHANGELOG.md'
-          : source.path,
+      source.sourceKind == SourceKind.markdown
+          ? source.path
+          : 'jobs/pending/${job.jobId}/CHANGELOG.md',
     );
     return const ChangelogWriter().append(
       existing.isEmpty && source.sourceKind == SourceKind.markdown

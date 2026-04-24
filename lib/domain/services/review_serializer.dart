@@ -87,15 +87,19 @@ class ReviewSerializer {
     return _trimTrailingBlankLines(buf.toString());
   }
 
-  /// §3.5 reading: markdown source → `02-spec.md @ <sha>`; PDF source →
-  /// `spec.pdf` with no `@ <sha>` segment. Filename is the basename of
-  /// [source.path] so the canonical `jobs/pending/...` prefix is stripped.
+  /// §3.5 reading: markdown source → `02-spec.md @ <sha>`; PDF / SVG source
+  /// → bare `spec.pdf` / `spec.svg` with no `@ <sha>` segment. Filename is
+  /// the basename of [source.path] so the canonical `jobs/pending/...`
+  /// prefix is stripped.
   String _sourceLine(SpecFile source) {
     final name = _basename(source.path);
-    if (source.sourceKind == SourceKind.pdf) {
-      return name;
+    switch (source.sourceKind) {
+      case SourceKind.pdf:
+      case SourceKind.svg:
+        return name;
+      case SourceKind.markdown:
+        return '$name @ ${source.sha}';
     }
-    return '$name @ ${source.sha}';
   }
 
   String _basename(String path) {

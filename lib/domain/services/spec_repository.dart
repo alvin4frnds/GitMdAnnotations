@@ -69,6 +69,7 @@ class SpecRepository {
     if (rev != null) return _loadMarkdown('$dir/$rev');
     if (names.contains('02-spec.md')) return _loadMarkdown('$dir/02-spec.md');
     if (names.contains('spec.pdf')) return _loadPdf('$dir/spec.pdf');
+    if (names.contains('spec.svg')) return _loadSvg('$dir/spec.svg');
     throw SpecNotFound(job);
   }
 
@@ -84,7 +85,8 @@ class SpecRepository {
     if (names.contains('02-spec.md')) {
       return parseChangelog(await fs.readString('$dir/02-spec.md'));
     }
-    if (names.contains('spec.pdf') && names.contains('CHANGELOG.md')) {
+    if ((names.contains('spec.pdf') || names.contains('spec.svg')) &&
+        names.contains('CHANGELOG.md')) {
       return parseChangelog(await fs.readString('$dir/CHANGELOG.md'));
     }
     return const [];
@@ -103,6 +105,7 @@ class SpecRepository {
 
   SourceKind? _detectSourceKind(Set<String> names) {
     if (names.contains('spec.pdf')) return SourceKind.pdf;
+    if (names.contains('spec.svg')) return SourceKind.svg;
     if (names.contains('02-spec.md') ||
         names.any(_revisionPattern.hasMatch)) {
       return SourceKind.markdown;
@@ -110,8 +113,9 @@ class SpecRepository {
     return null;
   }
 
-  /// Thin wrapper around [Phase.resolve]. For PDF-only folders (no markdown
-  /// signal), mirrors the same truth table with `spec.pdf` as Phase.spec.
+  /// Thin wrapper around [Phase.resolve]. For PDF-only or SVG-only folders
+  /// (no markdown signal), mirrors the same truth table with `spec.pdf` /
+  /// `spec.svg` as Phase.spec.
   Phase? _resolvePhase(Set<String> names) {
     try {
       return Phase.resolve(names);
@@ -120,6 +124,7 @@ class SpecRepository {
       if (names.any(_revisionPattern.hasMatch)) return Phase.revised;
       if (names.contains('03-review.md')) return Phase.review;
       if (names.contains('spec.pdf')) return Phase.spec;
+      if (names.contains('spec.svg')) return Phase.spec;
       return null;
     }
   }
@@ -156,6 +161,20 @@ class SpecRepository {
       sha: _contentSha(bytes),
       contents: base64.encode(bytes),
       sourceKind: SourceKind.pdf,
+    );
+  }
+
+  /// SVG is plain XML on disk but SpecFile.contents isn't consumed for
+  /// SVG-kind specs (non-annotatable — the reader opens the file directly
+  /// from [path]). Keep the loader symmetric with [_loadPdf] so callers get
+  /// a content-hash seeded from the raw bytes.
+  Future<SpecFile> _loadSvg(String path) async {
+    final bytes = await fs.readBytes(path);
+    return SpecFile(
+      path: path,
+      sha: _contentSha(bytes),
+      contents: base64.encode(bytes),
+      sourceKind: SourceKind.svg,
     );
   }
 

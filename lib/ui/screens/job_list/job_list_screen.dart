@@ -23,6 +23,7 @@ import '../repo_browser/repo_browser_screen.dart';
 import '../settings/settings_screen.dart';
 import '../spec_reader_md/spec_reader_md_screen.dart';
 import '../spec_reader_pdf/spec_reader_pdf_screen.dart';
+import '../spec_reader_svg/spec_reader_svg_screen.dart';
 
 /// Screen 3 — Job list / pending specs. T12 replaces the inline stub data
 /// with [jobListControllerProvider]; phase/sourceKind colour mapping lives
@@ -906,6 +907,10 @@ class _JobRow extends ConsumerWidget {
           jobRef: job.ref,
           filePath: '$workdir/jobs/pending/${job.ref.jobId}/spec.pdf',
         ),
+      SourceKind.svg => SpecReaderSvgScreen(
+          jobRef: job.ref,
+          filePath: '$workdir/jobs/pending/${job.ref.jobId}/spec.svg',
+        ),
     };
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -1126,7 +1131,11 @@ class _FileKindChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final label = kind == SourceKind.markdown ? '.md' : '.pdf';
+    final label = switch (kind) {
+      SourceKind.markdown => '.md',
+      SourceKind.pdf => '.pdf',
+      SourceKind.svg => '.svg',
+    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
