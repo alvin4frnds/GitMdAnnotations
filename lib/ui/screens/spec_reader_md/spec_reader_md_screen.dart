@@ -1029,7 +1029,7 @@ class _MarkdownBodyView extends StatelessWidget {
         selectable: false,
         styleSheet: _styleSheet(context),
         builders: {
-          'code': MdMermaidBuilder(),
+          'pre': MdMermaidBuilder(),
         },
         sizedImageBuilder: (config) => resolveInlineImage(
           uri: config.uri,

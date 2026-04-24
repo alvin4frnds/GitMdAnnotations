@@ -19,14 +19,27 @@ Future<BuildContext> _aContext(WidgetTester tester) async {
   return ctx;
 }
 
+md.Element _preWithCode({
+  required String source,
+  required String? languageClass,
+}) {
+  final code = md.Element.text('code', source);
+  if (languageClass != null) {
+    code.attributes['class'] = languageClass;
+  }
+  return md.Element('pre', [code]);
+}
+
 void main() {
   group('MdMermaidBuilder.visitElementAfterWithContext', () {
     testWidgets(
-      'returns a MermaidView for class="language-mermaid" code',
+      'returns a MermaidView for pre > code.language-mermaid',
       (tester) async {
         final ctx = await _aContext(tester);
-        final element = md.Element.text('code', 'graph TD\nA-->B')
-          ..attributes['class'] = 'language-mermaid';
+        final element = _preWithCode(
+          source: 'graph TD\nA-->B',
+          languageClass: 'language-mermaid',
+        );
         final widget = MdMermaidBuilder()
             .visitElementAfterWithContext(ctx, element, null, null);
         expect(widget, isA<MermaidView>());
@@ -35,12 +48,14 @@ void main() {
     );
 
     testWidgets(
-      'returns null for non-mermaid code so flutter_markdown falls back '
-      'to the default pre/code renderer',
+      'returns null for non-mermaid fenced code so flutter_markdown '
+      'falls back to the default pre/code renderer',
       (tester) async {
         final ctx = await _aContext(tester);
-        final element = md.Element.text('code', 'print("hi")')
-          ..attributes['class'] = 'language-dart';
+        final element = _preWithCode(
+          source: 'print("hi")',
+          languageClass: 'language-dart',
+        );
         final widget = MdMermaidBuilder()
             .visitElementAfterWithContext(ctx, element, null, null);
         expect(widget, isNull);
@@ -48,10 +63,10 @@ void main() {
     );
 
     testWidgets(
-      'returns null for a code block with no class attribute',
+      'returns null for a fenced code block with no language class',
       (tester) async {
         final ctx = await _aContext(tester);
-        final element = md.Element.text('code', 'plain text');
+        final element = _preWithCode(source: 'plain text', languageClass: null);
         final widget = MdMermaidBuilder()
             .visitElementAfterWithContext(ctx, element, null, null);
         expect(widget, isNull);
@@ -59,11 +74,29 @@ void main() {
     );
 
     testWidgets(
-      'returns null for an empty mermaid code block',
+      'returns null for an empty mermaid fence',
       (tester) async {
         final ctx = await _aContext(tester);
-        final element = md.Element.text('code', '   \n  ')
-          ..attributes['class'] = 'language-mermaid';
+        final element = _preWithCode(
+          source: '   \n  ',
+          languageClass: 'language-mermaid',
+        );
+        final widget = MdMermaidBuilder()
+            .visitElementAfterWithContext(ctx, element, null, null);
+        expect(widget, isNull);
+      },
+    );
+
+    testWidgets(
+      'returns null when pre wraps something other than a single code child',
+      (tester) async {
+        final ctx = await _aContext(tester);
+        // Unusual shape — pre with two code children. Shouldn't crash
+        // and should fall back to default rendering.
+        final element = md.Element('pre', [
+          md.Element.text('code', 'first'),
+          md.Element.text('code', 'second'),
+        ]);
         final widget = MdMermaidBuilder()
             .visitElementAfterWithContext(ctx, element, null, null);
         expect(widget, isNull);
