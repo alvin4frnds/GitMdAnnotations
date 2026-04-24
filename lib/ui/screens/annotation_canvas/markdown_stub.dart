@@ -7,6 +7,8 @@ import '../../../domain/entities/job_ref.dart';
 import '../../../domain/entities/spec_file.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../spec_reader_md/md_image_resolver.dart';
+import '../spec_reader_md/md_mermaid_builder.dart';
 
 /// Renders the full spec markdown behind the ink overlay so the user can
 /// annotate every heading, paragraph, bullet, and code block — not just a
@@ -62,6 +64,16 @@ class _SpecMarkdown extends StatelessWidget {
       shrinkWrap: true,
       selectable: false,
       styleSheet: _styleSheet(context),
+      builders: {
+        'pre': MdMermaidBuilder(),
+      },
+      sizedImageBuilder: (config) => resolveInlineImage(
+        uri: config.uri,
+        specPath: spec.path,
+        context: context,
+        title: config.title,
+        alt: config.alt,
+      ),
     );
   }
 

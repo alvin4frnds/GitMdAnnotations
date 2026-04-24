@@ -1,33 +1,41 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, Factory, TargetPlatform;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../app/providers/spec_providers.dart';
 import '../../../domain/services/mermaid_cache.dart';
 import '../../theme/tokens.dart';
 
-/// Renders a Mermaid diagram (spec-002 Milestone C).
+/// Renders a Mermaid diagram inline via a sized [WebViewWidget]
+/// (spec-002 Milestone C).
 ///
-/// On first render of a given source, spins up a headless
-/// [WebViewController] that loads a small HTML shell referencing the
-/// bundled `assets/js/mermaid.min.js`, invokes `mermaid.render()`, and
-/// hands the resulting SVG back via a JS channel. The SVG is cached in
-/// app-docs (see [MermaidCache]) so cold re-opens of the same document
-/// render from disk in one frame.
+/// Why WebView over flutter_svg: Mermaid emits `<foreignObject>` (HTML
+/// labels inside SVG), `<marker>` (arrowheads), and embedded `<style>`
+/// CSS — none of which flutter_svg supports. Rendering via the same
+/// browser engine the mermaid.js library was written for is the only
+/// way to get pixel-perfect fidelity with desktop tools.
 ///
-/// Cache-hit path skips the WebView entirely — [SvgPicture.string] is
-/// used directly. Cache-miss shows a stable-height "Rendering…"
-/// placeholder so scrolling doesn't jump when the SVG lands.
+/// Flow:
+///   1. Build an HTML page with the bundled mermaid.min.js + the
+///      source (or the pre-rendered SVG from cache).
+///   2. Load into a WebView.
+///   3. After render, JS measures the SVG bbox and posts `{w, h}` back
+///      via [MermaidBridge].
+///   4. Flutter sets the WebView's height to match the natural
+///      aspect ratio at parent width. Parent scroll is preserved by
+///      swallowing vertical drags before the WebView sees them.
 class MermaidView extends ConsumerStatefulWidget {
   const MermaidView({required this.source, super.key});
 
-  /// The raw Mermaid source (e.g. `graph TD; A-->B`). Used both as the
-  /// cache key (verbatim) and the payload passed to `mermaid.render()`.
+  /// The raw Mermaid source. Used both as the cache key and the
+  /// payload rendered into the HTML page.
   final String source;
 
   @override
@@ -35,88 +43,103 @@ class MermaidView extends ConsumerStatefulWidget {
 }
 
 class _MermaidViewState extends ConsumerState<MermaidView> {
-  String? _svg;
+  WebViewController? _controller;
+  double? _naturalWidth;
+  double? _naturalHeight;
   String? _error;
+  bool _ready = false;
 
   @override
   void initState() {
     super.initState();
-    _start();
+    _bootstrap();
   }
 
   @override
   void didUpdateWidget(covariant MermaidView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.source != widget.source) {
-      _svg = null;
-      _error = null;
-      _start();
+      setState(() {
+        _controller = null;
+        _naturalWidth = null;
+        _naturalHeight = null;
+        _error = null;
+        _ready = false;
+      });
+      _bootstrap();
     }
   }
 
-  Future<void> _start() async {
+  Future<void> _bootstrap() async {
     final cache = MermaidCache(fs: ref.read(fileSystemProvider));
     final cached = await cache.read(widget.source);
     if (!mounted) return;
-    if (cached != null) {
-      setState(() => _svg = cached);
-      return;
-    }
-    await _renderViaWebView(cache);
-  }
 
-  Future<void> _renderViaWebView(MermaidCache cache) async {
-    final completer = Completer<String>();
-    final html = await _buildHtml(widget.source);
+    final html = cached != null
+        ? await _buildSvgOnlyHtml(cached)
+        : await _buildRenderHtml(widget.source);
+
     final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0x00000000))
       ..addJavaScriptChannel(
         'MermaidBridge',
-        onMessageReceived: (msg) {
-          if (completer.isCompleted) return;
-          if (msg.message.startsWith('ERR:')) {
-            completer.completeError(
-              StateError(msg.message.substring(4)),
-            );
-            return;
-          }
-          completer.complete(msg.message);
-        },
+        onMessageReceived: (msg) => _onBridgeMessage(msg, cache, cached != null),
       )
       ..loadHtmlString(html);
-    // Keep a local reference so the WebView isn't GC'd while it runs
-    // the render. The controller is released once the completer
-    // settles.
-    // ignore: unused_local_variable
-    final _ = controller;
+
+    if (!mounted) return;
+    setState(() => _controller = controller);
+  }
+
+  void _onBridgeMessage(
+    JavaScriptMessage msg,
+    MermaidCache cache,
+    bool wasCacheHit,
+  ) {
+    if (!mounted) return;
+    final payload = msg.message;
+    if (payload.startsWith('ERR:')) {
+      setState(() => _error = payload.substring(4));
+      return;
+    }
     try {
-      final svg = await completer.future
-          .timeout(const Duration(seconds: 15));
-      await cache.write(widget.source, svg);
-      if (!mounted) return;
-      setState(() => _svg = svg);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.toString());
+      final decoded = jsonDecode(payload) as Map<String, dynamic>;
+      final svg = (decoded['svg'] as String?) ?? '';
+      final w = (decoded['w'] as num?)?.toDouble() ?? 0.0;
+      final h = (decoded['h'] as num?)?.toDouble() ?? 0.0;
+      if (w <= 0 || h <= 0) {
+        setState(() => _error = 'Mermaid returned zero-sized output');
+        return;
+      }
+      // On a cold render, persist the SVG so the next open is a hit.
+      if (!wasCacheHit && svg.isNotEmpty) {
+        // Fire-and-forget; best-effort cache.
+        // ignore: unawaited_futures
+        cache.write(widget.source, svg);
+      }
+      setState(() {
+        _naturalWidth = w;
+        _naturalHeight = h;
+        _ready = true;
+      });
+    } on FormatException {
+      setState(() => _error = 'Mermaid bridge payload malformed: $payload');
     }
   }
 
-  Future<String> _buildHtml(String source) async {
+  /// Full-fat renderer: loads mermaid.min.js, renders the source, then
+  /// measures the SVG bbox and reports {svg, w, h} back to Flutter.
+  Future<String> _buildRenderHtml(String source) async {
     final js = await rootBundle.loadString('assets/js/mermaid.min.js');
-    // Pass the source as a JSON string literal so all Unicode, quotes,
-    // backticks, backslashes, and `$`-expansions are handled by the
-    // spec-compliant JSON encoder. Then stop the HTML parser from
-    // treating a literal `</script>` inside the source as the end of
-    // the surrounding <script> tag — `<\/` is the same string for JS
-    // but invisible to the HTML tokenizer.
     final literal = jsonEncode(source).replaceAll('</', r'<\/');
     return '''
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <style>body{margin:0;padding:0;background:transparent;}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>$_pageCss</style>
   <script>$js</script>
 </head>
 <body>
@@ -124,9 +147,11 @@ class _MermaidViewState extends ConsumerState<MermaidView> {
 <script>
   (function () {
     try {
-      mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
+      mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'dark' });
       mermaid.render('m', $literal).then(function (result) {
-        MermaidBridge.postMessage(result.svg);
+        var host = document.getElementById('out');
+        host.innerHTML = result.svg;
+        ${_measureAndReportJs(reportSvg: true)}
       }).catch(function (err) {
         MermaidBridge.postMessage('ERR:' + (err && err.message ? err.message : String(err)));
       });
@@ -140,32 +165,142 @@ class _MermaidViewState extends ConsumerState<MermaidView> {
 ''';
   }
 
+  /// Cache-hit renderer: no mermaid.min.js load, just injects the
+  /// already-rendered SVG and measures/reports its natural size.
+  Future<String> _buildSvgOnlyHtml(String svg) async {
+    // The cached SVG might itself contain `</script>` inside CDATA; the
+    // JSON-encode + `</\/` swap handles it.
+    final literal = jsonEncode(svg).replaceAll('</', r'<\/');
+    return '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>$_pageCss</style>
+</head>
+<body>
+<div id="out"></div>
+<script>
+  (function () {
+    try {
+      var host = document.getElementById('out');
+      host.innerHTML = $literal;
+      ${_measureAndReportJs(reportSvg: false)}
+    } catch (err) {
+      MermaidBridge.postMessage('ERR:' + (err && err.message ? err.message : String(err)));
+    }
+  })();
+</script>
+</body>
+</html>
+''';
+  }
+
+  /// CSS shared by both render-HTML variants. Keeps the page flush to
+  /// the WebView bounds, sets a transparent background (so the Flutter
+  /// surface color shows through), and stretches the SVG to full width.
+  static const String _pageCss = '''
+html, body { margin: 0; padding: 0; background: transparent; }
+body { color: #E5E7EB; font-family: -apple-system, Segoe UI, Roboto, sans-serif; }
+#out { width: 100%; }
+#out svg { width: 100% !important; height: auto !important; display: block; }
+''';
+
+  /// JS that measures the SVG bbox in the document and posts back to
+  /// Flutter. When [reportSvg] is true, the SVG's outerHTML is also
+  /// included so Flutter can persist it to the cache.
+  static String _measureAndReportJs({required bool reportSvg}) {
+    return '''
+        var svgEl = document.querySelector('#out svg');
+        if (!svgEl) {
+          MermaidBridge.postMessage('ERR:no svg produced');
+          return;
+        }
+        // Prefer the intrinsic viewBox — width/height attrs may be
+        // percentages after the CSS rule above stretches the svg.
+        var vb = svgEl.viewBox && svgEl.viewBox.baseVal;
+        var w = (vb && vb.width) || svgEl.getBoundingClientRect().width;
+        var h = (vb && vb.height) || svgEl.getBoundingClientRect().height;
+        var payload = { w: w, h: h ${reportSvg ? ", svg: svgEl.outerHTML" : ""} };
+        MermaidBridge.postMessage(JSON.stringify(payload));
+''';
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final svg = _svg;
-    final error = _error;
-    if (svg != null) {
-      return Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: t.borderSubtle),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: SvgPicture.string(svg),
-      );
+    if (_error != null) {
+      return _ErrorCard(message: _error!);
     }
-    if (error != null) {
-      return _ErrorCard(message: error, source: widget.source);
+    final controller = _controller;
+    if (controller == null) {
+      return _PlaceholderCard(title: 'Rendering Mermaid diagram…');
     }
-    return _PlaceholderCard(source: widget.source);
+    // Build on LayoutBuilder to know the parent's available width, so
+    // we can hand the WebView a height that preserves the diagram's
+    // natural aspect ratio at that width.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final nw = _naturalWidth;
+        final nh = _naturalHeight;
+        // Fallback height until the JS bbox bounces back.
+        final computedHeight = (nw != null && nh != null && nw > 0)
+            ? constraints.maxWidth * (nh / nw)
+            : 160.0;
+        return Container(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            border: Border.all(color: t.borderSubtle),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: SizedBox(
+            height: computedHeight,
+            child: Stack(
+              children: [
+                // Swallow vertical drag gestures before the WebView sees
+                // them, so the outer Markdown ListView can scroll freely
+                // across the diagram. Taps still reach the WebView for
+                // future interactivity (panning/zooming handled inside
+                // the diagram can be wired up as needed).
+                WebViewWidget(
+                  controller: controller,
+                  gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                    Factory<VerticalDragGestureRecognizer>(
+                      VerticalDragGestureRecognizer.new,
+                    ),
+                  },
+                ),
+                if (!_ready)
+                  Positioned.fill(
+                    child: Container(
+                      color: t.surfaceSunken.withValues(alpha: 0.8),
+                      alignment: Alignment.center,
+                      child: const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
+
+  // Silence unused-on-non-android analyzer in case webview_flutter
+  // pulls in platform-specific types.
+  // ignore: unused_element
+  static TargetPlatform get _platform => defaultTargetPlatform;
 }
 
 class _PlaceholderCard extends StatelessWidget {
-  const _PlaceholderCard({required this.source});
-  final String source;
+  const _PlaceholderCard({required this.title});
+  final String title;
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +324,7 @@ class _PlaceholderCard extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Rendering Mermaid diagram…',
+              title,
               style: TextStyle(
                 color: t.textMuted,
                 fontSize: 13,
@@ -204,9 +339,8 @@ class _PlaceholderCard extends StatelessWidget {
 }
 
 class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({required this.message, required this.source});
+  const _ErrorCard({required this.message});
   final String message;
-  final String source;
 
   @override
   Widget build(BuildContext context) {
