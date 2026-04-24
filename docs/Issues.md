@@ -2,6 +2,29 @@
 
 Deferred findings from milestone QA rounds. Critical + High items are fixed before milestone close-out; Medium and Low accumulate here for the next scheduled polish pass or for opportunistic fixes during related work.
 
+## From M2a QA (2026-04-24)
+
+### Issue: On-device manual QA still pending for Milestone A
+- **Severity:** Medium
+- **Source:** M2a QA (2026-04-24)
+- **Screen/area:** Repo browser, Spec readers (md/pdf/svg).
+- **Detail:** Code-review triage ran clean against the M2a diff, build-debug-apk succeeds, and all 665 unit/widget tests pass. The spec's §5c.A manual checks (fixture repo with `inline.md`, `standalone.svg`, `spec.pdf`; verify tap dispatches, inline image rendering, pinch/pan) need to run on the OnePlus Pad Go 2 before M2a is truly closed.
+- **Proposed fix:** Install `build/app/outputs/flutter-apk/app-debug.apk` on device; walk through §5c.A fixtures; capture findings and either close the entry or add them here.
+
+### Issue: Pre-existing sign_in_screen_test flakes on local runner
+- **Severity:** Low
+- **Source:** M2a QA (2026-04-24)
+- **Screen/area:** `test/ui/screens/sign_in/sign_in_screen_test.dart`
+- **Detail:** Two tests (seeded device flow, and "Continue with GitHub" tap) fail with `StateError: Tried to read a provider from a ProviderContainer that was already disposed` after test completion. Reproduces on `HEAD` before any M2a commits — this is a pre-existing async race, not a regression from spec-002. Unrelated to auth code paths I touched.
+- **Proposed fix:** Add a `container.dispose()` guard or `await` the in-flight `startDeviceFlow` in the test tearDown so the AuthController doesn't re-read storage post-dispose.
+
+### Issue: md_image_resolver does not canonicalize relative traversal
+- **Severity:** Low
+- **Source:** M2a QA (2026-04-24)
+- **Screen/area:** `lib/ui/screens/spec_reader_md/md_image_resolver.dart:75-86`
+- **Detail:** A markdown image ref like `![](../other/image.png)` is joined naively against the spec's dirname without resolving `..`. `Image.file` / `File(path)` still open it correctly on real filesystems (the kernel resolves `..`), so there's no user-visible bug — just non-canonical paths in error messages and tests.
+- **Proposed fix:** Use `Uri.parse().normalize()` before handing the string to `File(...)`, or pull in a `path` package call. Skip unless a QA screenshot actually shows a confusing error.
+
 ## From M1a QA (2026-04-20)
 
 ### Issue: Job list first-row "just arrived" treatment missing

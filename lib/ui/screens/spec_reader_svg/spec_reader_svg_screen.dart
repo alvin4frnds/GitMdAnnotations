@@ -78,7 +78,7 @@ class _SvgReaderChrome extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               child: Text(
-                '← back',
+                jobRef == null ? '← back' : '← jobs',
                 style: TextStyle(color: t.textMuted, fontSize: 13),
               ),
             ),
