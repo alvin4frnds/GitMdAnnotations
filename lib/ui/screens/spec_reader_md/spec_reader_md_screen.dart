@@ -12,6 +12,7 @@ import '../../theme/tokens.dart';
 import '../annotation_canvas/annotation_canvas_screen.dart';
 import '../review_panel/review_panel_screen.dart';
 import '../submit_confirmation/submit_confirmation_screen.dart';
+import 'md_image_resolver.dart';
 
 /// Spec reader — markdown view.
 ///
@@ -511,6 +512,13 @@ class _MarkdownBodyView extends StatelessWidget {
         shrinkWrap: false,
         selectable: false,
         styleSheet: _styleSheet(context),
+        sizedImageBuilder: (config) => resolveInlineImage(
+          uri: config.uri,
+          specPath: spec.path,
+          context: context,
+          title: config.title,
+          alt: config.alt,
+        ),
       ),
     );
   }
