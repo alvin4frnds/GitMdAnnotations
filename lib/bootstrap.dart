@@ -5,6 +5,7 @@ import 'app/dev_seed.dart';
 import 'app/last_session.dart';
 import 'app/providers/annotation_providers.dart';
 import 'app/providers/auth_providers.dart';
+import 'app/providers/image_cache_providers.dart';
 import 'app/providers/pdf_providers.dart';
 import 'app/providers/repo_picker_providers.dart';
 import 'app/providers/review_providers.dart';
@@ -20,6 +21,7 @@ import 'infra/fs/fs_adapter.dart';
 import 'infra/git/git_adapter.dart';
 import 'infra/github/dio_github_repos_adapter.dart';
 import 'infra/id/system_id_generator.dart';
+import 'infra/net/dio_image_fetcher.dart';
 import 'infra/pdf/markdown_rasterizer_adapter.dart';
 import 'infra/pdf/pdfx_adapter.dart';
 import 'infra/png/png_flattener_adapter.dart';
@@ -88,6 +90,7 @@ ProviderScope buildAppScope({
         ),
       ),
       gitHubReposPortProvider.overrideWithValue(DioGitHubReposAdapter()),
+      imageFetcherProvider.overrideWithValue(DioImageFetcher()),
       backupExportPortProvider
           .overrideWithValue(SharedStorageBackupExportAdapter()),
       gitPortProvider.overrideWith((ref) {
