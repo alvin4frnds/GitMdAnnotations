@@ -80,6 +80,16 @@ dependencies:
   # ^7.x so it resolves against the same version flutter_markdown
   # already uses.
   markdown: ^7.2.2
+  # Stroke smoothing for the ink renderer. Steve Ruiz's Dart port of
+  # the perfect-freehand JS library — turns the sampled pointer points
+  # into a tapered, pressure-aware outline polygon that fills cleanly
+  # instead of the polygonal `lineTo`-segment look that bare canvas
+  # paths produce on fast strokes (visible as straight edges on a
+  # quickly-drawn circle). Consumed only from
+  # `lib/ui/widgets/ink_overlay/ink_painting.dart`; the SVG / PNG /
+  # PDF artifacts emitted at submit time get the same smoothing for
+  # free since `paintStrokeGroups` is the single source of truth.
+  perfect_freehand: ^2.0.0
 
 dev_dependencies:
   flutter_test:

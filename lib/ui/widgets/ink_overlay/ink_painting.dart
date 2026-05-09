@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:perfect_freehand/perfect_freehand.dart';
 
 import '../../../domain/entities/stroke.dart';
 import '../../../domain/entities/stroke_group.dart';
@@ -17,6 +18,14 @@ import '../../../domain/entities/stroke_group.dart';
 /// The caller owns the [canvas] lifecycle (recorder, save/restore, clip).
 /// The function does not scale, translate, or clip — it assumes the caller
 /// has sized the canvas to match the logical stroke coordinate space.
+///
+/// **Smoothing.** Strokes are rendered through `perfect_freehand` which
+/// turns the sampled pointer points into a tapered, pressure-aware
+/// outline polygon and fills it. This eliminates the polygonal `lineTo`
+/// look that bare canvas paths produce on fast strokes (e.g. a quickly
+/// drawn circle showed visible straight edges before this change).
+/// Stored `Stroke.points` are unchanged on disk — smoothing is render-
+/// time-only.
 void paintStrokeGroups(
   Canvas canvas, {
   required List<StrokeGroup> groups,
@@ -40,28 +49,32 @@ void paintStrokeGroups(
 }
 
 void _paintStroke(Canvas canvas, Stroke stroke) {
-  if (stroke.points.isEmpty) {
-    return;
-  }
-  final paint = _buildPaint(
-    color: _parseHex(stroke.color),
-    width: stroke.strokeWidth,
-    opacity: stroke.opacity,
-  );
+  if (stroke.points.isEmpty) return;
+  final color = _parseHex(stroke.color).withValues(alpha: stroke.opacity);
   if (stroke.points.length == 1) {
     final p = stroke.points.first;
     canvas.drawCircle(
       Offset(p.x, p.y),
       stroke.strokeWidth,
-      paint..style = PaintingStyle.fill,
+      Paint()..color = color,
     );
     return;
   }
-  final path = Path()..moveTo(stroke.points.first.x, stroke.points.first.y);
-  for (var i = 1; i < stroke.points.length; i++) {
-    path.lineTo(stroke.points[i].x, stroke.points[i].y);
-  }
-  canvas.drawPath(path, paint);
+  final outline = getStroke(
+    [
+      for (final p in stroke.points) PointVector(p.x, p.y, p.pressure),
+    ],
+    options: StrokeOptions(
+      size: stroke.strokeWidth,
+      // Stored strokes already carry the digitizer's pressure samples,
+      // so `simulatePressure: false` consumes them as-is. The submit-
+      // time PNG/PDF flatten and the on-screen render share this
+      // function, so both surfaces taper identically.
+      simulatePressure: false,
+      isComplete: true,
+    ),
+  );
+  _fillOutline(canvas, outline, color);
 }
 
 void _paintActiveStroke(
@@ -71,36 +84,40 @@ void _paintActiveStroke(
   required double width,
   required double opacity,
 }) {
-  if (points.isEmpty) {
-    return;
-  }
-  final paint = _buildPaint(color: color, width: width, opacity: opacity);
+  if (points.isEmpty) return;
+  final paintColor = color.withValues(alpha: opacity);
   if (points.length == 1) {
-    canvas.drawCircle(
-      points.first,
-      width,
-      paint..style = PaintingStyle.fill,
-    );
+    canvas.drawCircle(points.first, width, Paint()..color = paintColor);
     return;
   }
-  final path = Path()..moveTo(points.first.dx, points.first.dy);
-  for (var i = 1; i < points.length; i++) {
-    path.lineTo(points[i].dx, points[i].dy);
-  }
-  canvas.drawPath(path, paint);
+  final outline = getStroke(
+    [
+      for (final p in points) PointVector(p.dx, p.dy),
+    ],
+    options: StrokeOptions(
+      size: width,
+      // Active stroke has no pressure samples (the listener buffers
+      // Offsets only), so let perfect_freehand simulate pressure from
+      // velocity. `isComplete: false` leaves the trailing tail un-
+      // capped so the in-flight stroke doesn't visibly snap each frame.
+      simulatePressure: true,
+      isComplete: false,
+    ),
+  );
+  _fillOutline(canvas, outline, paintColor);
 }
 
-Paint _buildPaint({
-  required Color color,
-  required double width,
-  required double opacity,
-}) {
-  return Paint()
-    ..color = color.withValues(alpha: opacity)
-    ..strokeWidth = width
-    ..strokeCap = StrokeCap.round
-    ..strokeJoin = StrokeJoin.round
-    ..style = PaintingStyle.stroke;
+/// Fills the closed [outline] polygon produced by `getStroke`. The
+/// outline already encodes the stroke's tapered edges; a plain fill is
+/// the right paint mode (no `strokeWidth` needed).
+void _fillOutline(Canvas canvas, List<Offset> outline, Color color) {
+  if (outline.isEmpty) return;
+  final path = Path()..moveTo(outline.first.dx, outline.first.dy);
+  for (var i = 1; i < outline.length; i++) {
+    path.lineTo(outline[i].dx, outline[i].dy);
+  }
+  path.close();
+  canvas.drawPath(path, Paint()..color = color);
 }
 
 /// Parses a 7-character canonical light-mode hex (`#RRGGBB`) into a fully
