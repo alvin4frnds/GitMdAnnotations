@@ -58,6 +58,18 @@ abstract class GitPort {
   /// Down with libgit2's "unresolved conflicts exist in the index".
   Future<bool> abortMergeStateIfAny();
 
+  /// Seal an in-progress merge (created by a previous [mergeInto] that
+  /// was a real, non-fast-forward merge) by creating a 2-parent merge
+  /// commit on [branch] with [message] and clearing `MERGE_HEAD`. No-op
+  /// when no merge is in progress. Sync flows call this after every
+  /// non-FF merge so the merged state survives the next sync's
+  /// [abortMergeStateIfAny] preamble — without sealing, the merge is
+  /// silently dropped on the next run.
+  Future<void> sealInProgressMerge({
+    required String branch,
+    required String message,
+  });
+
   /// Copy the working tree at the current HEAD of [branch] to a new
   /// timestamped directory under [backupRoot] and return a handle.
   Future<BackupRef> backupBranchHead(

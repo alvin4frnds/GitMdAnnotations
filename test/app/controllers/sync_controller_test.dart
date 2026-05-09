@@ -90,7 +90,7 @@ void main() {
 
       await env.container
           .read(syncControllerProvider.notifier)
-          .syncDown(repo: _repo, workdir: _workdir);
+          .syncDown(repo: _repo, workdir: _workdir, backupRoot: '/tmp/backups');
 
       sub.close();
 
@@ -118,7 +118,7 @@ void main() {
 
       await env.container
           .read(syncControllerProvider.notifier)
-          .syncDown(repo: _repo, workdir: _workdir);
+          .syncDown(repo: _repo, workdir: _workdir, backupRoot: '/tmp/backups');
 
       final state = env.container.read(syncControllerProvider).value;
       expect(state, isA<SyncErrored>());
@@ -131,8 +131,8 @@ void main() {
       await env.container.read(syncControllerProvider.future);
 
       final notifier = env.container.read(syncControllerProvider.notifier);
-      final first = notifier.syncDown(repo: _repo, workdir: _workdir);
-      final second = notifier.syncDown(repo: _repo, workdir: _workdir);
+      final first = notifier.syncDown(repo: _repo, workdir: _workdir, backupRoot: '/tmp/backups');
+      final second = notifier.syncDown(repo: _repo, workdir: _workdir, backupRoot: '/tmp/backups');
       await Future.wait<void>([first, second]);
 
       expect(fake.fetchCount, 2);

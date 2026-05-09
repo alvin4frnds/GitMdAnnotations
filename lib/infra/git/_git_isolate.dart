@@ -95,6 +95,7 @@ Future<GitResponse> _dispatch(_IsolateState state, GitRequest req) async {
       GitReqPush() => _handlePush(state, req),
       GitReqResetHard() => _handleResetHard(state, req),
       GitReqAbortMergeStateIfAny() => _handleAbortMergeStateIfAny(state, req),
+      GitReqSealInProgressMerge() => _handleSealInProgressMerge(state, req),
       GitReqBackup() => await _handleBackup(state, req),
       GitReqReadChangelog() => await _handleReadChangelog(state, req),
       GitReqLocalBranches() => _handleLocalBranches(state, req),
@@ -218,6 +219,15 @@ GitResponse _handleMerge(_IsolateState state, GitReqMerge req) {
   if (repo.index.hasConflicts) {
     final paths = repo.index.conflicts.keys.toList();
     repo.stateCleanup();
+    // stateCleanup() drops MERGE_HEAD/MERGE_MSG but leaves the
+    // stage-1/2/3 conflict entries in the index AND the conflict
+    // markers in the working tree. Any follow-up libgit2 operation
+    // (checkoutBranch in _handleBackup, resetHard, even another
+    // mergeInto) would trip on "unresolved conflicts exist in the
+    // index". Hard-reset to HEAD so the SyncService's
+    // archive-and-reset fallback can run cleanly.
+    final headOid = repo.head.target;
+    repo.reset(oid: headOid, resetType: git2.GitReset.hard);
     throw GitMergeConflict(paths);
   }
   // No conflicts — the caller is expected to seal with a commit via
@@ -321,6 +331,54 @@ GitResponse _handleResetHard(_IsolateState state, GitReqResetHard req) {
   final repo = _onlyRepo(state);
   final oid = _resolveRefToOid(repo, req.ref);
   repo.reset(oid: oid, resetType: git2.GitReset.hard);
+  return GitResponseOk<void>(id: req.id, value: null);
+}
+
+GitResponse _handleSealInProgressMerge(
+  _IsolateState state,
+  GitReqSealInProgressMerge req,
+) {
+  final repo = _onlyRepo(state);
+  // libgit2's [git2.Merge.commit] populates the working tree + index
+  // with the merge result but does NOT create a commit; it leaves
+  // MERGE_HEAD on disk for a follow-up commit. [_handleCommit] only
+  // writes single-parent commits, so we produce the 2-parent merge
+  // commit ourselves before MERGE_HEAD is cleaned up by the next
+  // preamble (which would silently drop the merge).
+  //
+  // Probing the file system instead of [repo.state] — the cached
+  // libgit2 handle doesn't always reflect a merge that just landed in
+  // the same isolate session.
+  final mergeHeadFile = File('${repo.workdir}.git/MERGE_HEAD');
+  if (!mergeHeadFile.existsSync()) {
+    return GitResponseOk<void>(id: req.id, value: null);
+  }
+  // Pull the merge tip out of MERGE_HEAD. The file format is one sha
+  // per line; the first line is the head being merged in.
+  final mergeHeadSha =
+      mergeHeadFile.readAsStringSync().trim().split('\n').first.trim();
+  final mergeHeadOid = git2.Oid.fromSHA(repo: repo, sha: mergeHeadSha);
+  final mergeHeadCommit = git2.Commit.lookup(repo: repo, oid: mergeHeadOid);
+  // Move HEAD to [req.branch] so we read the right parent — defensive,
+  // typically already the case after [_handleMerge].
+  checkoutBranch(repo, req.branch);
+  final headCommit = git2.Commit.lookup(repo: repo, oid: repo.head.target);
+  final treeOid = repo.index.writeTree();
+  final tree = git2.Tree.lookup(repo: repo, oid: treeOid);
+  final sig = git2.Signature.create(
+    name: 'GitMdScribe Sync',
+    email: 'noreply@gitmdscribe.local',
+  );
+  git2.Commit.create(
+    repo: repo,
+    updateRef: 'refs/heads/${req.branch}',
+    author: sig,
+    committer: sig,
+    message: req.message,
+    tree: tree,
+    parents: [headCommit, mergeHeadCommit],
+  );
+  repo.stateCleanup();
   return GitResponseOk<void>(id: req.id, value: null);
 }
 

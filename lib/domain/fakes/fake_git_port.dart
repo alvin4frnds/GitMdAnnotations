@@ -57,6 +57,13 @@ class FakeGitPort implements GitPort {
   /// can't accidentally signal recovery on every subsequent sync.
   bool abortMergeStateReturns = false;
 
+  /// Override for [countCommitsAhead]. The fake's branch model maps
+  /// `origin/<x>` and `<x>` to the same `_log` entry, so by default
+  /// ahead-of-remote is always 0. Tests that need to exercise
+  /// `_runDown`'s "local has unique work" branch flip this to a
+  /// positive number to simulate diverged local-vs-remote state.
+  int? scriptedAheadCount;
+
   /// Branch name returned by [currentBranch]. Tests override per scenario;
   /// defaults to `main` because that's what a fresh clone looks like.
   String activeBranch = 'main';
@@ -178,6 +185,15 @@ class FakeGitPort implements GitPort {
   }
 
   @override
+  Future<void> sealInProgressMerge({
+    required String branch,
+    required String message,
+  }) async {
+    // Fake has no MERGE_HEAD concept — no-op. Tests that need to assert
+    // sealing was invoked can override this method on a subclass.
+  }
+
+  @override
   Future<void> resetHard(String ref) async {
     final (branch, snapshot) = _findSnapshot(ref);
     if (branch != null && snapshot != null) {
@@ -292,6 +308,8 @@ class FakeGitPort implements GitPort {
     required String localBranch,
     required String remoteBranch,
   }) async {
+    final scripted = scriptedAheadCount;
+    if (scripted != null) return scripted;
     // Strip the `origin/` prefix so callers don't have to care about the
     // namespace — the fake has no remote-tracking concept, `branches` is
     // the ground truth.

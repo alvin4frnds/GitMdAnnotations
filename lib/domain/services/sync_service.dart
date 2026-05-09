@@ -107,10 +107,14 @@ class SyncService {
   ///
   /// [GitPort.mergeInto] is fast-forward-only so calling it
   /// unconditionally is correct — a no-op when nothing is ahead.
-  Stream<SyncProgress> syncDown(RepoRef repo, {required String workdir}) {
+  Stream<SyncProgress> syncDown(
+    RepoRef repo, {
+    required String workdir,
+    required String backupRoot,
+  }) {
     final controller = StreamController<SyncProgress>();
     // Fire-and-forget: the controller closes at the end of [_runDown].
-    scheduleMicrotask(() => _runDown(repo, controller));
+    scheduleMicrotask(() => _runDown(repo, backupRoot, controller));
     return controller.stream;
   }
 
@@ -137,6 +141,7 @@ class SyncService {
 
   Future<void> _runDown(
     RepoRef repo,
+    String backupRoot,
     StreamController<SyncProgress> out,
   ) async {
     try {
@@ -225,8 +230,47 @@ class SyncService {
       out.add(const SyncMergingMainIntoJobs());
       try {
         await git.mergeInto(defaultBranch, target: 'claude-jobs');
-      } on GitMergeConflict catch (e) {
-        out.add(SyncFailed(e));
+        // If that merge was non-FF (real merge), [mergeInto] left
+        // MERGE_HEAD un-committed. Seal it now so the next sync's
+        // preamble doesn't drop it. No-op when the merge was FF (no
+        // MERGE_HEAD on disk).
+        await git.sealInProgressMerge(
+          branch: 'claude-jobs',
+          message: 'sync: merge $defaultBranch into claude-jobs',
+        );
+      } on GitMergeConflict catch (_) {
+        // Remote-wins per user direction: when local claude-jobs and
+        // main diverge enough that a fast-forward merge fails, fall
+        // back to the archive+reset flow.
+        //
+        // Skip archiving when local claude-jobs already matches
+        // origin/claude-jobs — there's no unique local work to
+        // preserve, so the costly working-tree copy is wasted and
+        // would re-fire on every subsequent sync (the merge into
+        // claude-jobs always re-conflicts because the underlying
+        // file divergence is intrinsic to the repo's history).
+        final ahead = await git.countCommitsAhead(
+          localBranch: 'claude-jobs',
+          remoteBranch: 'origin/claude-jobs',
+        );
+        if (ahead == 0) {
+          out.add(const SyncComplete());
+          return;
+        }
+        try {
+          final backup = await _conflictResolver.archiveAndReset(
+            repo,
+            backupRoot: backupRoot,
+            tolerateMergeConflict: true,
+          );
+          out.add(SyncConflictArchived(backup));
+          out.add(const SyncComplete());
+        } on GitMergeConflict catch (e2) {
+          // Defensive: with tolerateMergeConflict above, this branch
+          // is unreachable today — the inner merge no longer rethrows.
+          // Kept so a future change to the contract surfaces clearly.
+          out.add(SyncFailed(e2));
+        }
         return;
       }
 

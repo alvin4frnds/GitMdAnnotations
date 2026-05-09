@@ -190,9 +190,11 @@ class RepoPickerController extends AsyncNotifier<RepoPickerState> {
     final hasLocalJobs = (await ref.read(gitPortProvider).localBranches())
         .contains('claude-jobs');
     if (!hasLocalJobs) {
-      unawaited(ref
-          .read(syncControllerProvider.notifier)
-          .syncDown(repo: repoRef, workdir: workdir));
+      unawaited(ref.read(syncControllerProvider.notifier).syncDown(
+            repo: repoRef,
+            workdir: workdir,
+            backupRoot: '$workdir/.gitmdscribe-backups',
+          ));
     }
     // Re-emit the loaded list so the UI can render "picked <name>"
     // feedback before the gate flips to JobList.

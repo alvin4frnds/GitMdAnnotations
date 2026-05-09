@@ -37,6 +37,7 @@ class ConflictResolver {
   Future<BackupRef> archiveAndReset(
     RepoRef repo, {
     required String backupRoot,
+    bool tolerateMergeConflict = false,
   }) async {
     final backup = await git.backupBranchHead(
       'claude-jobs',
@@ -52,10 +53,33 @@ class ConflictResolver {
     await git.fetch(repo, branch: 'claude-jobs');
     await git.fetch(repo, branch: repo.defaultBranch);
     await git.resetHard('origin/claude-jobs');
-    await git.mergeInto(
-      'origin/${repo.defaultBranch}',
-      target: 'claude-jobs',
-    );
+    // Re-apply origin/<defaultBranch> on top of origin/claude-jobs so
+    // newly-arrived source on main propagates into the sidecar
+    // (D-13). When [tolerateMergeConflict] is set and the merge
+    // conflicts (origin/main and origin/claude-jobs disagree on
+    // shared files), accept origin/claude-jobs as-is — local state is
+    // already coherent thanks to the resetHard above and the archived
+    // backup still preserves any pre-reset work. The default behavior
+    // preserves the Sync Up contract: propagate the conflict so the
+    // caller can surface a typed failure.
+    try {
+      await git.mergeInto(
+        'origin/${repo.defaultBranch}',
+        target: 'claude-jobs',
+      );
+      // Seal a successful non-fast-forward merge so the merged state
+      // persists past the next sync's [abortMergeStateIfAny] preamble
+      // — without this, the merge is silently dropped and the next
+      // sync would re-trigger archiveAndReset.
+      await git.sealInProgressMerge(
+        branch: 'claude-jobs',
+        message:
+            'sync: merge origin/${repo.defaultBranch} into claude-jobs '
+            '(remote-wins archive-and-reset)',
+      );
+    } on GitMergeConflict {
+      if (!tolerateMergeConflict) rethrow;
+    }
     return backup;
   }
 }

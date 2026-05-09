@@ -602,7 +602,11 @@ class _TopChrome extends ConsumerWidget {
             onPressed: canSync
                 ? () => ref
                     .read(syncControllerProvider.notifier)
-                    .syncDown(repo: repo!, workdir: workdir)
+                    .syncDown(
+                      repo: repo!,
+                      workdir: workdir,
+                      backupRoot: '$workdir/.gitmdscribe-backups',
+                    )
                 : null,
           ),
           const SizedBox(width: 8),

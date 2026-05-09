@@ -51,7 +51,7 @@ void main() {
       final service = SyncService(git: fake);
 
       final events = await service
-          .syncDown(_repo, workdir: _workdir)
+          .syncDown(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
           .toList();
 
       expect(
@@ -79,7 +79,7 @@ void main() {
       final service = SyncService(git: fake);
 
       final events = await service
-          .syncDown(_repo, workdir: _workdir)
+          .syncDown(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
           .toList();
 
       expect(events.last, isA<SyncComplete>());
@@ -100,7 +100,7 @@ void main() {
       final service = SyncService(git: fake);
 
       final events = await service
-          .syncDown(_repo, workdir: _workdir)
+          .syncDown(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
           .toList();
 
       expect(events.whereType<SyncStarted>(), hasLength(1));
@@ -119,7 +119,7 @@ void main() {
       final service = SyncService(git: fake);
 
       final events = await service
-          .syncDown(_repo, workdir: _workdir)
+          .syncDown(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
           .toList();
 
       expect(events.last, isA<SyncFailed>());
@@ -128,7 +128,39 @@ void main() {
       expect(events.whereType<SyncMergingMainIntoJobs>(), isEmpty);
     });
 
-    test('claude-jobs merge conflict surfaces SyncFailed', () async {
+    test(
+        'claude-jobs merge conflict with local commits ahead triggers '
+        'archive-and-reset (remote wins)', () async {
+      final fake = _FailSecondMerge()..scriptedAheadCount = 1;
+      await fake.commit(
+        files: const [FileWrite(path: 'README.md', contents: '# hi')],
+        message: 'initial',
+        id: _identity,
+        branch: 'main',
+      );
+      await fake.commit(
+        files: const [FileWrite(path: '.keep', contents: '')],
+        message: 'init-jobs',
+        id: _identity,
+        branch: 'claude-jobs',
+      );
+      final service = SyncService(git: fake);
+
+      final events = await service
+          .syncDown(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
+          .toList();
+
+      // Conflict on the second merge with local-ahead-of-remote runs
+      // archive-and-reset, emits SyncConflictArchived, then completes.
+      expect(events.whereType<SyncConflictArchived>(), hasLength(1));
+      expect(events.last, isA<SyncComplete>());
+      expect(fake.backups, hasLength(1));
+    });
+
+    test(
+        'claude-jobs merge conflict with no local commits ahead skips '
+        'archive (avoids loop on inherent main↔jobs divergence)', () async {
+      // Default scriptedAheadCount stays null → fake returns 0 ahead.
       final fake = _FailSecondMerge();
       await fake.commit(
         files: const [FileWrite(path: 'README.md', contents: '# hi')],
@@ -145,13 +177,13 @@ void main() {
       final service = SyncService(git: fake);
 
       final events = await service
-          .syncDown(_repo, workdir: _workdir)
+          .syncDown(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
           .toList();
 
-      expect(events.last, isA<SyncFailed>());
-      expect((events.last as SyncFailed).error, isA<GitMergeConflict>());
-      expect(events.whereType<SyncMergingMainIntoJobs>(), hasLength(1));
-      expect(events.whereType<SyncComplete>(), isEmpty);
+      // No local-ahead work to preserve → no archive, just complete.
+      expect(events.whereType<SyncConflictArchived>(), isEmpty);
+      expect(events.last, isA<SyncComplete>());
+      expect(fake.backups, isEmpty);
     });
 
     test(
@@ -163,7 +195,7 @@ void main() {
       final service = SyncService(git: fake);
 
       final events = await service
-          .syncDown(_repo, workdir: _workdir)
+          .syncDown(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
           .toList();
 
       // The sidecar-init progress event fires before the merge step.
@@ -185,7 +217,7 @@ void main() {
       final service = SyncService(git: fake);
 
       final events = await service
-          .syncDown(_repo, workdir: _workdir)
+          .syncDown(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
           .toList();
 
       expect(events.whereType<SyncInitializingSidecar>(), hasLength(1));
@@ -206,7 +238,7 @@ void main() {
       final service = SyncService(git: fake);
 
       final events = await service
-          .syncDown(_repo, workdir: _workdir)
+          .syncDown(_repo, workdir: _workdir, backupRoot: '/tmp/backups')
           .toList();
 
       expect(events.last, isA<SyncFailed>());
@@ -223,7 +255,7 @@ void main() {
       final service = SyncService(git: fake);
 
       var seenComplete = false;
-      await for (final p in service.syncDown(_repo, workdir: _workdir)) {
+      await for (final p in service.syncDown(_repo, workdir: _workdir, backupRoot: '/tmp/backups')) {
         if (p is SyncComplete) seenComplete = true;
       }
       expect(seenComplete, isTrue);
@@ -236,7 +268,7 @@ void main() {
       await _seedJobs(fake);
       final service = SyncService(git: fake);
 
-      final events = await service.syncDown(_repo, workdir: _workdir).toList();
+      final events = await service.syncDown(_repo, workdir: _workdir, backupRoot: '/tmp/backups').toList();
       final types = events.map((e) => e.runtimeType.toString()).toList();
 
       expect(types, contains('SyncRecoveredStaleMerge'));
@@ -260,7 +292,7 @@ void main() {
       await _seedJobs(fake);
       final service = SyncService(git: fake);
 
-      final events = await service.syncDown(_repo, workdir: _workdir).toList();
+      final events = await service.syncDown(_repo, workdir: _workdir, backupRoot: '/tmp/backups').toList();
 
       expect(events.whereType<SyncRecoveredStaleMerge>(), isEmpty);
     });

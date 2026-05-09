@@ -57,6 +57,7 @@ class SyncController extends AsyncNotifier<SyncState> {
   Future<void> syncDown({
     required RepoRef repo,
     required String workdir,
+    required String backupRoot,
   }) async {
     if (_running) return;
     _running = true;
@@ -65,10 +66,20 @@ class SyncController extends AsyncNotifier<SyncState> {
     // off from RepoPicker.pick()) see "Syncing…" from their first frame,
     // not after the first stream event lands a microtask later.
     state = const AsyncValue.data(SyncInProgress(SyncStarted()));
+    BackupRef? archivedBackup;
     try {
-      await for (final p in _service.syncDown(repo, workdir: workdir)) {
-        if (p is SyncComplete) {
-          state = AsyncValue.data(SyncDone(_clock.now()));
+      await for (final p in _service.syncDown(
+        repo,
+        workdir: workdir,
+        backupRoot: backupRoot,
+      )) {
+        if (p is SyncConflictArchived) {
+          archivedBackup = p.backup;
+          state = AsyncValue.data(SyncInProgress(p));
+        } else if (p is SyncComplete) {
+          state = AsyncValue.data(
+            SyncDone(_clock.now(), backup: archivedBackup),
+          );
         } else if (p is SyncFailed) {
           state = AsyncValue.data(SyncErrored(p.error));
         } else {

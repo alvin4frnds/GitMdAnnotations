@@ -129,6 +129,23 @@ class GitReqAbortMergeStateIfAny extends GitRequest {
   const GitReqAbortMergeStateIfAny({required super.id});
 }
 
+/// Seal an in-progress merge (created by [GitReqMerge] when the merge
+/// was real, not fast-forward) by creating a 2-parent merge commit on
+/// [branch] and clearing `MERGE_HEAD`. No-op when no merge is in
+/// progress. Used by the sync flows where the caller wants the merge
+/// persisted as a commit instead of being dropped by the next preamble
+/// cleanup. The sync system identity is hardcoded inside the handler —
+/// these are not user-attributable commits.
+class GitReqSealInProgressMerge extends GitRequest {
+  const GitReqSealInProgressMerge({
+    required super.id,
+    required this.branch,
+    required this.message,
+  });
+  final String branch;
+  final String message;
+}
+
 class GitReqBackup extends GitRequest {
   const GitReqBackup({
     required super.id,

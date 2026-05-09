@@ -217,6 +217,21 @@ class GitAdapter implements GitPort {
   }
 
   @override
+  Future<void> sealInProgressMerge({
+    required String branch,
+    required String message,
+  }) async {
+    final resp = await _send(
+      (id) => GitReqSealInProgressMerge(
+        id: id,
+        branch: branch,
+        message: message,
+      ),
+    );
+    _unwrap<void>(resp);
+  }
+
+  @override
   Future<BackupRef> backupBranchHead(
     String branch, {
     required String backupRoot,
