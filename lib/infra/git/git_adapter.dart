@@ -211,6 +211,12 @@ class GitAdapter implements GitPort {
   }
 
   @override
+  Future<bool> abortMergeStateIfAny() async {
+    final resp = await _send((id) => GitReqAbortMergeStateIfAny(id: id));
+    return _unwrap<bool>(resp);
+  }
+
+  @override
   Future<BackupRef> backupBranchHead(
     String branch, {
     required String backupRoot,

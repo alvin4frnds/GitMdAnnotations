@@ -50,6 +50,13 @@ class FakeGitPort implements GitPort {
   /// Default outcome for [push]. Null -> returns `PushSuccess(headSha)`.
   PushOutcome? scriptedPushOutcome;
 
+  /// Outcome of the next [abortMergeStateIfAny] call. Tests flip this to
+  /// `true` to simulate a repo that arrived with leftover merge state, so
+  /// `SyncService._runDown` exercises its `SyncRecoveredStaleMerge`
+  /// emission path. Reset to `false` once consumed so a single test run
+  /// can't accidentally signal recovery on every subsequent sync.
+  bool abortMergeStateReturns = false;
+
   /// Branch name returned by [currentBranch]. Tests override per scenario;
   /// defaults to `main` because that's what a fresh clone looks like.
   String activeBranch = 'main';
@@ -161,6 +168,13 @@ class FakeGitPort implements GitPort {
     if (scripted != null) return scripted;
     final head = await headSha(branch);
     return PushSuccess(head ?? 'fake-head-empty');
+  }
+
+  @override
+  Future<bool> abortMergeStateIfAny() async {
+    final out = abortMergeStateReturns;
+    abortMergeStateReturns = false;
+    return out;
   }
 
   @override

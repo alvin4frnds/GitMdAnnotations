@@ -94,6 +94,7 @@ Future<GitResponse> _dispatch(_IsolateState state, GitRequest req) async {
       GitReqCommit() => _handleCommit(state, req),
       GitReqPush() => _handlePush(state, req),
       GitReqResetHard() => _handleResetHard(state, req),
+      GitReqAbortMergeStateIfAny() => _handleAbortMergeStateIfAny(state, req),
       GitReqBackup() => await _handleBackup(state, req),
       GitReqReadChangelog() => await _handleReadChangelog(state, req),
       GitReqLocalBranches() => _handleLocalBranches(state, req),
@@ -321,6 +322,31 @@ GitResponse _handleResetHard(_IsolateState state, GitReqResetHard req) {
   final oid = _resolveRefToOid(repo, req.ref);
   repo.reset(oid: oid, resetType: git2.GitReset.hard);
   return GitResponseOk<void>(id: req.id, value: null);
+}
+
+GitResponse _handleAbortMergeStateIfAny(
+  _IsolateState state,
+  GitReqAbortMergeStateIfAny req,
+) {
+  final repo = _onlyRepo(state);
+  // libgit2 refuses every subsequent checkout/merge with "unresolved
+  // conflicts exist in the index" once stage-1/2/3 entries are sitting
+  // in the index from a prior incomplete merge — typically a process
+  // kill between [_handleMerge]'s `Merge.commit` (line ~216) and the
+  // commit that would seal it. Mirror the post-conflict cleanup
+  // already in [_handleMerge] but run it preemptively, before any
+  // merge handler tries to touch the working tree.
+  final messy =
+      repo.state != git2.GitRepositoryState.none || repo.index.hasConflicts;
+  if (!messy) {
+    return GitResponseOk<bool>(id: req.id, value: false);
+  }
+  repo.stateCleanup();
+  // stateCleanup() drops MERGE_HEAD / MERGE_MSG but does NOT clear the
+  // stage-1/2/3 index entries. A hard reset to the current HEAD does.
+  final headOid = repo.head.target;
+  repo.reset(oid: headOid, resetType: git2.GitReset.hard);
+  return GitResponseOk<bool>(id: req.id, value: true);
 }
 
 /// Hex-SHA fast path, RevParse fallback for anything else (branch refs

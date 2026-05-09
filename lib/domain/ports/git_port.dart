@@ -47,6 +47,17 @@ abstract class GitPort {
   /// Hard-reset HEAD to [ref] on the current branch.
   Future<void> resetHard(String ref);
 
+  /// Sanitize any leftover merge state (`MERGE_HEAD`, `MERGE_MSG`, or
+  /// stage-1/2/3 conflict entries in the index) from a prior incomplete
+  /// sync. Returns `true` when something was actually cleaned, `false`
+  /// when the repo was already in a coherent state. Always safe to call;
+  /// a no-op on a clean repo.
+  ///
+  /// `SyncService._runDown` invokes this before any merge so that a
+  /// previous run that crashed mid-merge can't permanently wedge Sync
+  /// Down with libgit2's "unresolved conflicts exist in the index".
+  Future<bool> abortMergeStateIfAny();
+
   /// Copy the working tree at the current HEAD of [branch] to a new
   /// timestamped directory under [backupRoot] and return a handle.
   Future<BackupRef> backupBranchHead(

@@ -228,6 +228,42 @@ void main() {
       }
       expect(seenComplete, isTrue);
     });
+
+    test('emits SyncRecoveredStaleMerge when abortMergeStateIfAny cleaned',
+        () async {
+      final fake = FakeGitPort()..abortMergeStateReturns = true;
+      await _seedMain(fake);
+      await _seedJobs(fake);
+      final service = SyncService(git: fake);
+
+      final events = await service.syncDown(_repo, workdir: _workdir).toList();
+      final types = events.map((e) => e.runtimeType.toString()).toList();
+
+      expect(types, contains('SyncRecoveredStaleMerge'));
+      // Recovery is a preamble: it lands between Started and Fetching so
+      // the UI toast fires before any visible progress text changes.
+      expect(
+        types.indexOf('SyncRecoveredStaleMerge'),
+        equals(types.indexOf('SyncStarted') + 1),
+      );
+      expect(
+        types.indexOf('SyncRecoveredStaleMerge'),
+        lessThan(types.indexOf('SyncFetching')),
+      );
+      expect(events.last, isA<SyncComplete>());
+    });
+
+    test('omits SyncRecoveredStaleMerge when nothing needed cleaning',
+        () async {
+      final fake = FakeGitPort(); // abortMergeStateReturns defaults to false
+      await _seedMain(fake);
+      await _seedJobs(fake);
+      final service = SyncService(git: fake);
+
+      final events = await service.syncDown(_repo, workdir: _workdir).toList();
+
+      expect(events.whereType<SyncRecoveredStaleMerge>(), isEmpty);
+    });
   });
 
   group('SyncService.syncUp', () {

@@ -120,6 +120,15 @@ class GitReqResetHard extends GitRequest {
   final String ref;
 }
 
+/// Sanitize any leftover merge state (`MERGE_HEAD`, conflicted index)
+/// from a prior incomplete sync. Reply payload is a `bool`: `true` when
+/// the isolate actually cleaned something, `false` when the repo was
+/// already coherent. See `SyncService._runDown` for why this runs as an
+/// explicit preamble rather than being folded into the merge handler.
+class GitReqAbortMergeStateIfAny extends GitRequest {
+  const GitReqAbortMergeStateIfAny({required super.id});
+}
+
 class GitReqBackup extends GitRequest {
   const GitReqBackup({
     required super.id,

@@ -22,6 +22,15 @@ class SyncFetching extends SyncProgress {
   const SyncFetching();
 }
 
+/// Emitted by [SyncService.syncDown] when the local clone arrived with
+/// leftover merge state from a prior crash / interrupted run, and the
+/// service cleaned it up so the sync could proceed. Surfaced as a
+/// neutral one-shot toast — recurring occurrences signal a real
+/// upstream bug worth chasing.
+class SyncRecoveredStaleMerge extends SyncProgress {
+  const SyncRecoveredStaleMerge();
+}
+
 class SyncFastForwardingMain extends SyncProgress {
   const SyncFastForwardingMain();
 }
@@ -132,6 +141,16 @@ class SyncService {
   ) async {
     try {
       out.add(const SyncStarted());
+
+      // Defensive: a previous Sync Down that crashed mid-merge can leave
+      // MERGE_HEAD + conflict entries in the index. libgit2 then refuses
+      // every subsequent checkout / merge with "unresolved conflicts
+      // exist in the index" and the user is permanently wedged until
+      // they wipe the clone. Run the cleanup before any merge so a
+      // single retry recovers without manual intervention. The boolean
+      // return drives the one-shot recovery toast in the UI.
+      final recovered = await git.abortMergeStateIfAny();
+      if (recovered) out.add(const SyncRecoveredStaleMerge());
 
       final defaultBranch = repo.defaultBranch;
       out.add(const SyncFetching());

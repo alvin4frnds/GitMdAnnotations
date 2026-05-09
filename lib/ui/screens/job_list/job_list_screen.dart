@@ -16,6 +16,7 @@ import '../../../domain/entities/job.dart';
 import '../../../domain/entities/phase.dart';
 import '../../../domain/entities/repo_ref.dart';
 import '../../../domain/entities/source_kind.dart';
+import '../../../domain/services/sync_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../changelog_viewer/changelog_viewer_screen.dart';
@@ -517,6 +518,17 @@ class _TopChrome extends ConsumerWidget {
           content: Text('Sync failed: ${nextVal.error}'),
           backgroundColor: t.statusDanger,
           duration: const Duration(seconds: 6),
+        ));
+      } else if (nextVal is SyncInProgress &&
+          nextVal.latest is SyncRecoveredStaleMerge) {
+        // Neutral one-shot toast — distinct from the red SyncErrored
+        // banner. Tells the user that the previous run left the repo
+        // in a half-merged state and we cleaned it up; the sync is
+        // continuing normally. Recurring occurrences here are a smell
+        // and a paper trail for chasing the upstream root cause.
+        messenger?.showSnackBar(const SnackBar(
+          content: Text('Recovered from a prior incomplete sync — retrying'),
+          duration: Duration(seconds: 4),
         ));
       }
     });
