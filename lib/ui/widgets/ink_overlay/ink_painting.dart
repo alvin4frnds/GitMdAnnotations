@@ -48,6 +48,22 @@ void paintStrokeGroups(
   );
 }
 
+/// `streamline` is perfect_freehand's low-pass filter on input points —
+/// the higher the value, the smoother the curve but the more the
+/// rendered stroke lags behind the pen tip. The default of 0.5 gave a
+/// visible "trail" on the OnePlus Pad Go 2 that read as a render delay.
+/// 0.2 keeps the curve smoothing without the perceptual lag.
+const double _kStreamline = 0.2;
+
+/// `thinning` controls how strongly pressure modulates stroke width.
+/// At 0.5 (default) the in-flight stroke (simulated pressure) and the
+/// committed stroke (real digitizer pressure) render at noticeably
+/// different widths — a snap on pen-up that the user reads as a 1-s
+/// delay. 0.0 = uniform width regardless of pressure; eliminates the
+/// snap, sacrifices pressure-aware tapering. Annotation strokes on a
+/// review surface read better as uniform-width anyway.
+const double _kThinning = 0.0;
+
 void _paintStroke(Canvas canvas, Stroke stroke) {
   if (stroke.points.isEmpty) return;
   final color = _parseHex(stroke.color).withValues(alpha: stroke.opacity);
@@ -66,10 +82,12 @@ void _paintStroke(Canvas canvas, Stroke stroke) {
     ],
     options: StrokeOptions(
       size: stroke.strokeWidth,
-      // Stored strokes already carry the digitizer's pressure samples,
-      // so `simulatePressure: false` consumes them as-is. The submit-
-      // time PNG/PDF flatten and the on-screen render share this
-      // function, so both surfaces taper identically.
+      thinning: _kThinning,
+      streamline: _kStreamline,
+      // `simulatePressure: false` consumes real digitizer pressure
+      // samples; safe because `thinning: 0` makes the value irrelevant
+      // to width — kept for parity with the active path so future
+      // pressure plumbing only needs to flip thinning.
       simulatePressure: false,
       isComplete: true,
     ),
@@ -96,11 +114,12 @@ void _paintActiveStroke(
     ],
     options: StrokeOptions(
       size: width,
-      // Active stroke has no pressure samples (the listener buffers
-      // Offsets only), so let perfect_freehand simulate pressure from
-      // velocity. `isComplete: false` leaves the trailing tail un-
-      // capped so the in-flight stroke doesn't visibly snap each frame.
+      thinning: _kThinning,
+      streamline: _kStreamline,
       simulatePressure: true,
+      // `isComplete: false` leaves the trailing tail un-capped so the
+      // in-flight stroke doesn't visibly snap each frame as new
+      // samples arrive.
       isComplete: false,
     ),
   );
