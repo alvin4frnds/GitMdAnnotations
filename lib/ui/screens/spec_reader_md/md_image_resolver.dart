@@ -18,6 +18,16 @@ import '../../widgets/mermaid_view/mermaid_view.dart';
 /// all three surfaces render identically.
 const double _kImageMaxWidth = 880;
 
+/// Maximum logical height an inline image renders at. Without this cap,
+/// a tall mockup screenshot (e.g. 1920×1080) clamped only by width
+/// renders ~500 canonical px tall, which the canonical-page transform
+/// scales to ~1500 physical px on the OnePlus Pad Go 2 — dominating the
+/// viewport so badly that the user reads "only images, no text." With a
+/// 400-px cap and `BoxFit.contain`, the same image renders ~711×400
+/// canonical (preserving aspect ratio), leaving room for surrounding
+/// markdown text on the same scroll position.
+const double _kImageMaxHeight = 400;
+
 /// Pinned skeleton-card height while bytes are decoding. Tall enough
 /// (≥ 120 px per spec-004 §10) that `MarkdownBody(shrinkWrap: true)`
 /// doesn't collapse the row to zero during the async decode — without
@@ -364,9 +374,13 @@ class _ClampedImageFile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: _kImageMaxWidth),
+      constraints: const BoxConstraints(
+        maxWidth: _kImageMaxWidth,
+        maxHeight: _kImageMaxHeight,
+      ),
       child: Image.file(
         File(absPath),
+        fit: BoxFit.contain,
         frameBuilder: (ctx, child, frame, _) {
           if (frame == null) return _imageSkeletonCard(ctx, alt: alt);
           return child;
@@ -382,13 +396,14 @@ class _ClampedImageFile extends StatelessWidget {
   }
 }
 
-/// SVG-backed image clamped to [_kImageMaxWidth] with the same
-/// stable-height skeleton as [_ClampedImageFile]. flutter_svg has no
-/// `errorBuilder`; the stack-trace path inside [SvgPicture.file] would
-/// surface as a thrown exception during paint, which `flutter_markdown`
-/// would propagate. We accept that risk for v1 — the prior code had no
-/// error path either; if QA shows breakage on a malformed SVG we can
-/// pull the read into a `FutureBuilder<String>` like [_MmdReference].
+/// SVG-backed image clamped to [_kImageMaxWidth] / [_kImageMaxHeight]
+/// with the same stable-height skeleton as [_ClampedImageFile].
+/// flutter_svg has no `errorBuilder`; the stack-trace path inside
+/// [SvgPicture.file] would surface as a thrown exception during paint,
+/// which `flutter_markdown` would propagate. We accept that risk for
+/// v1 — the prior code had no error path either; if QA shows breakage
+/// on a malformed SVG we can pull the read into a
+/// `FutureBuilder<String>` like [_MmdReference].
 class _ClampedSvgFile extends StatelessWidget {
   const _ClampedSvgFile({required this.absPath, required this.alt});
   final String absPath;
@@ -397,9 +412,13 @@ class _ClampedSvgFile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: _kImageMaxWidth),
+      constraints: const BoxConstraints(
+        maxWidth: _kImageMaxWidth,
+        maxHeight: _kImageMaxHeight,
+      ),
       child: SvgPicture.file(
         File(absPath),
+        fit: BoxFit.contain,
         placeholderBuilder: (ctx) => _imageSkeletonCard(ctx, alt: alt),
       ),
     );
@@ -459,9 +478,13 @@ class _NetworkImageState extends ConsumerState<_NetworkImage> {
           );
         }
         return ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: _kImageMaxWidth),
+          constraints: const BoxConstraints(
+            maxWidth: _kImageMaxWidth,
+            maxHeight: _kImageMaxHeight,
+          ),
           child: Image.file(
             File(path),
+            fit: BoxFit.contain,
             frameBuilder: (ctx, child, frame, _) {
               if (frame == null) {
                 return _imageSkeletonCard(ctx, alt: widget.alt);
