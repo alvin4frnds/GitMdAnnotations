@@ -123,16 +123,20 @@ void main() {
     await tester.pump();
 
     // Awaiting-user panel must render the seeded code plus the verification
-    // caption so the demo reviewer can act on it.
+    // caption so the demo reviewer can act on it. Caption text matches the
+    // post-26b64af UX (auto-copy + Copy & open GitHub button).
     expect(find.text('WDJB-MJHT'), findsOneWidget);
     expect(
-      find.text('Open github.com/login/device and enter this code.'),
+      find.text('Code copied to clipboard. Paste at github.com/login/device.'),
       findsOneWidget,
     );
 
-    // Wait (real time) for the 3-step poll script to resolve.
+    // Wait (real time) for the 3-step poll script to resolve. The poll
+    // interval is 5 ms × 3 polls = 15 ms ideal, but full-suite runs add
+    // scheduler jitter — give the wall-clock budget enough headroom that
+    // the test is robust to a busy host without slowing isolated runs.
     await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 80));
+      await Future<void>.delayed(const Duration(milliseconds: 400));
     });
     await tester.pump();
     await tester.pump();

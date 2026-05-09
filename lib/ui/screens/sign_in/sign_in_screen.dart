@@ -25,6 +25,12 @@ class SignInScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
     final async = ref.watch(authControllerProvider);
+    // The card grows when AuthDeviceFlowAwaitingUser stacks the device-code
+    // panel under the brand + buttons. On tight viewports (landscape phone
+    // with keyboard, split-screen tablet, the widget-test surface) that
+    // exceeds the available height. LayoutBuilder + SingleChildScrollView +
+    // ConstrainedBox(minHeight) keeps the card centred when it fits and
+    // makes it scroll when it doesn't.
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -33,19 +39,26 @@ class SignInScreen extends ConsumerWidget {
           colors: [t.accentSoftBg, t.surfaceBackground],
         ),
       ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 380),
-          child: Card(
-            elevation: 0,
-            color: t.surfaceElevated,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: t.borderSubtle),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
-              child: _SignInBody(async: async),
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 380),
+                child: Card(
+                  elevation: 0,
+                  color: t.surfaceElevated,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: t.borderSubtle),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
+                    child: _SignInBody(async: async),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
