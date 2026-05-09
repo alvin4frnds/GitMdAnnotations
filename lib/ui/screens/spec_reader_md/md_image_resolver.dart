@@ -22,11 +22,11 @@ const double _kImageMaxWidth = 880;
 /// a tall mockup screenshot (e.g. 1920×1080) clamped only by width
 /// renders ~500 canonical px tall, which the canonical-page transform
 /// scales to ~1500 physical px on the OnePlus Pad Go 2 — dominating the
-/// viewport so badly that the user reads "only images, no text." With a
-/// 400-px cap and `BoxFit.contain`, the same image renders ~711×400
-/// canonical (preserving aspect ratio), leaving room for surrounding
-/// markdown text on the same scroll position.
-const double _kImageMaxHeight = 400;
+/// viewport so badly that the user reads "only images, no text." 280
+/// canonical px ≈ 870 physical px on the tablet (~44% of viewport
+/// height), leaving room for surrounding markdown text + the next
+/// image to render on the same scroll position.
+const double _kImageMaxHeight = 280;
 
 /// Pinned skeleton-card height while bytes are decoding. Tall enough
 /// (≥ 120 px per spec-004 §10) that `MarkdownBody(shrinkWrap: true)`
