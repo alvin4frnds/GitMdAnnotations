@@ -77,26 +77,40 @@ class SpecImporter {
     final baseSlug = slugify(base);
     final jobId = await _resolveCollision(baseSlug, workdir);
 
-    final FileWrite write;
+    final List<FileWrite> writes;
     if (isPdf) {
-      write = FileWrite(
-        path: 'jobs/pending/$jobId/spec.pdf',
-        contents: '',
-        bytes: bytes,
-      );
+      writes = [
+        FileWrite(
+          path: 'jobs/pending/$jobId/spec.pdf',
+          contents: '',
+          bytes: bytes,
+        ),
+      ];
     } else {
-      write = FileWrite(
+      final spec = FileWrite(
         path: 'jobs/pending/$jobId/02-spec.md',
         contents: _composeSpec(
           sourceRelPath: normalized,
           contents: contents!,
         ),
       );
+      // Carry referenced inline images alongside the spec so the
+      // markdown renderer (md_image_resolver) finds them at the same
+      // relative path it already joins. Without this, every imported
+      // spec with image refs renders the loud "image not found" card
+      // because only the .md was copied.
+      final imageWrites = await _collectInlineImageWrites(
+        sourceContents: contents,
+        sourceRelPath: normalized,
+        jobId: jobId,
+        workdir: workdir,
+      );
+      writes = [spec, ...imageWrites];
     }
 
     try {
       final commit = await _git.commit(
-        files: [write],
+        files: writes,
         message: 'Import $normalized as $jobId',
         id: identity,
         branch: 'claude-jobs',
@@ -109,6 +123,77 @@ class SpecImporter {
       return SpecImportFailure('Commit failed: $e', cause: e);
     }
   }
+
+  /// Scans [sourceContents] for `![alt](path)` references and reads
+  /// each relative file from the source repo so it can be committed
+  /// alongside the spec. Skips:
+  ///   * `http`/`https` URLs (fetched + cached at render time by
+  ///     [NetworkImageCache]).
+  ///   * Absolute paths (`/abs/…` or `file://…`) — meaningless after
+  ///     the spec moves into `jobs/pending/`.
+  ///   * Refs whose source file is missing — the resolver will surface
+  ///     a loud error card at render time, which is the same UX as
+  ///     before this fix.
+  Future<List<FileWrite>> _collectInlineImageWrites({
+    required String sourceContents,
+    required String sourceRelPath,
+    required String jobId,
+    required String workdir,
+  }) async {
+    final sourceDir = _dirname(sourceRelPath);
+    final seen = <String>{};
+    final writes = <FileWrite>[];
+    for (final match in _imageRefPattern.allMatches(sourceContents)) {
+      final rawHref = match.group(1)?.trim();
+      if (rawHref == null || rawHref.isEmpty) continue;
+      // Strip optional `"title"` after the URL: `![](foo.png "alt")`.
+      final href = rawHref.split(RegExp(r'\s+')).first;
+      if (!_isCopyableImageRef(href)) continue;
+      if (!seen.add(href)) continue; // dedupe identical refs
+
+      final sourceImagePath = sourceDir.isEmpty
+          ? '$workdir/$href'
+          : '$workdir/$sourceDir/$href';
+      final destImagePath = 'jobs/pending/$jobId/$href';
+
+      try {
+        final bytes = await _fs.readBytes(sourceImagePath);
+        writes.add(FileWrite(
+          path: destImagePath,
+          contents: '',
+          bytes: Uint8List.fromList(bytes),
+        ));
+      } on FsError {
+        // Missing or unreadable — skip silently. The resolver renders a
+        // loud "image not found" card at the destination path; that's
+        // the same diagnostic the user gets if they reference an image
+        // that never existed.
+        continue;
+      }
+    }
+    return writes;
+  }
+
+  static bool _isCopyableImageRef(String href) {
+    final lower = href.toLowerCase();
+    if (lower.startsWith('http://') || lower.startsWith('https://')) {
+      return false;
+    }
+    if (lower.startsWith('file://')) return false;
+    if (href.startsWith('/')) return false; // absolute path
+    if (lower.startsWith('data:')) return false;
+    return true;
+  }
+
+  static String _dirname(String relPath) {
+    final slash = relPath.lastIndexOf('/');
+    return slash < 0 ? '' : relPath.substring(0, slash);
+  }
+
+  /// CommonMark inline image: `![alt](url)`. Captures the URL portion
+  /// (which may include a title segment after whitespace, stripped
+  /// downstream).
+  static final RegExp _imageRefPattern = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
 
   static bool _hasPdfExtension(String path) =>
       path.toLowerCase().endsWith('.pdf');

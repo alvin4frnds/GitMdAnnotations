@@ -118,6 +118,133 @@ void main() {
       );
     });
 
+    test('copies referenced inline images alongside the spec '
+        '(spec-004 follow-up)', () async {
+      final fs = FakeFileSystem()
+        ..seedFile(
+          '/repo/docs/orchestrator/walk.md',
+          '# Walk\n\n'
+              '![A](assets/a.png)\n'
+              '![B](assets/b.png)\n'
+              '![Remote](https://example.com/c.png)\n'
+              '![Title with spaces](assets/d.png "tooltip")\n',
+        );
+      await fs.writeBytes(
+        '/repo/docs/orchestrator/assets/a.png',
+        Uint8List.fromList([1, 1]),
+      );
+      await fs.writeBytes(
+        '/repo/docs/orchestrator/assets/b.png',
+        Uint8List.fromList([2, 2]),
+      );
+      await fs.writeBytes(
+        '/repo/docs/orchestrator/assets/d.png',
+        Uint8List.fromList([4, 4]),
+      );
+      final git = FakeGitPort();
+      final importer = _buildImporter(fs, git);
+
+      final outcome = await importer.importFromRepoPath(
+        sourceRelPath: 'docs/orchestrator/walk.md',
+        repo: _repo,
+        workdir: '/repo',
+        identity: _identity,
+      );
+
+      expect(outcome, isA<SpecImportSuccess>());
+      // The spec lands as a string write…
+      final stringTree = git.branches['claude-jobs']!;
+      expect(
+        stringTree.keys,
+        contains('jobs/pending/spec-walk/02-spec.md'),
+      );
+      // …and the three local images land as binary writes alongside it,
+      // at the same relative path the markdown references.
+      final binTree = git.binaryBranches['claude-jobs']!;
+      expect(binTree.keys.toSet(), {
+        'jobs/pending/spec-walk/assets/a.png',
+        'jobs/pending/spec-walk/assets/b.png',
+        'jobs/pending/spec-walk/assets/d.png',
+      });
+      expect(binTree['jobs/pending/spec-walk/assets/a.png'], [1, 1]);
+      expect(binTree['jobs/pending/spec-walk/assets/d.png'], [4, 4]);
+    });
+
+    test('skips image refs whose source file is missing — '
+        'resolver shows loud error card at render time', () async {
+      final fs = FakeFileSystem()
+        ..seedFile(
+          '/repo/docs/walk.md',
+          '# x\n![A](assets/exists.png)\n![B](assets/nope.png)\n',
+        );
+      await fs.writeBytes(
+        '/repo/docs/assets/exists.png',
+        Uint8List.fromList([1]),
+      );
+      final git = FakeGitPort();
+      final importer = _buildImporter(fs, git);
+
+      final outcome = await importer.importFromRepoPath(
+        sourceRelPath: 'docs/walk.md',
+        repo: _repo,
+        workdir: '/repo',
+        identity: _identity,
+      );
+
+      expect(outcome, isA<SpecImportSuccess>());
+      final binTree = git.binaryBranches['claude-jobs']!;
+      expect(binTree.keys, ['jobs/pending/spec-walk/assets/exists.png']);
+    });
+
+    test('image ref dedupe: the same href used twice is committed once',
+        () async {
+      final fs = FakeFileSystem()
+        ..seedFile(
+          '/repo/walk.md',
+          '![1](pic.png)\n\nlater: ![2](pic.png)\n',
+        );
+      await fs.writeBytes('/repo/pic.png', Uint8List.fromList([7]));
+      final git = FakeGitPort();
+      final importer = _buildImporter(fs, git);
+
+      final outcome = await importer.importFromRepoPath(
+        sourceRelPath: 'walk.md',
+        repo: _repo,
+        workdir: '/repo',
+        identity: _identity,
+      );
+
+      expect(outcome, isA<SpecImportSuccess>());
+      final binTree = git.binaryBranches['claude-jobs']!;
+      expect(binTree.keys, ['jobs/pending/spec-walk/pic.png']);
+    });
+
+    test('absolute / data: / file: refs are not copied', () async {
+      final fs = FakeFileSystem()
+        ..seedFile(
+          '/repo/walk.md',
+          '![A](/abs/x.png)\n'
+              '![B](file:///etc/passwd)\n'
+              '![C](data:image/png;base64,iVBOR)\n',
+        );
+      // Even if /abs/x.png exists in the fake FS, it must not be copied —
+      // the resolver doesn't anchor absolute paths to the spec dir.
+      await fs.writeBytes('/abs/x.png', Uint8List.fromList([9]));
+      final git = FakeGitPort();
+      final importer = _buildImporter(fs, git);
+
+      final outcome = await importer.importFromRepoPath(
+        sourceRelPath: 'walk.md',
+        repo: _repo,
+        workdir: '/repo',
+        identity: _identity,
+      );
+
+      expect(outcome, isA<SpecImportSuccess>());
+      final binTree = git.binaryBranches['claude-jobs'] ?? const {};
+      expect(binTree, isEmpty);
+    });
+
     test('leading-slash in relPath is normalised', () async {
       final fs = FakeFileSystem()..seedFile('/repo/notes.md', '# x');
       final git = FakeGitPort();
