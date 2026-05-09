@@ -258,7 +258,7 @@ Deferred findings from milestone QA rounds. Critical + High items are fixed befo
 
 ## From M1b close-out QA round 1 (2026-04-20)
 
-Reference: `docs/_m1b_qa_round1.md` + 25 screenshots in `docs/_m1b_qa_round1/`. 0 Critical / 0 High / 1 Medium / 3 Low. Clean pass — close-out loop did not iterate.
+0 Critical / 0 High / 1 Medium / 3 Low. Clean pass — close-out loop did not iterate.
 
 ### Issue: PDF mockup pages render "Failed to render page N" instead of transparent placeholders
 - **Severity:** Medium
@@ -299,14 +299,14 @@ Reference: `docs/_m1b_qa_round1.md` + 25 screenshots in `docs/_m1b_qa_round1/`. 
 
 ### Issue: Sync Up badge does not reflect local unpushed commits
 - **Severity:** Medium
-- **Source:** Phase-1 close-out QA (2026-04-21) — F2 in `docs/_m1_phase1_close.md`.
+- **Source:** Phase-1 close-out QA (2026-04-21) — F2.
 - **Screen/area:** `lib/ui/screens/job_list/job_list_screen.dart` (Sync Up chrome), `lib/app/controllers/sync_controller.dart`.
 - **Detail:** After a successful local review commit, the JobList's "Sync Up [N]" pill still reads `0`. Users get no visible indication that commits are queued waiting for a push. The SnackBar "Review committed locally. Push on next Sync Up." promises the pending work is there, but the badge contradicts that — the offline queue is invisible.
 - **Proposed fix:** Surface `git log origin/claude-jobs..claude-jobs --count` as a provider that the JobList chrome watches. Invalidate the provider on every `ReviewSubmitter.submit` / `.approve` success and after every `SyncController.syncUp` so the badge re-queries. Guard against zero-upstream (fresh clone with no origin) by falling back to 0 rather than throwing.
 
 ### Issue: Changelog viewer does not show local unpushed commits
 - **Severity:** Low
-- **Source:** Phase-1 close-out QA (2026-04-21) — F3 in `docs/_m1_phase1_close.md`.
+- **Source:** Phase-1 close-out QA (2026-04-21) — F3.
 - **Screen/area:** `lib/ui/screens/changelog_viewer/changelog_viewer_screen.dart`, `lib/app/controllers/changelog_viewer_controller.dart`, `lib/domain/services/changelog_aggregator.dart`.
 - **Detail:** After a local review commit that appends a changelog line, the Changelog viewer still reads `0 entries`. Either the aggregator reads from a source that only reflects pushed state, or the viewer's cache isn't invalidated on commit.
 - **Proposed fix:** Share the same invalidation hook as the Sync Up badge fix above — on every local commit completion, `ref.invalidate(changelogViewerControllerProvider)` so the aggregator re-reads the on-disk CHANGELOG files.

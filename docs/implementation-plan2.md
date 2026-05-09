@@ -98,7 +98,7 @@ Scope:
 - **Accept:** widget test + unit test covering save-on-timer + restore-on-reopen.
 
 #### 4.4 — M1c close-out QA round  _[~4 hrs, do myself]_
-Build release APK, install on tablet (now with real libgit2 from Wave 2), drive full golden path via ADB per the standing memory loop, capture screenshots, triage findings. `docs/_m1c_qa_round1*` (already locally untracked) may have scaffolding — reuse or supersede.
+Build release APK, install on tablet (now with real libgit2 from Wave 2), drive full golden path via ADB per the standing memory loop, capture screenshots, triage findings.
 - **Accept:** no Critical / High findings; Medium/Low to Issues.md; PROGRESS.md closes M1c.
 
 ### Wave 5 — M1d (runs after M1c closes; streams inside can parallelize)
