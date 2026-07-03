@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:perfect_freehand/perfect_freehand.dart';
 
 import '../../../domain/entities/stroke.dart';
 import '../../../domain/entities/stroke_group.dart';
@@ -19,13 +18,19 @@ import '../../../domain/entities/stroke_group.dart';
 /// The function does not scale, translate, or clip — it assumes the caller
 /// has sized the canvas to match the logical stroke coordinate space.
 ///
-/// **Smoothing.** Strokes are rendered through `perfect_freehand` which
-/// turns the sampled pointer points into a tapered, pressure-aware
-/// outline polygon and fills it. This eliminates the polygonal `lineTo`
-/// look that bare canvas paths produce on fast strokes (e.g. a quickly
-/// drawn circle showed visible straight edges before this change).
-/// Stored `Stroke.points` are unchanged on disk — smoothing is render-
-/// time-only.
+/// **Rendering.** We draw a smooth [Catmull-Rom] spline **through the actual
+/// captured points**, stroked at the full nominal width with round caps and
+/// joins. The spline passes through every sampled point (so the ink is
+/// faithful to what the pen drew) but curves between them, so sparse samples
+/// on a fast stroke read as a smooth line rather than straight facets. This
+/// is deliberately NOT `perfect_freehand`'s tapered-outline fill: resampling
+/// the points into a coarse outline is what made fast strokes look
+/// facetted/"rough", and smoothing that outline through its midpoints
+/// pinched thin strokes until handwriting became illegible. A stroked
+/// centerline keeps every stroke full-width and legible. Stored
+/// `Stroke.points` are unchanged on disk — this is render-time only.
+///
+/// [Catmull-Rom]: https://en.wikipedia.org/wiki/Centripetal_Catmull%E2%80%93Rom_spline
 void paintStrokeGroups(
   Canvas canvas, {
   required List<StrokeGroup> groups,
@@ -48,51 +53,15 @@ void paintStrokeGroups(
   );
 }
 
-/// `streamline` is perfect_freehand's low-pass filter on input points —
-/// the higher the value, the smoother the curve but the more the
-/// rendered stroke lags behind the pen tip. The default of 0.5 gave a
-/// visible "trail" on the OnePlus Pad Go 2 that read as a render delay.
-/// 0.2 keeps the curve smoothing without the perceptual lag.
-const double _kStreamline = 0.2;
-
-/// `thinning` controls how strongly pressure modulates stroke width.
-/// At 0.5 (default) the in-flight stroke (simulated pressure) and the
-/// committed stroke (real digitizer pressure) render at noticeably
-/// different widths — a snap on pen-up that the user reads as a 1-s
-/// delay. 0.0 = uniform width regardless of pressure; eliminates the
-/// snap, sacrifices pressure-aware tapering. Annotation strokes on a
-/// review surface read better as uniform-width anyway.
-const double _kThinning = 0.0;
-
 void _paintStroke(Canvas canvas, Stroke stroke) {
   if (stroke.points.isEmpty) return;
   final color = _parseHex(stroke.color).withValues(alpha: stroke.opacity);
-  if (stroke.points.length == 1) {
-    final p = stroke.points.first;
-    canvas.drawCircle(
-      Offset(p.x, p.y),
-      stroke.strokeWidth,
-      Paint()..color = color,
-    );
-    return;
-  }
-  final outline = getStroke(
-    [
-      for (final p in stroke.points) PointVector(p.x, p.y, p.pressure),
-    ],
-    options: StrokeOptions(
-      size: stroke.strokeWidth,
-      thinning: _kThinning,
-      streamline: _kStreamline,
-      // `simulatePressure: false` consumes real digitizer pressure
-      // samples; safe because `thinning: 0` makes the value irrelevant
-      // to width — kept for parity with the active path so future
-      // pressure plumbing only needs to flip thinning.
-      simulatePressure: false,
-      isComplete: true,
-    ),
+  _strokeSmooth(
+    canvas,
+    [for (final p in stroke.points) Offset(p.x, p.y)],
+    stroke.strokeWidth,
+    color,
   );
-  _fillOutline(canvas, outline, color);
 }
 
 void _paintActiveStroke(
@@ -103,40 +72,52 @@ void _paintActiveStroke(
   required double opacity,
 }) {
   if (points.isEmpty) return;
-  final paintColor = color.withValues(alpha: opacity);
-  if (points.length == 1) {
-    canvas.drawCircle(points.first, width, Paint()..color = paintColor);
-    return;
-  }
-  final outline = getStroke(
-    [
-      for (final p in points) PointVector(p.dx, p.dy),
-    ],
-    options: StrokeOptions(
-      size: width,
-      thinning: _kThinning,
-      streamline: _kStreamline,
-      simulatePressure: true,
-      // `isComplete: false` leaves the trailing tail un-capped so the
-      // in-flight stroke doesn't visibly snap each frame as new
-      // samples arrive.
-      isComplete: false,
-    ),
-  );
-  _fillOutline(canvas, outline, paintColor);
+  _strokeSmooth(canvas, points, width, color.withValues(alpha: opacity));
 }
 
-/// Fills the closed [outline] polygon produced by `getStroke`. The
-/// outline already encodes the stroke's tapered edges; a plain fill is
-/// the right paint mode (no `strokeWidth` needed).
-void _fillOutline(Canvas canvas, List<Offset> outline, Color color) {
-  if (outline.isEmpty) return;
-  final path = Path()..moveTo(outline.first.dx, outline.first.dy);
-  for (var i = 1; i < outline.length; i++) {
-    path.lineTo(outline[i].dx, outline[i].dy);
+/// Strokes a smooth Catmull-Rom spline through [points] at [width] in
+/// [color]. A single point renders as a dot the same thickness as the line;
+/// two points render as a straight segment. Round caps/joins keep the ends
+/// and any true corner clean.
+void _strokeSmooth(
+  Canvas canvas,
+  List<Offset> points,
+  double width,
+  Color color,
+) {
+  if (points.isEmpty) return;
+  if (points.length == 1) {
+    canvas.drawCircle(points.first, width / 2, Paint()..color = color);
+    return;
   }
-  path.close();
-  canvas.drawPath(path, Paint()..color = color);
+  final path = Path()..moveTo(points.first.dx, points.first.dy);
+  if (points.length == 2) {
+    path.lineTo(points[1].dx, points[1].dy);
+  } else {
+    // Catmull-Rom → cubic bezier: the tangent at each point is 1/6 of the
+    // vector between its neighbours (standard tension). The curve interpolates
+    // every point, so it stays faithful to the stroke while rounding the gaps
+    // between sparse samples. Ends clamp to themselves (no phantom neighbour).
+    for (var i = 0; i < points.length - 1; i++) {
+      final p0 = points[i == 0 ? 0 : i - 1];
+      final p1 = points[i];
+      final p2 = points[i + 1];
+      final p3 = points[i + 2 < points.length ? i + 2 : points.length - 1];
+      final c1 = Offset(p1.dx + (p2.dx - p0.dx) / 6, p1.dy + (p2.dy - p0.dy) / 6);
+      final c2 = Offset(p2.dx - (p3.dx - p1.dx) / 6, p2.dy - (p3.dy - p1.dy) / 6);
+      path.cubicTo(c1.dx, c1.dy, c2.dx, c2.dy, p2.dx, p2.dy);
+    }
+  }
+  canvas.drawPath(
+    path,
+    Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..isAntiAlias = true,
+  );
 }
 
 /// Parses a 7-character canonical light-mode hex (`#RRGGBB`) into a fully

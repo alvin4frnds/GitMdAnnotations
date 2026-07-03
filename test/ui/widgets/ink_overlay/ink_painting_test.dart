@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -97,6 +98,33 @@ void main() {
         activeStrokePoints: const [],
         activeStrokeColor: const Color(0xFF000000),
         activeStrokeWidth: 2.0,
+      );
+      recorder.endRecording().dispose();
+    });
+
+    test('renders a coarse closed loop (many-point stroke) without throwing '
+        'via the actual-stroke polyline path (BUG-1)', () {
+      // A sparsely-sampled circle is the case that exposed the facetted
+      // "rough lines" bug. It now renders as a stroked polyline through the
+      // real points (full width, round joins) rather than a resampled
+      // perfect_freehand outline. Guards that path from regressing to a
+      // crash on the closed-loop / repeated-endpoint handling.
+      final recorder = ui.PictureRecorder();
+      final canvas = _canvasOn(recorder);
+      const cx = 60.0, cy = 60.0, r = 40.0;
+      final pts = [
+        for (var i = 0; i <= 12; i++)
+          Offset(cx + r * math.cos(i * math.pi / 6),
+              cy + r * math.sin(i * math.pi / 6)),
+      ];
+      paintStrokeGroups(
+        canvas,
+        groups: [
+          _group([_stroke(pts)]),
+        ],
+        activeStrokePoints: pts,
+        activeStrokeColor: const Color(0xFFDC2626),
+        activeStrokeWidth: 3.5,
       );
       recorder.endRecording().dispose();
     });
