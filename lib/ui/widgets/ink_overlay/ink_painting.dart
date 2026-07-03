@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:perfect_freehand/perfect_freehand.dart';
 
 import '../../../domain/entities/stroke.dart';
 import '../../../domain/entities/stroke_group.dart';
@@ -18,19 +19,16 @@ import '../../../domain/entities/stroke_group.dart';
 /// The function does not scale, translate, or clip — it assumes the caller
 /// has sized the canvas to match the logical stroke coordinate space.
 ///
-/// **Rendering.** We draw a smooth [Catmull-Rom] spline **through the actual
-/// captured points**, stroked at the full nominal width with round caps and
-/// joins. The spline passes through every sampled point (so the ink is
-/// faithful to what the pen drew) but curves between them, so sparse samples
-/// on a fast stroke read as a smooth line rather than straight facets. This
-/// is deliberately NOT `perfect_freehand`'s tapered-outline fill: resampling
-/// the points into a coarse outline is what made fast strokes look
-/// facetted/"rough", and smoothing that outline through its midpoints
-/// pinched thin strokes until handwriting became illegible. A stroked
-/// centerline keeps every stroke full-width and legible. Stored
-/// `Stroke.points` are unchanged on disk — this is render-time only.
-///
-/// [Catmull-Rom]: https://en.wikipedia.org/wiki/Centripetal_Catmull%E2%80%93Rom_spline
+/// **Rendering.** The pen renders as a variable-width nib: `perfect_freehand`
+/// turns the sampled points into a tapered outline whose width swells where
+/// the pen moved slowly and thins where it moved fast (velocity-simulated
+/// pressure), and we fill that outline as a *smooth* path — every outline
+/// vertex is a quadratic control point, the curve passes through the
+/// midpoints — so even sparse samples on a fast stroke read as a smooth,
+/// pen-like line rather than the flat, uniform-width marker the previous
+/// constant-stroke renderer produced. The highlighter (a wide, chisel tool)
+/// stays deliberately flat/uniform via a constant-width centreline stroke.
+/// Stored `Stroke.points` are unchanged on disk — this is render-time only.
 void paintStrokeGroups(
   Canvas canvas, {
   required List<StrokeGroup> groups,
@@ -56,12 +54,10 @@ void paintStrokeGroups(
 void _paintStroke(Canvas canvas, Stroke stroke) {
   if (stroke.points.isEmpty) return;
   final color = _parseHex(stroke.color).withValues(alpha: stroke.opacity);
-  _strokeSmooth(
-    canvas,
-    [for (final p in stroke.points) Offset(p.x, p.y)],
-    stroke.strokeWidth,
-    color,
-  );
+  final points = [
+    for (final p in stroke.points) PointVector(p.x, p.y, p.pressure),
+  ];
+  _paint(canvas, points, stroke.strokeWidth, color, isComplete: true);
 }
 
 void _paintActiveStroke(
@@ -72,32 +68,103 @@ void _paintActiveStroke(
   required double opacity,
 }) {
   if (points.isEmpty) return;
-  _strokeSmooth(canvas, points, width, color.withValues(alpha: opacity));
+  // The active-stroke listenable only carries positions; velocity-simulated
+  // pressure (below) derives the taper from point spacing, so a flat 0.5 here
+  // is fine — `simulatePressure` ignores it. `isComplete: false` lets the
+  // growing tip round off cleanly while the stroke is still being drawn.
+  final vectors = [for (final p in points) PointVector(p.dx, p.dy, 0.5)];
+  _paint(canvas, vectors, width, color.withValues(alpha: opacity),
+      isComplete: false);
 }
 
-/// Strokes a smooth Catmull-Rom spline through [points] at [width] in
-/// [color]. A single point renders as a dot the same thickness as the line;
-/// two points render as a straight segment. Round caps/joins keep the ends
-/// and any true corner clean.
-void _strokeSmooth(
+/// The pen nib width (2.0) and highlighter width (16.0) are far enough apart
+/// that width alone tells the tools apart without threading tool identity
+/// through the render layer. Anything at/above this is the flat highlighter.
+const double _kHighlighterMinWidth = 8.0;
+
+/// Base-diameter multiplier for the pen. The stored [Stroke.strokeWidth] is
+/// the nominal nib width (2.0); `perfect_freehand`'s `size` is the *neutral*
+/// diameter (`size = width * factor`) and pressure/velocity swell or thin it:
+/// the drawn diameter ranges `size*(1-thinning)` … `size*(1+thinning)`. At
+/// factor 1.7 / thinning 0.5 that is ~1.7px (fast) to ~5px (slow) — a thin
+/// pen with a gentle calligraphic taper, not the heavy marker an earlier
+/// bolder setting produced. Tuned by eye on-device against OneNote.
+const double _kPenSizeFactor = 1.7;
+
+void _paint(
+  Canvas canvas,
+  List<PointVector> points,
+  double width,
+  Color color, {
+  required bool isComplete,
+}) {
+  if (points.length == 1) {
+    canvas.drawCircle(points.first, width / 2, Paint()..color = color);
+    return;
+  }
+  if (width >= _kHighlighterMinWidth) {
+    _strokeFlat(canvas, points, width, color);
+    return;
+  }
+  final outline = getStroke(
+    points,
+    options: StrokeOptions(
+      size: width * _kPenSizeFactor,
+      thinning: 0.5,
+      // Keep the rendered line faithful to the raw pen path. `streamline` is a
+      // low-pass filter on the input points; at the library default (0.55) it
+      // lags and rounds off quick direction changes ("auto-corrects" the
+      // stroke). A low value de-jitters only lightly so sharp/fast movements
+      // survive, matching OneNote's gentler smoothing. `smoothing` only softens
+      // the outline edges, so it can stay moderate without eating corners.
+      smoothing: 0.45,
+      streamline: 0.2,
+      simulatePressure: true,
+      isComplete: isComplete,
+    ),
+  );
+  if (outline.isEmpty) return;
+  canvas.drawPath(
+    _outlineToPath(outline),
+    Paint()
+      ..color = color
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true,
+  );
+}
+
+/// Builds a smooth closed [Path] around the `perfect_freehand` [outline]:
+/// each vertex is a quadratic control point and the curve passes through the
+/// midpoint of every edge, so the filled boundary is round, never facetted.
+Path _outlineToPath(List<Offset> outline) {
+  final path = Path()..moveTo(outline.first.dx, outline.first.dy);
+  for (var i = 0; i < outline.length; i++) {
+    final p0 = outline[i];
+    final p1 = outline[(i + 1) % outline.length];
+    path.quadraticBezierTo(
+      p0.dx,
+      p0.dy,
+      (p0.dx + p1.dx) / 2,
+      (p0.dy + p1.dy) / 2,
+    );
+  }
+  return path..close();
+}
+
+/// Flat, uniform-width centreline stroke for the highlighter — a Catmull-Rom
+/// spline through the points so it stays smooth, stroked at the full nominal
+/// [width] with round caps/joins. Deliberately *not* tapered: a chisel
+/// highlighter reads as an even band, not a pen.
+void _strokeFlat(
   Canvas canvas,
   List<Offset> points,
   double width,
   Color color,
 ) {
-  if (points.isEmpty) return;
-  if (points.length == 1) {
-    canvas.drawCircle(points.first, width / 2, Paint()..color = color);
-    return;
-  }
   final path = Path()..moveTo(points.first.dx, points.first.dy);
   if (points.length == 2) {
     path.lineTo(points[1].dx, points[1].dy);
   } else {
-    // Catmull-Rom → cubic bezier: the tangent at each point is 1/6 of the
-    // vector between its neighbours (standard tension). The curve interpolates
-    // every point, so it stays faithful to the stroke while rounding the gaps
-    // between sparse samples. Ends clamp to themselves (no phantom neighbour).
     for (var i = 0; i < points.length - 1; i++) {
       final p0 = points[i == 0 ? 0 : i - 1];
       final p1 = points[i];

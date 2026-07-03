@@ -103,12 +103,13 @@ void main() {
     });
 
     test('renders a coarse closed loop (many-point stroke) without throwing '
-        'via the actual-stroke polyline path (BUG-1)', () {
+        'via the variable-width outline path (BUG-1)', () {
       // A sparsely-sampled circle is the case that exposed the facetted
-      // "rough lines" bug. It now renders as a stroked polyline through the
-      // real points (full width, round joins) rather than a resampled
-      // perfect_freehand outline. Guards that path from regressing to a
-      // crash on the closed-loop / repeated-endpoint handling.
+      // "rough lines" bug. It now renders as a perfect_freehand variable-width
+      // outline filled as a smooth (quadratic-through-midpoints) path, which
+      // curves through the sparse samples instead of facetting them. Guards
+      // that path from regressing to a crash on the closed-loop / repeated
+      // control-point handling.
       final recorder = ui.PictureRecorder();
       final canvas = _canvasOn(recorder);
       const cx = 60.0, cy = 60.0, r = 40.0;
