@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/controllers/batch_spec_importer.dart';
 import '../../../app/controllers/repo_browser_controller.dart';
 import '../../../app/controllers/spec_importer.dart';
 import '../../../app/providers/spec_import_providers.dart';
@@ -10,6 +11,7 @@ import '../../theme/tokens.dart';
 import '../spec_reader_md/spec_reader_md_screen.dart';
 import '../spec_reader_pdf/spec_reader_pdf_screen.dart';
 import '../spec_reader_svg/spec_reader_svg_screen.dart';
+import 'batch_convert_bar.dart';
 
 /// Repo-file browser for the "convert existing .md / .pdf → spec" flow.
 /// Rooted at the current workdir. The user navigates folders + picks a
@@ -32,6 +34,7 @@ class _RepoBrowserScreenState extends ConsumerState<RepoBrowserScreen> {
     final t = context.tokens;
     final async = ref.watch(repoBrowserControllerProvider);
     final importState = ref.watch(specImportControllerProvider);
+    final batchState = ref.watch(batchConvertControllerProvider);
 
     ref.listen<AsyncValue<SpecImportOutcome?>>(specImportControllerProvider,
         (prev, next) {
@@ -41,17 +44,49 @@ class _RepoBrowserScreenState extends ConsumerState<RepoBrowserScreen> {
       }
     });
 
+    // Batch convert terminates in-place (no pop): show a one-shot summary
+    // SnackBar and clear the selection. The JobList picks up the new rows
+    // via the invalidation the controller already fired.
+    ref.listen<BatchConvertState>(batchConvertControllerProvider,
+        (prev, next) {
+      if (next is! BatchFinished || !mounted) return;
+      final total = prev is BatchRunning ? prev.total : null;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+        content: Text(_batchSummary(next, total)),
+        duration: const Duration(seconds: 4),
+      ));
+      ref.read(repoSelectionControllerProvider.notifier).clear();
+    });
+
     return ColoredBox(
       color: t.surfaceBackground,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _TopChrome(async: async),
-          Expanded(child: _Body(async: async, importState: importState)),
+          Expanded(
+            child: _Body(
+              async: async,
+              importState: importState,
+              batchState: batchState,
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+/// Human summary for a finished batch. On cancel it names how many files
+/// were left unconverted (AC-6/AC-7).
+String _batchSummary(BatchFinished f, int? total) {
+  final converted = f.converted.length;
+  if (f.cancelled) {
+    final notRun = total == null ? null : total - converted - f.failures.length;
+    final tail = notRun == null || notRun <= 0 ? '' : ' — $notRun not run';
+    return 'Converted $converted, cancelled$tail';
+  }
+  return 'Converted $converted, ${f.failures.length} failed';
 }
 
 class _TopChrome extends ConsumerWidget {
@@ -114,12 +149,25 @@ class _TopChrome extends ConsumerWidget {
 }
 
 class _Body extends ConsumerWidget {
-  const _Body({required this.async, required this.importState});
+  const _Body({
+    required this.async,
+    required this.importState,
+    required this.batchState,
+  });
   final AsyncValue<RepoBrowserState> async;
   final AsyncValue<SpecImportOutcome?> importState;
+  final BatchConvertState batchState;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final placeholder = _placeholder(context);
+    if (placeholder != null) return placeholder;
+    return _ready(context, ref, async.value!);
+  }
+
+  /// Loading / error / no-repo / null states, or null once a directory
+  /// listing is ready to render.
+  Widget? _placeholder(BuildContext context) {
     final t = context.tokens;
     if (async.isLoading && !async.hasValue) {
       return const Center(child: CircularProgressIndicator());
@@ -144,31 +192,50 @@ class _Body extends ConsumerWidget {
         ),
       );
     }
-    if (state == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    if (state == null) return const Center(child: CircularProgressIndicator());
+    return null;
+  }
+
+  Widget _ready(BuildContext context, WidgetRef ref, RepoBrowserState state) {
+    final batchRunning = batchState is BatchRunning;
+    final disabled = importState.isLoading || batchRunning;
+    final selected = ref.watch(repoSelectionControllerProvider);
+    final convertibleRelPaths = [
+      for (final e in state.entries)
+        if (_isConvertible(e)) e.relPath,
+    ];
     return Column(
       children: [
         if (importState.value is SpecImportFailure)
           _FailureBanner(
             message: (importState.value as SpecImportFailure).message,
-            onDismiss: () => ref
-                .read(specImportControllerProvider.notifier)
-                .cancel(),
+            onDismiss: () =>
+                ref.read(specImportControllerProvider.notifier).cancel(),
           ),
-        if (importState.isLoading) const LinearProgressIndicator(minHeight: 2),
+        if (batchRunning)
+          BatchProgressBar(running: batchState as BatchRunning)
+        else if (importState.isLoading)
+          const LinearProgressIndicator(minHeight: 2),
+        if (selected.isNotEmpty && !batchRunning)
+          SelectionActionBar(
+            convertibleRelPaths: convertibleRelPaths,
+            disabled: disabled,
+          ),
         Expanded(
           child: state.entries.isEmpty
               ? _EmptyState(isRoot: state.isAtRoot)
-              : _EntryList(
-                  entries: state.entries,
-                  disabled: importState.isLoading,
-                ),
+              : _EntryList(entries: state.entries, disabled: disabled),
         ),
       ],
     );
   }
 }
+
+/// A row is convertible iff it is a file whose name is not `.svg` — the
+/// exact rule the single-convert button uses (SVG is non-annotatable,
+/// spec-002). Directories and `.svg` files get no checkbox.
+bool _isConvertible(RepoBrowserEntry e) =>
+    !e.isDirectory && !e.name.toLowerCase().endsWith('.svg');
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.isRoot});
@@ -222,6 +289,7 @@ class _EntryList extends ConsumerWidget {
         }
         return _FileRow(
           entry: e,
+          disabled: disabled,
           onConvert: disabled
               ? null
               : () => ref
@@ -314,10 +382,15 @@ class _DirectoryRow extends StatelessWidget {
 class _FileRow extends StatelessWidget {
   const _FileRow({
     required this.entry,
+    required this.disabled,
     required this.onConvert,
     required this.onOpen,
   });
   final RepoBrowserEntry entry;
+
+  /// Disables the leading checkbox while an import / batch is in flight
+  /// (AC-11). The convert / open callbacks are already null in that state.
+  final bool disabled;
   final VoidCallback? onConvert;
 
   /// Spec-002 Milestone A: tapping the row body opens the appropriate
@@ -335,9 +408,16 @@ class _FileRow extends StatelessWidget {
         onTap: onOpen,
         hoverColor: t.surfaceSunken,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+          padding: const EdgeInsets.fromLTRB(8, 10, 12, 10),
           child: Row(
             children: [
+              // Convertible rows carry a leading checkbox for batch select;
+              // `.svg` rows are non-convertible so get an equal-width spacer
+              // to keep the description icons aligned (AC-1).
+              if (isSvg)
+                const SizedBox(width: 40)
+              else
+                _RowCheckbox(relPath: entry.relPath, disabled: disabled),
               Icon(Icons.description_outlined, size: 18, color: t.textMuted),
               const SizedBox(width: 12),
               Expanded(
@@ -391,6 +471,35 @@ class _FileRow extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Leading checkbox for a convertible file row. Watches only its own
+/// membership in the selection set (`select((s) => s.contains(relPath))`)
+/// so ticking one row never rebuilds the whole list (spec-005 §9).
+class _RowCheckbox extends ConsumerWidget {
+  const _RowCheckbox({required this.relPath, required this.disabled});
+  final String relPath;
+  final bool disabled;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(
+      repoSelectionControllerProvider.select((s) => s.contains(relPath)),
+    );
+    return SizedBox(
+      width: 40,
+      child: Checkbox(
+        value: selected,
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        onChanged: disabled
+            ? null
+            : (_) => ref
+                .read(repoSelectionControllerProvider.notifier)
+                .toggle(relPath),
       ),
     );
   }

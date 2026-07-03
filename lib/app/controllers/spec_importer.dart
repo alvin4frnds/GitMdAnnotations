@@ -45,6 +45,7 @@ class SpecImporter {
     required RepoRef repo,
     required String workdir,
     required GitIdentity identity,
+    Set<String> reservedJobIds = const {},
   }) async {
     final normalized = _stripLeadingSlash(sourceRelPath);
     if (normalized.startsWith('jobs/pending/')) {
@@ -75,7 +76,7 @@ class SpecImporter {
 
     final base = basename(normalized);
     final baseSlug = slugify(base);
-    final jobId = await _resolveCollision(baseSlug, workdir);
+    final jobId = await _resolveCollision(baseSlug, workdir, reservedJobIds);
 
     final List<FileWrite> writes;
     if (isPdf) {
@@ -211,13 +212,19 @@ class SpecImporter {
     return buf.toString();
   }
 
-  Future<String> _resolveCollision(String baseSlug, String workdir) async {
-    if (!await _fs.exists('$workdir/jobs/pending/$baseSlug')) {
+  Future<String> _resolveCollision(
+    String baseSlug,
+    String workdir,
+    Set<String> reservedJobIds,
+  ) async {
+    if (!reservedJobIds.contains(baseSlug) &&
+        !await _fs.exists('$workdir/jobs/pending/$baseSlug')) {
       return baseSlug;
     }
     for (var n = 2; n < 10000; n++) {
       final candidate = '$baseSlug-$n';
-      if (!await _fs.exists('$workdir/jobs/pending/$candidate')) {
+      if (!reservedJobIds.contains(candidate) &&
+          !await _fs.exists('$workdir/jobs/pending/$candidate')) {
         return candidate;
       }
     }

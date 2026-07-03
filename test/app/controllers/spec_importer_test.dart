@@ -245,6 +245,47 @@ void main() {
       expect(binTree, isEmpty);
     });
 
+    test('reservedJobIds forces a -n suffix even when disk is empty '
+        '(AC-8 in-batch reservation)', () async {
+      // Disk has no jobs/pending entries, so the disk probe alone would
+      // hand back the bare slug. A prior file in the same batch already
+      // claimed `spec-notes`, so the reservation must push this one to -2.
+      final fs = FakeFileSystem()..seedFile('/repo/b/notes.md', '# x');
+      final git = FakeGitPort();
+      final importer = _buildImporter(fs, git);
+
+      final outcome = await importer.importFromRepoPath(
+        sourceRelPath: 'b/notes.md',
+        repo: _repo,
+        workdir: '/repo',
+        identity: _identity,
+        reservedJobIds: const {'spec-notes'},
+      );
+
+      final ok = outcome as SpecImportSuccess;
+      expect(ok.job.jobId, 'spec-notes-2');
+      expect(
+        git.branches['claude-jobs']!.keys,
+        ['jobs/pending/spec-notes-2/02-spec.md'],
+      );
+    });
+
+    test('reservedJobIds skips consecutive taken suffixes', () async {
+      final fs = FakeFileSystem()..seedFile('/repo/c/notes.md', '# x');
+      final git = FakeGitPort();
+      final importer = _buildImporter(fs, git);
+
+      final outcome = await importer.importFromRepoPath(
+        sourceRelPath: 'c/notes.md',
+        repo: _repo,
+        workdir: '/repo',
+        identity: _identity,
+        reservedJobIds: const {'spec-notes', 'spec-notes-2'},
+      );
+
+      expect((outcome as SpecImportSuccess).job.jobId, 'spec-notes-3');
+    });
+
     test('leading-slash in relPath is normalised', () async {
       final fs = FakeFileSystem()..seedFile('/repo/notes.md', '# x');
       final git = FakeGitPort();
